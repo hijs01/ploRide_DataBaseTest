@@ -1,9 +1,11 @@
 import 'package:cabrider/brand_colors.dart';
+import 'package:cabrider/screens/loginpage.dart';
+import 'package:cabrider/widgets/taxi_button.dart';
 import 'package:flutter/material.dart';
 
 class RegistrationPage extends StatelessWidget {
   const RegistrationPage({super.key});
-  
+
   static const String id = 'register';
 
   @override
@@ -36,7 +38,6 @@ class RegistrationPage extends StatelessWidget {
                   padding: EdgeInsets.all(20.0),
                   child: Column(
                     children: <Widget>[
-
                       // Fullname
                       TextField(
                         keyboardType: TextInputType.text,
@@ -51,7 +52,7 @@ class RegistrationPage extends StatelessWidget {
                         style: TextStyle(fontSize: 14),
                       ),
 
-                      SizedBox(height: 10,),
+                      SizedBox(height: 10),
 
                       // Email Address
                       TextField(
@@ -68,7 +69,6 @@ class RegistrationPage extends StatelessWidget {
                       ),
 
                       SizedBox(height: 10),
-
 
                       // Phone
                       TextField(
@@ -102,27 +102,10 @@ class RegistrationPage extends StatelessWidget {
 
                       SizedBox(height: 40),
 
-                      ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(25),
-                          ),
-                          backgroundColor: BrandColors.colorGreen,
-                          foregroundColor: Colors.white,
-                        ),
+                      TaxiButton(
+                        title: 'REGISTER',
+                        color: BrandColors.colorGreen,
                         onPressed: () {},
-                        child: Container(
-                          height: 50,
-                          child: Center(
-                            child: Text(
-                              'REGISTER',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontFamily: 'Brand-Bold',
-                              ),
-                            ),
-                          ),
-                        ),
                       ),
                     ],
                   ),
@@ -130,7 +113,11 @@ class RegistrationPage extends StatelessWidget {
 
                 TextButton(
                   onPressed: () {
-                    Navigator.pushNamedAndRemoveUntil(context, LoginPage.id, (route) => false);
+                    Navigator.pushNamedAndRemoveUntil(
+                      context,
+                      LoginPage.id,
+                      (route) => false,
+                    );
                   },
                   child: Text(
                     'Already have a RIDER account? Log in',
