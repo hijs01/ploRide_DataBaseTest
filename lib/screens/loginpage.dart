@@ -1,5 +1,6 @@
 import 'package:cabrider/brand_colors.dart';
 import 'package:cabrider/screens/registrationpage.dart';
+import 'package:cabrider/widgets/taxi_button.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
@@ -67,27 +68,10 @@ class LoginPage extends StatelessWidget {
 
                       SizedBox(height: 40),
 
-                      ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(25),
-                          ),
-                          backgroundColor: BrandColors.colorGreen,
-                          foregroundColor: Colors.white,
-                        ),
+                      TaxiButton(
+                        title: 'LOGIN',
+                        color: BrandColors.colorGreen,
                         onPressed: () {},
-                        child: Container(
-                          height: 50,
-                          child: Center(
-                            child: Text(
-                              'LOGIN',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontFamily: 'Brand-Bold',
-                              ),
-                            ),
-                          ),
-                        ),
                       ),
                     ],
                   ),
@@ -114,3 +98,35 @@ class LoginPage extends StatelessWidget {
     );
   }
 }
+
+// class TaxiButton extends StatelessWidget {
+//   const TaxiButton({
+//     super.key,
+//   });
+
+//   @override
+//   Widget build(BuildContext context) {
+//     return ElevatedButton(
+//       style: ElevatedButton.styleFrom(
+//         shape: RoundedRectangleBorder(
+//           borderRadius: BorderRadius.circular(25),
+//         ),
+//         backgroundColor: BrandColors.colorGreen,
+//         foregroundColor: Colors.white,
+//       ),
+//       onPressed: () {},
+//       child: Container(
+//         height: 50,
+//         child: Center(
+//           child: Text(
+//             'LOGIN',
+//             style: TextStyle(
+//               fontSize: 18,
+//               fontFamily: 'Brand-Bold',
+//             ),
+//           ),
+//         ),
+//       ),
+//     );
+//   }
+// }
