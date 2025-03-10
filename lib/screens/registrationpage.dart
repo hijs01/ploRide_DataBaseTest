@@ -1,15 +1,32 @@
 import 'package:cabrider/brand_colors.dart';
 import 'package:cabrider/screens/loginpage.dart';
+import 'package:cabrider/screens/mainpage.dart';
 import 'package:cabrider/widgets/taxi_button.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
-class RegistrationPage extends StatelessWidget {
+class RegistrationPage extends StatefulWidget {
+  static const String id = 'register';
+
+  const RegistrationPage({super.key});
+
+  @override
+  _RegistrationPageState createState() => _RegistrationPageState();
+}
+
+class _RegistrationPageState extends State<RegistrationPage> {
   final FirebaseAuth _auth = FirebaseAuth.instance;
-
   final GlobalKey<ScaffoldState> scaffoldKey = new GlobalKey<ScaffoldState>();
 
-  void showSnackBar(String title, BuildContext context) {
+  var fullnameController = TextEditingController();
+  var emailController = TextEditingController();
+  var phoneController = TextEditingController();
+  var passwordController = TextEditingController();
+
+  void showSnackBar(String title) {
     final snackBar = SnackBar(
       content: Text(
         title,
@@ -20,22 +37,32 @@ class RegistrationPage extends StatelessWidget {
     ScaffoldMessenger.of(context).showSnackBar(snackBar);
   }
 
-  static const String id = 'register';
-
-  var fullnameController = TextEditingController();
-  var emailController = TextEditingController();
-  var phoneController = TextEditingController();
-  var passwordController = TextEditingController();
-
-  void registerUser() async {
+  void registerUser(BuildContext context) async {
     final User? user =
-        (await _auth.createUserWithEmailAndPassword(
-          email: emailController.text,
-          password: passwordController.text,
-        )).user;
+        (await _auth
+            .createUserWithEmailAndPassword(
+              email: emailController.text,
+              password: passwordController.text,
+            )
+            .catchError((ex) {
+              PlatformException thisEx = ex;
+              showSnackBar(thisEx.message ?? 'An error occurred');
+            })).user;
 
     if (user != null) {
-      print('registration successful');
+      DatabaseReference newUserRef = FirebaseDatabase.instance.ref().child(
+        'users/${user.uid}',
+      );
+
+      Map userMap = {
+        'fullname': fullnameController.text,
+        'email': emailController.text,
+        'phone': phoneController.text,
+      };
+
+      newUserRef.set(userMap);
+
+      Navigator.pushNamedAndRemoveUntil(context, MainPage.id, (route) => false);
     }
   }
 
@@ -141,37 +168,47 @@ class RegistrationPage extends StatelessWidget {
                       TaxiButton(
                         title: 'REGISTER',
                         color: BrandColors.colorGreen,
-                        onPressed: () {
+                        onPressed: () async {
                           //check network Availability
-                          if (fullnameController.text.length < 3) {
-                            showSnackBar('Please provide full name', context);
-                            return;
-                          }
 
-                          if (!emailController.text.contains('@')) {
-                            showSnackBar(
-                              'Please provide a valid email address',
-                              context,
-                            );
-                            return;
-                          }
+                          try {
+                            var connectivityResult =
+                                await (Connectivity().checkConnectivity());
 
-                          if (phoneController.text.length < 10) {
-                            showSnackBar(
-                              'Please provide a valid phone number',
-                              context,
-                            );
-                            return;
-                          }
+                            if (connectivityResult == ConnectivityResult.none) {
+                              showSnackBar('인터넷 연결이 없습니다. 연결 상태를 확인해주세요.');
+                              return;
+                            }
 
-                          if (passwordController.text.length < 8) {
-                            showSnackBar(
-                              'Password must be at least 8 characters',
-                              context,
-                            );
-                            return;
+                            if (fullnameController.text.length < 3) {
+                              showSnackBar('Please provide full name');
+                              return;
+                            }
+
+                            if (!emailController.text.contains('@')) {
+                              showSnackBar(
+                                'Please provide a valid email address',
+                              );
+                              return;
+                            }
+
+                            if (phoneController.text.length < 10) {
+                              showSnackBar(
+                                'Please provide a valid phone number',
+                              );
+                              return;
+                            }
+
+                            if (passwordController.text.length < 8) {
+                              showSnackBar(
+                                'Password must be at least 8 characters',
+                              );
+                              return;
+                            }
+                            registerUser(context);
+                          } catch (e) {
+                            showSnackBar('An error occurred');
                           }
-                          registerUser();
                         },
                       ),
                     ],
