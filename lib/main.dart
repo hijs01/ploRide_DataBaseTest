@@ -1,5 +1,6 @@
 import 'package:cabrider/screens/loginpage.dart';
 import 'package:cabrider/screens/mainpage.dart';
+import 'package:cabrider/screens/registrationpage.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'dart:io';
