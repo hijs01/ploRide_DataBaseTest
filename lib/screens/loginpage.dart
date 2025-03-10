@@ -93,7 +93,9 @@ class Loginpage extends StatelessWidget {
                 ),
 
                 TextButton(
-                  onPressed: () {},
+                  onPressed: () {
+                    Navigator.pusNamedAndRemoveUntil(context, RegistrationPage.id, (route) => false);
+                  },
                   child: Text(
                     'Don\'t have an account? Create Account',
                     style: TextStyle(color: Colors.black),
