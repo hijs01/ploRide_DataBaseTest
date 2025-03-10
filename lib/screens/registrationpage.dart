@@ -7,6 +7,9 @@ import 'package:flutter/material.dart';
 class RegistrationPage extends StatelessWidget {
   // 이건 주석이다
   final test = 'test';
+
+  final String test2 = 'test2';
+  //이건 주석이다 2
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
   final GlobalKey<ScaffoldState> scaffoldKey = new GlobalKey<ScaffoldState>();
