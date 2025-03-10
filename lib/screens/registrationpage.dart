@@ -1,6 +1,7 @@
 import 'package:cabrider/brand_colors.dart';
 import 'package:cabrider/screens/loginpage.dart';
 import 'package:cabrider/screens/mainpage.dart';
+import 'package:cabrider/widgets/ProgressDialog.dart';
 import 'package:cabrider/widgets/taxi_button.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -38,6 +39,13 @@ class _RegistrationPageState extends State<RegistrationPage> {
   }
 
   void registerUser(BuildContext context) async {
+    showDialog(
+      context: context,
+      builder:
+          (BuildContext context) =>
+              ProgressDialog(status: 'Registering you...'),
+    );
+
     final User? user =
         (await _auth
             .createUserWithEmailAndPassword(
@@ -45,10 +53,12 @@ class _RegistrationPageState extends State<RegistrationPage> {
               password: passwordController.text,
             )
             .catchError((ex) {
+              Navigator.pop(context);
               PlatformException thisEx = ex;
               showSnackBar(thisEx.message ?? 'An error occurred');
             })).user;
 
+    Navigator.pop(context);
     if (user != null) {
       DatabaseReference newUserRef = FirebaseDatabase.instance.ref().child(
         'users/${user.uid}',
