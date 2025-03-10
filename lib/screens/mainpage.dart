@@ -13,7 +13,11 @@ class _MainpageState extends State<Mainpage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Main Page'),
+        title: Text('Main Page',
+        style: TextStyle(
+          color: Colors.white
+        ),),
+
         centerTitle: true,
         backgroundColor: Colors.black,
       ),
