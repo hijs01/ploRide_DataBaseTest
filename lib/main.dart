@@ -1,6 +1,28 @@
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_database/firebase_database.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'dart:io';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(
+    options:
+        Platform.isIOS
+            ? const FirebaseOptions(
+              apiKey: 'YOUR_IOS_API_KEY',
+              appId: 'YOUR_IOS_APP_ID',
+              messagingSenderId: '425631894947',
+              projectId: 'geetaxi-aa379',
+            )
+            : const FirebaseOptions(
+              apiKey: 'AIzaSyAknGQdA7yAS5SICTW8lOKilEN7FBpNS-U',
+              appId: '1:425631894947:android:dff55450334fed0295de16',
+              messagingSenderId: '425631894947',
+              projectId: 'geetaxi-aa379',
+            ),
+  );
+
   runApp(const MyApp());
 }
 
