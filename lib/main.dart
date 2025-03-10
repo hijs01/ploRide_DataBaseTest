@@ -1,3 +1,4 @@
+import 'package:cabrider/screens/loginpage.dart';
 import 'package:cabrider/screens/mainpage.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
@@ -32,13 +33,8 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      theme: ThemeData(
-        fontFamily: 'Brand-Regular',
-        primarySwatch: Colors.blue,
-
-      ),
-      home: Mainpage(),
-    
+      theme: ThemeData(fontFamily: 'Brand-Regular', primarySwatch: Colors.blue),
+      home: Loginpage(),
     );
   }
 }
