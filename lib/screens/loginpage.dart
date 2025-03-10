@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 class Loginpage extends StatelessWidget {
   const Loginpage({super.key});
+  static const String id = 'login';
 
   @override
   Widget build(BuildContext context) {
