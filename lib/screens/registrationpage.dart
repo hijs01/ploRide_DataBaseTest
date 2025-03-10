@@ -7,9 +7,6 @@ import 'package:flutter/material.dart';
 class RegistrationPage extends StatelessWidget {
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
-  int test1 = 0;
-  int sum = 0 + 1; //테스트
-
   final GlobalKey<ScaffoldState> scaffoldKey = new GlobalKey<ScaffoldState>();
 
   void showSnackBar(String title, BuildContext context) {
