@@ -219,7 +219,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
                   onPressed: () {
                     Navigator.pushNamedAndRemoveUntil(
                       context,
-                      LoginPage.id,
+                      Loginpage.id,
                       (route) => false,
                     );
                   },
