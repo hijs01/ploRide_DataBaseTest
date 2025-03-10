@@ -1,8 +1,10 @@
 import 'package:cabrider/brand_colors.dart';
 import 'package:cabrider/screens/mainpage.dart';
+import 'package:cabrider/widgets/ProgressDialog.dart';
 import 'package:cabrider/widgets/TaxiButton.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
@@ -23,25 +25,46 @@ class _LoginpageState extends State<Loginpage> {
 
   void showSnackBar(String title) {
     final snackBar = SnackBar(
-      content: Text(title, textAlign: TextAlign.center, style: TextStyle(fontSize: 15),),
+      content: Text(
+        title,
+        textAlign: TextAlign.center,
+        style: TextStyle(fontSize: 15),
+      ),
     );
     ScaffoldMessenger.of(context).showSnackBar(snackBar);
   }
 
   void login() async {
+    showDialog(
+      context: context,
+      builder:
+          (BuildContext context) => ProgressDialog(status: 'Logging you in'),
+    );
     try {
-      final UserCredential userCredential = await _auth.signInWithEmailAndPassword(
-        email: emailController.text, 
-        password: passwordController.text
-      );
-      
+      final UserCredential userCredential = await _auth
+          .signInWithEmailAndPassword(
+            email: emailController.text,
+            password: passwordController.text,
+          )
+          .catchError((ex) {
+            Navigator.pop(context);
+            PlatformException thisEx = ex;
+            showSnackBar(thisEx.message ?? 'An error occurred');
+          });
+
       final User? user = userCredential.user;
-      
-      if(user != null) {
-        DatabaseReference userRef = FirebaseDatabase.instance.ref().child('users/${user.uid}');
+
+      if (user != null) {
+        DatabaseReference userRef = FirebaseDatabase.instance.ref().child(
+          'users/${user.uid}',
+        );
         userRef.once().then((DatabaseEvent event) {
-          if(event.snapshot.value != null) {
-            Navigator.pushNamedAndRemoveUntil(context, MainPage.id, (route) => false);
+          if (event.snapshot.value != null) {
+            Navigator.pushNamedAndRemoveUntil(
+              context,
+              MainPage.id,
+              (route) => false,
+            );
           }
         });
       }
@@ -53,7 +76,7 @@ class _LoginpageState extends State<Loginpage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      key: scaffoldKey, 
+      key: scaffoldKey,
       backgroundColor: Colors.white,
       body: SafeArea(
         child: SingleChildScrollView(
@@ -116,24 +139,25 @@ class _LoginpageState extends State<Loginpage> {
                       TaxiButton(
                         text: 'LOGIN',
                         color: BrandColors.colorGreen,
-                        onPressed: () async{
-                            var connectivityResult = await Connectivity().checkConnectivity();
-                            if(connectivityResult == ConnectivityResult.none){
-                              showSnackBar('No Internet Connectivity');
-                              return;
-                            }
+                        onPressed: () async {
+                          var connectivityResult =
+                              await Connectivity().checkConnectivity();
+                          if (connectivityResult == ConnectivityResult.none) {
+                            showSnackBar('No Internet Connectivity');
+                            return;
+                          }
 
-                            if(!emailController.text.contains('@')){
-                              showSnackBar('Please enter a valid email address');
-                              return;
-                            }
+                          if (!emailController.text.contains('@')) {
+                            showSnackBar('Please enter a valid email address');
+                            return;
+                          }
 
-                            if(passwordController.text.length < 8){
-                              showSnackBar('Please enter a valid password');
-                              return;
-                            }
+                          if (passwordController.text.length < 8) {
+                            showSnackBar('Please enter a valid password');
+                            return;
+                          }
 
-                            login();
+                          login();
                         },
                       ),
                     ],
@@ -155,4 +179,3 @@ class _LoginpageState extends State<Loginpage> {
     );
   }
 }
-
