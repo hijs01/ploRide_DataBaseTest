@@ -10,8 +10,8 @@ Future<void> main() async {
     options:
         Platform.isIOS
             ? const FirebaseOptions(
-              apiKey: 'YOUR_IOS_API_KEY',
-              appId: 'YOUR_IOS_APP_ID',
+              apiKey: 'AIzaSyBFtw9Wu3003CyA4auGTToQw_JjB2xaGN8',
+              appId: '1:425631894947:ios:3dd5d94321ccd60195de16',
               messagingSenderId: '425631894947',
               projectId: 'geetaxi-aa379',
             )
