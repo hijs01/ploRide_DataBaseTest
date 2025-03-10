@@ -1,9 +1,10 @@
 import 'package:cabrider/brand_colors.dart';
+import 'package:cabrider/screens/registrationpage.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
-class Loginpage extends StatelessWidget {
-  const Loginpage({super.key});
+class LoginPage extends StatelessWidget {
+  const LoginPage({super.key});
   static const String id = 'login';
 
   @override
@@ -94,7 +95,11 @@ class Loginpage extends StatelessWidget {
 
                 TextButton(
                   onPressed: () {
-                    Navigator.pusNamedAndRemoveUntil(context, RegistrationPage.id, (route) => false);
+                    Navigator.pushNamedAndRemoveUntil(
+                      context,
+                      RegistrationPage.id,
+                      (route) => false,
+                    );
                   },
                   child: Text(
                     'Don\'t have an account? Create Account',
