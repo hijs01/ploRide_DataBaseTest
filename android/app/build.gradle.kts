@@ -1,11 +1,25 @@
 plugins {
     id("com.android.application")
+    //Add the Google services Gradle plugin
+    id("com.google.gms.google-services")
     id("kotlin-android")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
-    //Add the Google services Gradle plugin
-    id("com.google.gms.google-services")
+    //Add the dependency for the Google services Gradle plugin
+    id("com.google.gms.google-services") version "4.4.2" apply false
 }
+
+dependencies {
+    // Import the Firebase BoM
+    implementation(platform("com.google.firebase:firebase-bom:33.10.0"))
+
+    // Add Firebase Analytics (or other Firebase dependencies you need)
+    implementation("com.google.firebase:firebase-analytics")
+
+    // 추가적으로 필요한 Firebase 서비스가 있다면 여기에 추가
+    // 예: implementation("com.google.firebase:firebase-auth")
+}
+
 
 android {
     namespace = "com.example.cabrider"
@@ -43,15 +57,4 @@ android {
 
 flutter {
     source = "../.."
-}
-
-dependencies {
-    // Import the Firebase BoM
-    implementation(platform("com.google.firebase:firebase-bom:33.10.0"))
-
-    // Add Firebase Analytics (or other Firebase dependencies you need)
-    implementation("com.google.firebase:firebase-analytics")
-
-    // 추가적으로 필요한 Firebase 서비스가 있다면 여기에 추가
-    // 예: implementation("com.google.firebase:firebase-auth")
 }
