@@ -130,7 +130,7 @@ class RegistrationPage extends StatelessWidget {
 
                 TextButton(
                   onPressed: () {
-                    Navigator.pusNamedAndRemoveUntil(context, LoginPagae.id, (route) => false);
+                    Navigator.pushNamedAndRemoveUntil(context, LoginPage.id, (route) => false);
                   },
                   child: Text(
                     'Already have a RIDER account? Log in',
