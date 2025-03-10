@@ -5,20 +5,24 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 class RegistrationPage extends StatelessWidget {
-
-
+  // 이건 주석이다
+  final test = 'test';
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
   final GlobalKey<ScaffoldState> scaffoldKey = new GlobalKey<ScaffoldState>();
 
   void showSnackBar(String title, BuildContext context) {
     final snackBar = SnackBar(
-      content: Text(title, textAlign: TextAlign.center, style: TextStyle(fontSize: 15),),);
-      ScaffoldMessenger.of(context).showSnackBar(snackBar);
+      content: Text(
+        title,
+        textAlign: TextAlign.center,
+        style: TextStyle(fontSize: 15),
+      ),
+    );
+    ScaffoldMessenger.of(context).showSnackBar(snackBar);
   }
-  
 
-  static const String id = 'register'; 
+  static const String id = 'register';
 
   var fullnameController = TextEditingController();
   var emailController = TextEditingController();
@@ -26,19 +30,20 @@ class RegistrationPage extends StatelessWidget {
   var passwordController = TextEditingController();
 
   void registerUser() async {
-    final User? user = (await _auth.createUserWithEmailAndPassword(
-      email: emailController.text, 
-      password: passwordController.text
-    )).user;
+    final User? user =
+        (await _auth.createUserWithEmailAndPassword(
+          email: emailController.text,
+          password: passwordController.text,
+        )).user;
 
     if (user != null) {
-        print('registration successful');
+      print('registration successful');
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold( 
+    return Scaffold(
       key: scaffoldKey,
       backgroundColor: Colors.white,
       body: SafeArea(
@@ -139,28 +144,35 @@ class RegistrationPage extends StatelessWidget {
                         title: 'REGISTER',
                         color: BrandColors.colorGreen,
                         onPressed: () {
-
                           //check network Availability
                           if (fullnameController.text.length < 3) {
                             showSnackBar('Please provide full name', context);
                             return;
-
                           }
-                          
-                         if(!emailController.text.contains('@')) {
-                          showSnackBar('Please provide a valid email address', context);
-                          return;
-                         }
-                         
-                         if (phoneController.text.length <10) {
-                            showSnackBar('Please provide a valid phone number', context);
+
+                          if (!emailController.text.contains('@')) {
+                            showSnackBar(
+                              'Please provide a valid email address',
+                              context,
+                            );
                             return;
                           }
 
-                         if (passwordController.text.length < 8) {
-                          showSnackBar('Password must be at least 8 characters', context); 
-                          return;
-                         }
+                          if (phoneController.text.length < 10) {
+                            showSnackBar(
+                              'Please provide a valid phone number',
+                              context,
+                            );
+                            return;
+                          }
+
+                          if (passwordController.text.length < 8) {
+                            showSnackBar(
+                              'Password must be at least 8 characters',
+                              context,
+                            );
+                            return;
+                          }
                           registerUser();
                         },
                       ),
