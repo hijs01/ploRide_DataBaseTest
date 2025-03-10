@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 
 class Mainpage extends StatefulWidget {
   const Mainpage({super.key});
+  static const String id = 'mainpage';
+  
 
   @override
   State<Mainpage> createState() => _MainpageState();
