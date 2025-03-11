@@ -71,7 +71,7 @@ class _SearchPageState extends State<SearchPage> {
       body: Column(
         children: <Widget>[
           Container(
-            height: 210,
+            height: 218,
             decoration: BoxDecoration(
               color: Colors.white,
               boxShadow: [

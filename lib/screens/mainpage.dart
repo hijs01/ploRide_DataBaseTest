@@ -1,5 +1,7 @@
+import 'package:cabrider/widgets/ProgressDialog.dart';
 import 'package:flutter/material.dart';
 import 'package:cabrider/dataprovider/appdata.dart';
+import 'package:flutter_polyline_points/flutter_polyline_points.dart';
 import 'package:provider/provider.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'dart:async';
@@ -12,6 +14,8 @@ import 'package:cabrider/styles/styles.dart';
 import 'package:cabrider/widgets/BrandDivider.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:cabrider/screens/searchpage.dart';
+import 'package:cabrider/datamodels/directiondetails.dart';
+import 'package:cabrider/datamodels/address.dart';
 
 class MainPage extends StatefulWidget {
   const MainPage({super.key});
@@ -31,6 +35,11 @@ class _MainPageState extends State<MainPage> {
 
   double mapBottomPadding = 0;
 
+  final List<LatLng> polylineCoordinates = [];
+  final Set<Polyline> _polylines = {};
+  final Set<Marker> _Markers = {};
+  final Set<Circle> _Circles = {};
+
   static const CameraPosition _kGooglePlex = CameraPosition(
     target: LatLng(37.42796133580664, -122.085749655962),
     zoom: 14.4746,
@@ -43,7 +52,7 @@ class _MainPageState extends State<MainPage> {
       Position position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.bestForNavigation,
       );
-      print('현재 위치: ${position.latitude}, ${position.longitude}'); // 디버깅용 로그
+      print('현재 위치: ${position.latitude}, ${position.longitude}');
 
       setState(() {
         currentPosition = position;
@@ -52,12 +61,10 @@ class _MainPageState extends State<MainPage> {
       LatLng pos = LatLng(position.latitude, position.longitude);
       CameraPosition cp = CameraPosition(target: pos, zoom: 14);
 
-      // 지도 이동이 성공했는지 확인
       try {
         await mapController.animateCamera(CameraUpdate.newCameraPosition(cp));
         print('지도 이동 성공: ${pos.latitude}, ${pos.longitude}');
 
-        // 현재 카메라 위치 확인
         final cameraPosition = await mapController.getLatLng(
           ScreenCoordinate(x: 0, y: 0),
         );
@@ -68,11 +75,29 @@ class _MainPageState extends State<MainPage> {
         print('지도 이동 실패: $e');
       }
 
+      // 실제 주소 변환 결과를 사용
       String address = await HelperMethods.findCordinateAddress(
         position,
         context,
       );
       print('현재 주소: $address');
+
+      // 현재 pickup 주소 확인
+      var currentPickup =
+          Provider.of<AppData>(context, listen: false).pickupAddress;
+      if (currentPickup == null) {
+        // pickup 주소가 없으면 현재 위치로 설정
+        Provider.of<AppData>(context, listen: false).updatePickupAddress(
+          Address(
+            placeName: address,
+            latitude: position.latitude,
+            longitude: position.longitude,
+            placeId: '', // 여기서는 빈 값으로 설정
+            placeFormattedAddress: address,
+          ),
+        );
+        print('Pickup address set to current location: $address');
+      }
     } catch (e) {
       print('위치 설정 중 오류 발생: $e');
     }
@@ -227,6 +252,9 @@ class _MainPageState extends State<MainPage> {
                 tiltGesturesEnabled: true,
                 rotateGesturesEnabled: true,
                 trafficEnabled: false,
+                polylines: _polylines,
+                markers: _Markers,
+                circles: _Circles,
                 onMapCreated: (GoogleMapController controller) async {
                   _controller.complete(controller);
                   mapController = controller;
@@ -237,6 +265,9 @@ class _MainPageState extends State<MainPage> {
 
                   await Future.delayed(const Duration(milliseconds: 200));
                   SetupPositionLocator();
+                },
+                onTap: (_) {
+                  // 지도를 탭했을 때 InfoWindow가 닫히지 않도록
                 },
               ),
             ),
@@ -311,14 +342,17 @@ class _MainPageState extends State<MainPage> {
                       ),
                       SizedBox(height: 20),
                       GestureDetector(
-                        onTap: () {
-                          Navigator.push(
+                        onTap: () async {
+                          var response = await Navigator.push(
                             // pushNamed 대신 push를 사용
                             context,
                             MaterialPageRoute(
                               builder: (context) => SearchPage(),
                             ),
                           );
+                          if (response == 'getDirection') {
+                            await getDirection();
+                          }
                         },
                         child: Container(
                           decoration: BoxDecoration(
@@ -409,5 +443,215 @@ class _MainPageState extends State<MainPage> {
         ),
       ),
     );
+  }
+
+  Future<void> getDirection() async {
+    var pickup = Provider.of<AppData>(context, listen: false).pickupAddress;
+    var destination =
+        Provider.of<AppData>(context, listen: false).destinationAddress;
+
+    print('Pickup: ${pickup?.placeName}');
+    print('Destination: ${destination?.placeName}');
+
+    if (pickup == null || destination == null) {
+      print('Pickup or destination is null');
+      return;
+    }
+
+    var pickLatLng = LatLng(pickup.latitude, pickup.longitude);
+    var destinationLatLng = LatLng(destination.latitude, destination.longitude);
+
+    showDialog(
+      barrierDismissible: false,
+      context: context,
+      builder:
+          (BuildContext context) =>
+              const ProgressDialog(status: "Please wait..."),
+    );
+
+    var thisDetails = await HelperMethods.getDirectionDetails(
+      pickLatLng,
+      destinationLatLng,
+    );
+
+    Navigator.pop(context);
+
+    if (thisDetails == null || thisDetails.encodedPoints.isEmpty) {
+      print('No direction details or empty encoded points');
+      return;
+    }
+
+    print('Encoded Points: ${thisDetails.encodedPoints}');
+
+    polylineCoordinates.clear();
+
+    PolylinePoints polylinePoints = PolylinePoints();
+    List<PointLatLng> results = polylinePoints.decodePolyline(
+      thisDetails.encodedPoints,
+    );
+
+    print('Decoded points count: ${results.length}');
+
+    if (results.isNotEmpty) {
+      for (var point in results) {
+        polylineCoordinates.add(LatLng(point.latitude, point.longitude));
+      }
+    }
+
+    _polylines.clear();
+
+    setState(() {
+      Polyline polyline = Polyline(
+        polylineId: const PolylineId('polyid'),
+        color: const Color.fromARGB(255, 95, 109, 237),
+        points: polylineCoordinates,
+        jointType: JointType.round,
+        width: 4,
+        startCap: Cap.roundCap,
+        endCap: Cap.roundCap,
+        geodesic: true,
+      );
+      _polylines.add(polyline);
+      print(
+        'Polyline added to set. Points count: ${polylineCoordinates.length}',
+      );
+    });
+
+    try {
+      // Fit the polyline into the map view
+      LatLngBounds bounds;
+      if (pickLatLng.latitude > destinationLatLng.latitude &&
+          pickLatLng.longitude > destinationLatLng.longitude) {
+        bounds = LatLngBounds(
+          southwest: destinationLatLng,
+          northeast: pickLatLng,
+        );
+      } else if (pickLatLng.longitude > destinationLatLng.longitude) {
+        bounds = LatLngBounds(
+          southwest: LatLng(pickLatLng.latitude, destinationLatLng.longitude),
+          northeast: LatLng(destinationLatLng.latitude, pickLatLng.longitude),
+        );
+      } else if (pickLatLng.latitude > destinationLatLng.latitude) {
+        bounds = LatLngBounds(
+          southwest: LatLng(destinationLatLng.latitude, pickLatLng.longitude),
+          northeast: LatLng(pickLatLng.latitude, destinationLatLng.longitude),
+        );
+      } else {
+        bounds = LatLngBounds(
+          southwest: pickLatLng,
+          northeast: destinationLatLng,
+        );
+      }
+
+      await mapController.animateCamera(
+        CameraUpdate.newLatLngBounds(bounds, 70),
+      );
+      print('Camera animated to show route');
+    } catch (e) {
+      print('Error animating camera: $e');
+    }
+
+    // Clear existing markers first
+    _Markers.clear();
+    _Circles.clear();
+
+    // Create markers with InfoWindow
+    final pickupMarker = Marker(
+      markerId: const MarkerId('pickup'),
+      position: pickLatLng,
+      icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+      infoWindow: InfoWindow(
+        title: pickup.placeName,
+        snippet: 'My Location',
+      ),
+      
+      visible: true,
+    );
+
+    final destinationMarker = Marker(
+      markerId: const MarkerId('destination'),
+      position: destinationLatLng,
+      icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+      infoWindow: InfoWindow(
+        title: destination.placeName,
+        snippet: 'Destination',
+      ),
+       
+      visible: true,
+    );
+
+    // Add markers
+    setState(() {
+      
+      destination.placeFormattedAddress = destination.placeName;
+      pickup.placeFormattedAddress = pickup.placeName;
+      _Markers.add(pickupMarker);
+      _Markers.add(destinationMarker);
+    });
+
+   
+    // 마커 정보창 표시를 위한 지연
+    await Future.delayed(const Duration(milliseconds: 300));
+
+    // 마커 탭 시뮬레이션을 위한 함수
+    void _simulateMarkerTap() {
+      setState(() {
+        // 마커를 다시 생성하여 InfoWindow가 표시되도록 함
+        _Markers.clear();
+        
+        final updatedPickupMarker = Marker(
+          markerId: const MarkerId('pickup'),
+          position: pickLatLng,
+          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+          infoWindow: InfoWindow(
+            title: pickup.placeName,
+            snippet: 'My Location',
+          ),
+          visible: true,
+        );
+        
+        final updatedDestinationMarker = Marker(
+          markerId: const MarkerId('destination'),
+          position: destinationLatLng,
+          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+          infoWindow: InfoWindow(
+            title: destination.placeName,
+            snippet: 'Destination',
+          ),
+          visible: true,
+        );
+        
+        _Markers.add(updatedPickupMarker);
+        _Markers.add(updatedDestinationMarker);
+      });
+      
+    }
+
+    // 마커 탭 시뮬레이션 실행
+    _simulateMarkerTap();
+
+    // Add circles
+    Circle pickupCircle = Circle(
+      circleId: const CircleId('pickup'),
+      strokeColor: Colors.green,
+      strokeWidth: 3,
+      radius: 12,
+      center: pickLatLng,
+      fillColor: BrandColors.colorGreen,
+    );
+
+    Circle destinationCircle = Circle(
+      circleId: const CircleId('destination'),
+      strokeColor: BrandColors.colorAccentPurple,
+      strokeWidth: 3,
+      radius: 12,
+      center: destinationLatLng,
+      fillColor: BrandColors.colorAccentPurple,
+    );
+
+    setState(() {
+      _Circles.add(pickupCircle);
+      _Circles.add(destinationCircle);
+    });
   }
 }
