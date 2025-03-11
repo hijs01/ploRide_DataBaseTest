@@ -11,6 +11,7 @@ import 'package:cabrider/helpers/helpermethods.dart';
 import 'package:cabrider/styles/styles.dart';
 import 'package:cabrider/widgets/BrandDivider.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:cabrider/screens/searchpage.dart';
 
 class MainPage extends StatefulWidget {
   const MainPage({super.key});
@@ -21,12 +22,12 @@ class MainPage extends StatefulWidget {
 }
 
 class _MainPageState extends State<MainPage> {
-  GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   double searchSheetHeight = (Platform.isIOS) ? 300 : 275;
 
-  Completer<GoogleMapController> _controller = Completer();
+  final Completer<GoogleMapController> _controller = Completer();
   late GoogleMapController mapController;
-  bool _mapLoaded = false;
+  final bool _mapLoaded = false;
 
   double mapBottomPadding = 0;
 
@@ -211,7 +212,7 @@ class _MainPageState extends State<MainPage> {
       body: SafeArea(
         child: Stack(
           children: <Widget>[
-            Container(
+            SizedBox(
               height: MediaQuery.of(context).size.height,
               width: MediaQuery.of(context).size.width,
               child: GoogleMap(
@@ -309,27 +310,38 @@ class _MainPageState extends State<MainPage> {
                         ),
                       ),
                       SizedBox(height: 20),
-                      Container(
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(4),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black12,
-                              blurRadius: 5.0,
-                              spreadRadius: 0.5,
-                              offset: Offset(0.7, 0.7),
+                      GestureDetector(
+                        onTap: () {
+                          Navigator.push(
+                            // pushNamed 대신 push를 사용
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => SearchPage(),
                             ),
-                          ],
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsets.all(12.0),
-                          child: Row(
-                            children: [
-                              Icon(Icons.search, color: Colors.blueAccent),
-                              SizedBox(width: 10),
-                              Text('Search Destination'),
+                          );
+                        },
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(4),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black12,
+                                blurRadius: 5.0,
+                                spreadRadius: 0.5,
+                                offset: Offset(0.7, 0.7),
+                              ),
                             ],
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.all(12.0),
+                            child: Row(
+                              children: [
+                                Icon(Icons.search, color: Colors.blueAccent),
+                                SizedBox(width: 10),
+                                Text('Search Destination'),
+                              ],
+                            ),
                           ),
                         ),
                       ),
