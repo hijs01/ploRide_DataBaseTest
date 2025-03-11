@@ -1,9 +1,12 @@
+import 'package:cabrider/dataprovider/appdata.dart';
 import 'package:cabrider/screens/loginpage.dart';
 import 'package:cabrider/screens/mainpage.dart';
 import 'package:cabrider/screens/registrationpage.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'dart:io';
+
+import 'package:provider/provider.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -33,14 +36,21 @@ class MyApp extends StatelessWidget {
   // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      theme: ThemeData(fontFamily: 'Brand-Regular', primarySwatch: Colors.blue),
-      initialRoute: MainPage.id,
-      routes: {
-        RegistrationPage.id: (context) => RegistrationPage(),
-        Loginpage.id: (context) => Loginpage(),
-        MainPage.id: (context) => MainPage(),
-      },
+    return ChangeNotifierProvider<AppData>(
+      create: (context) => AppData(),
+      child: MaterialApp(
+        debugShowCheckedModeBanner: false,
+        theme: ThemeData(
+          fontFamily: 'Brand-Regular',
+          primarySwatch: Colors.blue,
+        ),
+        initialRoute: MainPage.id,
+        routes: {
+          MainPage.id: (context) => MainPage(),
+          RegistrationPage.id: (context) => RegistrationPage(),
+          Loginpage.id: (context) => Loginpage(),
+        },
+      ),
     );
   }
 }

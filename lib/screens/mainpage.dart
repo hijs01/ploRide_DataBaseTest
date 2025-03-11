@@ -1,7 +1,6 @@
-import 'package:cabrider/styles/styles.dart';
-import 'package:cabrider/widgets/BrandDivider.dart';
-import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
+import 'package:cabrider/dataprovider/appdata.dart';
+import 'package:provider/provider.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'dart:async';
 import 'package:geolocator/geolocator.dart';
@@ -9,6 +8,9 @@ import 'package:cabrider/brand_colors.dart';
 import 'package:outline_material_icons/outline_material_icons.dart';
 import 'dart:io' show Platform;
 import 'package:cabrider/helpers/helpermethods.dart';
+import 'package:cabrider/styles/styles.dart';
+import 'package:cabrider/widgets/BrandDivider.dart';
+import 'package:firebase_database/firebase_database.dart';
 
 class MainPage extends StatefulWidget {
   const MainPage({super.key});
@@ -38,7 +40,7 @@ class _MainPageState extends State<MainPage> {
   void SetupPositionLocator() async {
     try {
       Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.bestForNavigation
+        desiredAccuracy: LocationAccuracy.bestForNavigation,
       );
       print('현재 위치: ${position.latitude}, ${position.longitude}'); // 디버깅용 로그
 
@@ -48,20 +50,27 @@ class _MainPageState extends State<MainPage> {
 
       LatLng pos = LatLng(position.latitude, position.longitude);
       CameraPosition cp = CameraPosition(target: pos, zoom: 14);
-      
+
       // 지도 이동이 성공했는지 확인
       try {
         await mapController.animateCamera(CameraUpdate.newCameraPosition(cp));
         print('지도 이동 성공: ${pos.latitude}, ${pos.longitude}');
-        
+
         // 현재 카메라 위치 확인
-        final cameraPosition = await mapController.getLatLng(ScreenCoordinate(x: 0, y: 0));
-        print('현재 카메라 위치: ${cameraPosition.latitude}, ${cameraPosition.longitude}');
+        final cameraPosition = await mapController.getLatLng(
+          ScreenCoordinate(x: 0, y: 0),
+        );
+        print(
+          '현재 카메라 위치: ${cameraPosition.latitude}, ${cameraPosition.longitude}',
+        );
       } catch (e) {
         print('지도 이동 실패: $e');
       }
 
-      String address = await HelperMethods.findCordinateAddress(position);
+      String address = await HelperMethods.findCordinateAddress(
+        position,
+        context,
+      );
       print('현재 주소: $address');
     } catch (e) {
       print('위치 설정 중 오류 발생: $e');
@@ -77,7 +86,7 @@ class _MainPageState extends State<MainPage> {
       // 위치 서비스가 활성화되어 있는지 확인
       serviceEnabled = await Geolocator.isLocationServiceEnabled();
       print('위치 서비스 활성화 상태: $serviceEnabled'); // 디버깅용 로그
-      
+
       if (!serviceEnabled) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('위치 서비스가 비활성화되어 있습니다. 설정에서 활성화해주세요.')),
@@ -88,15 +97,15 @@ class _MainPageState extends State<MainPage> {
       // 위치 권한 확인
       permission = await Geolocator.checkPermission();
       print('현재 위치 권한 상태: $permission'); // 디버깅용 로그
-      
+
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
         print('위치 권한 요청 결과: $permission'); // 디버깅용 로그
-        
+
         if (permission == LocationPermission.denied) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('위치 권한이 거부되었습니다.'))
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('위치 권한이 거부되었습니다.')));
           return;
         }
       }
@@ -224,7 +233,7 @@ class _MainPageState extends State<MainPage> {
                   setState(() {
                     mapBottomPadding = (Platform.isAndroid) ? 280 : 270;
                   });
-                  
+
                   await Future.delayed(const Duration(milliseconds: 200));
                   SetupPositionLocator();
                 },
@@ -333,7 +342,12 @@ class _MainPageState extends State<MainPage> {
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('Add Home'),
+                              Text(
+                                Provider.of<AppData>(
+                                      context,
+                                    ).pickupAddress?.placeName ??
+                                    'Add Home',
+                              ),
                               SizedBox(height: 3),
                               Text(
                                 'Your residential address',
