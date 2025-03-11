@@ -48,7 +48,18 @@ class _MainPageState extends State<MainPage> {
 
       LatLng pos = LatLng(position.latitude, position.longitude);
       CameraPosition cp = CameraPosition(target: pos, zoom: 14);
-      mapController.animateCamera(CameraUpdate.newCameraPosition(cp));
+      
+      // 지도 이동이 성공했는지 확인
+      try {
+        await mapController.animateCamera(CameraUpdate.newCameraPosition(cp));
+        print('지도 이동 성공: ${pos.latitude}, ${pos.longitude}');
+        
+        // 현재 카메라 위치 확인
+        final cameraPosition = await mapController.getLatLng(ScreenCoordinate(x: 0, y: 0));
+        print('현재 카메라 위치: ${cameraPosition.latitude}, ${cameraPosition.longitude}');
+      } catch (e) {
+        print('지도 이동 실패: $e');
+      }
 
       String address = await HelperMethods.findCordinateAddress(position);
       print('현재 주소: $address');
@@ -107,8 +118,10 @@ class _MainPageState extends State<MainPage> {
   @override
   void initState() {
     super.initState();
-    // 앱 시작 시 위치 권한 확인
-    _checkLocationPermission();
+    // 앱 시작 시 약간의 지연 후 위치 권한 확인
+    Future.delayed(const Duration(seconds: 1), () {
+      _checkLocationPermission();
+    });
   }
 
   @override
