@@ -33,6 +33,9 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   double searchSheetHeight = (Platform.isIOS) ? 300 : 275;
   double rideDetailsSheetHeight = 0;
+  double requestingSheetHeight = 0;
+  
+
 
   final Completer<GoogleMapController> _controller = Completer();
   late GoogleMapController mapController;
@@ -589,6 +592,64 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                         ),
                       ],
                     ),
+                  ),
+                ),
+              ),
+            ),
+
+            Positioned(
+              left: 0,
+              right: 0,
+              child: AnimatedSize(
+                curve: Curves.easeIn,
+                duration: Duration(milliseconds: 150),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.only(
+                      topLeft: Radius.circular(15), 
+                      topRight: Radius.circular(15),
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black26,
+                        blurRadius: 15,
+                        spreadRadius: 0.5,
+                        offset: Offset(0.7, 0.7),
+                      )
+                    ],
+                  ),
+                  height: 250,
+                  child: Column(
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 18),
+                        child: Column(
+                          children: [
+                            SizedBox(height: 20),
+                            Container(
+                              height: 50,
+                              width: 50,
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(25),
+                                border: Border.all(width: 1.0, color: BrandColors.colorLightGrayFair),
+                              ),
+                              child: Icon(Icons.close, size: 25),
+                            ),
+                            SizedBox(height: 10),
+                            Container(
+                              width: double.infinity,
+                              child: Text(
+                                'Cancel ride',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(fontSize: 12),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
