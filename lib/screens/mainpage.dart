@@ -8,6 +8,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:cabrider/brand_colors.dart';
 import 'package:outline_material_icons/outline_material_icons.dart';
 import 'dart:io' show Platform;
+import 'package:cabrider/helpers/helpermethods.dart';
 
 class MainPage extends StatefulWidget {
   const MainPage({super.key});
@@ -19,7 +20,7 @@ class MainPage extends StatefulWidget {
 
 class _MainPageState extends State<MainPage> {
   GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
-  double searchSheetHeight = (Platform.isIOS) ? 310 : 270;
+  double searchSheetHeight = (Platform.isIOS) ? 300 : 275;
 
   Completer<GoogleMapController> _controller = Completer();
   late GoogleMapController mapController;
@@ -34,66 +35,72 @@ class _MainPageState extends State<MainPage> {
 
   // 현재 위치 변수 추가
   Position? currentPosition;
+  void SetupPositionLocator() async {
+    try {
+      Position position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.bestForNavigation
+      );
+      print('현재 위치: ${position.latitude}, ${position.longitude}'); // 디버깅용 로그
+
+      setState(() {
+        currentPosition = position;
+      });
+
+      LatLng pos = LatLng(position.latitude, position.longitude);
+      CameraPosition cp = CameraPosition(target: pos, zoom: 14);
+      mapController.animateCamera(CameraUpdate.newCameraPosition(cp));
+
+      String address = await HelperMethods.findCordinateAddress(position);
+      print('현재 주소: $address');
+    } catch (e) {
+      print('위치 설정 중 오류 발생: $e');
+    }
+  }
 
   // 위치 권한 요청 함수
   Future<void> _checkLocationPermission() async {
     bool serviceEnabled;
     LocationPermission permission;
 
-    // 위치 서비스가 활성화되어 있는지 확인
-    serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) {
-      // 위치 서비스가 비활성화되어 있으면 사용자에게 알림
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('위치 서비스가 비활성화되어 있습니다. 설정에서 활성화해주세요.')),
-      );
-      return;
-    }
-
-    // 위치 권한 확인
-    permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      // 권한이 거부되었으면 요청
-      permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied) {
-        // 권한이 다시 거부되면 사용자에게 알림
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('위치 권한이 거부되었습니다.')));
+    try {
+      // 위치 서비스가 활성화되어 있는지 확인
+      serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      print('위치 서비스 활성화 상태: $serviceEnabled'); // 디버깅용 로그
+      
+      if (!serviceEnabled) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('위치 서비스가 비활성화되어 있습니다. 설정에서 활성화해주세요.')),
+        );
         return;
       }
-    }
 
-    if (permission == LocationPermission.deniedForever) {
-      // 권한이 영구적으로 거부되었으면 사용자에게 알림
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('위치 권한이 영구적으로 거부되었습니다. 설정에서 변경해주세요.')),
-      );
-      return;
-    }
+      // 위치 권한 확인
+      permission = await Geolocator.checkPermission();
+      print('현재 위치 권한 상태: $permission'); // 디버깅용 로그
+      
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        print('위치 권한 요청 결과: $permission'); // 디버깅용 로그
+        
+        if (permission == LocationPermission.denied) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('위치 권한이 거부되었습니다.'))
+          );
+          return;
+        }
+      }
 
-    // 권한이 허용되었으면 현재 위치 가져오기
-    _getCurrentLocation();
-  }
+      if (permission == LocationPermission.deniedForever) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('위치 권한이 영구적으로 거부되었습니다. 설정에서 변경해주세요.')),
+        );
+        return;
+      }
 
-  // 현재 위치 가져오기
-  void _getCurrentLocation() async {
-    try {
-      Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-      );
-      setState(() {
-        currentPosition = position;
-      });
-
-      // 현재 위치로 카메라 이동
-      LatLng latLng = LatLng(position.latitude, position.longitude);
-      CameraPosition cameraPosition = CameraPosition(target: latLng, zoom: 14);
-      mapController.animateCamera(
-        CameraUpdate.newCameraPosition(cameraPosition),
-      );
+      // 권한이 허용되었으면 위치 설정 시작
+      SetupPositionLocator();
     } catch (e) {
-      print('위치를 가져오는 중 오류 발생: $e');
+      print('위치 권한 확인 중 오류 발생: $e');
     }
   }
 
@@ -193,13 +200,20 @@ class _MainPageState extends State<MainPage> {
                 zoomControlsEnabled: true,
                 zoomGesturesEnabled: true,
                 initialCameraPosition: _kGooglePlex,
-                onMapCreated: (GoogleMapController controller) {
+                compassEnabled: true,
+                tiltGesturesEnabled: true,
+                rotateGesturesEnabled: true,
+                trafficEnabled: false,
+                onMapCreated: (GoogleMapController controller) async {
                   _controller.complete(controller);
                   mapController = controller;
 
                   setState(() {
-                    mapBottomPadding = (Platform.isAndroid) ? 270 : 320;
+                    mapBottomPadding = (Platform.isAndroid) ? 280 : 270;
                   });
+                  
+                  await Future.delayed(const Duration(milliseconds: 200));
+                  SetupPositionLocator();
                 },
               ),
             ),
