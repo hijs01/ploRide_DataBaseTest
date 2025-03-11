@@ -1,3 +1,4 @@
+import 'package:cabrider/styles/styles.dart';
 import 'package:cabrider/widgets/BrandDivider.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
@@ -6,6 +7,7 @@ import 'dart:async';
 import 'package:geolocator/geolocator.dart';
 import 'package:cabrider/brand_colors.dart';
 import 'package:outline_material_icons/outline_material_icons.dart';
+import 'dart:io' show Platform;
 
 class MainPage extends StatefulWidget {
   const MainPage({super.key});
@@ -16,9 +18,14 @@ class MainPage extends StatefulWidget {
 }
 
 class _MainPageState extends State<MainPage> {
+  GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  double searchSheetHeight = (Platform.isIOS) ? 310 : 270;
+
   Completer<GoogleMapController> _controller = Completer();
   late GoogleMapController mapController;
   bool _mapLoaded = false;
+
+  double mapBottomPadding = 0;
 
   static const CameraPosition _kGooglePlex = CameraPosition(
     target: LatLng(37.42796133580664, -122.085749655962),
@@ -100,6 +107,78 @@ class _MainPageState extends State<MainPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      key: _scaffoldKey,
+      drawer: Container(
+        width: 250,
+        color: Colors.white,
+        child: Drawer(
+          child: ListView(
+            padding: EdgeInsets.all(0),
+            children: [
+              Container(
+                color: Colors.white,
+                height: 160,
+                child: DrawerHeader(
+                  decoration: BoxDecoration(color: Colors.white),
+                  child: Row(
+                    children: [
+                      Image.asset(
+                        'images/user_icon.png',
+                        height: 60,
+                        width: 60,
+                      ),
+                      SizedBox(width: 15),
+
+                      Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            'John Doe',
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontFamily: 'Brand-Bold',
+                            ),
+                          ),
+                          SizedBox(height: 5),
+                          Text('View Profile'),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              BrandDivider(),
+
+              SizedBox(height: 10),
+
+              ListTile(
+                leading: Icon(OMIcons.cardGiftcard),
+                title: Text('Free Rides', style: kDrawerHeaderStyle),
+              ),
+
+              ListTile(
+                leading: Icon(OMIcons.creditCard),
+                title: Text('Payment', style: kDrawerHeaderStyle),
+              ),
+
+              ListTile(
+                leading: Icon(OMIcons.history),
+                title: Text('Ride History', style: kDrawerHeaderStyle),
+              ),
+
+              ListTile(
+                leading: Icon(OMIcons.contactSupport),
+                title: Text('Support', style: kDrawerHeaderStyle),
+              ),
+
+              ListTile(
+                leading: Icon(OMIcons.info),
+                title: Text('About', style: kDrawerHeaderStyle),
+              ),
+            ],
+          ),
+        ),
+      ),
       body: SafeArea(
         child: Stack(
           children: <Widget>[
@@ -107,6 +186,7 @@ class _MainPageState extends State<MainPage> {
               height: MediaQuery.of(context).size.height,
               width: MediaQuery.of(context).size.width,
               child: GoogleMap(
+                padding: EdgeInsets.only(bottom: mapBottomPadding),
                 mapType: MapType.normal,
                 myLocationButtonEnabled: true,
                 myLocationEnabled: true,
@@ -116,15 +196,50 @@ class _MainPageState extends State<MainPage> {
                 onMapCreated: (GoogleMapController controller) {
                   _controller.complete(controller);
                   mapController = controller;
+
+                  setState(() {
+                    mapBottomPadding = (Platform.isAndroid) ? 270 : 320;
+                  });
                 },
               ),
             ),
+
+            /// Menu Button
+            Positioned(
+              top: 14,
+              left: 20,
+              child: GestureDetector(
+                onTap: () {
+                  _scaffoldKey.currentState?.openDrawer();
+                },
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black26,
+                        blurRadius: 5.0,
+                        spreadRadius: 0.5,
+                        offset: Offset(0.7, 0.7),
+                      ),
+                    ],
+                  ),
+                  child: CircleAvatar(
+                    backgroundColor: Colors.white,
+                    radius: 20,
+                    child: Icon(Icons.menu, color: Colors.black87),
+                  ),
+                ),
+              ),
+            ),
+
             Positioned(
               left: 0,
               right: 0,
               bottom: 0,
               child: Container(
-                height: 300,
+                height: searchSheetHeight,
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.only(
@@ -204,16 +319,17 @@ class _MainPageState extends State<MainPage> {
                           ),
                         ],
                       ),
-                    SizedBox(
-                      height: 10,
-                    ),
+                      SizedBox(height: 10),
 
-                    BrandDivider(),
-                    SizedBox(height: 16),
+                      BrandDivider(),
+                      SizedBox(height: 16),
 
-                     Row(
+                      Row(
                         children: [
-                          Icon(OMIcons.workOutline  , color: BrandColors.colorDimText),
+                          Icon(
+                            OMIcons.workOutline,
+                            color: BrandColors.colorDimText,
+                          ),
                           SizedBox(width: 12),
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -223,14 +339,15 @@ class _MainPageState extends State<MainPage> {
                               Text(
                                 'Your office address',
                                 style: TextStyle(
-                                  fontSize: 11, 
+                                  fontSize: 11,
                                   color: BrandColors.colorDimText,
                                 ),
                               ),
                             ],
                           ),
                         ],
-                      ), ],
+                      ),
+                    ],
                   ),
                 ),
               ),
