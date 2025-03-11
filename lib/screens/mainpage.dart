@@ -1,7 +1,10 @@
+import 'package:cabrider/globalvariable.dart';
 import 'package:cabrider/widgets/ProgressDialog.dart';
+import 'package:cabrider/widgets/TaxiButton.dart';
 import 'package:flutter/material.dart';
 import 'package:cabrider/dataprovider/appdata.dart';
 import 'package:flutter_polyline_points/flutter_polyline_points.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:provider/provider.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'dart:async';
@@ -26,9 +29,10 @@ class MainPage extends StatefulWidget {
   State<MainPage> createState() => _MainPageState();
 }
 
-class _MainPageState extends State<MainPage> {
+class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   double searchSheetHeight = (Platform.isIOS) ? 300 : 275;
+  double rideDetailsSheetHeight = 0;
 
   final Completer<GoogleMapController> _controller = Completer();
   late GoogleMapController mapController;
@@ -41,13 +45,23 @@ class _MainPageState extends State<MainPage> {
   final Set<Marker> _Markers = {};
   final Set<Circle> _Circles = {};
 
-  static const CameraPosition _kGooglePlex = CameraPosition(
-    target: LatLng(37.42796133580664, -122.085749655962),
-    zoom: 14.4746,
-  );
+  bool drawerCanOpen = true;
+
+  void showDetailSheet() async {
+    await getDirection();
+
+    setState(() {
+      searchSheetHeight = 0;
+      rideDetailsSheetHeight = (Platform.isAndroid) ? 235 : 260;
+      mapBottomPadding = (Platform.isAndroid) ? 240 : 230;
+      drawerCanOpen = false;
+    });
+  }
 
   // 현재 위치 변수 추가
   Position? currentPosition;
+
+  Directiondetails? tripDirectionDetails;
   void SetupPositionLocator() async {
     try {
       Position position = await Geolocator.getCurrentPosition(
@@ -87,7 +101,7 @@ class _MainPageState extends State<MainPage> {
       var currentPickup =
           Provider.of<AppData>(context, listen: false).pickupAddress;
       print('현재 pickup 주소 상태: ${currentPickup?.placeName ?? "null"}');
-      
+
       if (currentPickup == null) {
         // pickup 주소가 없으면 현재 위치로 설정
         var newPickupAddress = Address(
@@ -97,13 +111,16 @@ class _MainPageState extends State<MainPage> {
           placeId: '', // 여기서는 빈 값으로 설정
           placeFormattedAddress: address,
         );
-        
-        Provider.of<AppData>(context, listen: false).updatePickupAddress(
-          newPickupAddress,
-        );
+
+        Provider.of<AppData>(
+          context,
+          listen: false,
+        ).updatePickupAddress(newPickupAddress);
         print('Pickup 주소 새로 설정됨:');
         print('- placeName: ${newPickupAddress.placeName}');
-        print('- placeFormattedAddress: ${newPickupAddress.placeFormattedAddress}');
+        print(
+          '- placeFormattedAddress: ${newPickupAddress.placeFormattedAddress}',
+        );
       }
     } catch (e) {
       print('위치 설정 중 오류 발생: $e');
@@ -254,7 +271,7 @@ class _MainPageState extends State<MainPage> {
                 myLocationEnabled: true,
                 zoomControlsEnabled: true,
                 zoomGesturesEnabled: true,
-                initialCameraPosition: _kGooglePlex,
+                initialCameraPosition: googlePlex,
                 compassEnabled: true,
                 tiltGesturesEnabled: true,
                 rotateGesturesEnabled: true,
@@ -285,7 +302,11 @@ class _MainPageState extends State<MainPage> {
               left: 20,
               child: GestureDetector(
                 onTap: () {
-                  _scaffoldKey.currentState?.openDrawer();
+                  if (drawerCanOpen) {
+                    _scaffoldKey.currentState?.openDrawer();
+                  } else {
+                    resetApp();
+                  }
                 },
                 child: Container(
                   decoration: BoxDecoration(
@@ -303,7 +324,10 @@ class _MainPageState extends State<MainPage> {
                   child: CircleAvatar(
                     backgroundColor: Colors.white,
                     radius: 20,
-                    child: Icon(Icons.menu, color: Colors.black87),
+                    child: Icon(
+                      (drawerCanOpen) ? Icons.menu : Icons.arrow_back,
+                      color: Colors.black87,
+                    ),
                   ),
                 ),
               ),
@@ -313,135 +337,258 @@ class _MainPageState extends State<MainPage> {
               left: 0,
               right: 0,
               bottom: 0,
-              child: Container(
-                height: searchSheetHeight,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.only(
-                    topLeft: Radius.circular(15),
-                    topRight: Radius.circular(15),
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black26,
-                      blurRadius: 15,
-                      spreadRadius: 0.5,
-                      offset: Offset(0.7, 0.7),
+              child: AnimatedSize(
+                duration: new Duration(milliseconds: 150),
+                curve: Curves.easeIn,
+                child: Container(
+                  height: searchSheetHeight,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.only(
+                      topLeft: Radius.circular(15),
+                      topRight: Radius.circular(15),
                     ),
-                  ],
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 24,
-                    vertical: 18,
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      SizedBox(height: 5),
-                      Text('Nice to see you!', style: TextStyle(fontSize: 10)),
-                      Text(
-                        'Where are you going?',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontFamily: 'Brand-Bold',
-                        ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black26,
+                        blurRadius: 15,
+                        spreadRadius: 0.5,
+                        offset: Offset(0.7, 0.7),
                       ),
-                      SizedBox(height: 20),
-                      GestureDetector(
-                        onTap: () async {
-                          var response = await Navigator.push(
-                            // pushNamed 대신 push를 사용
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => SearchPage(),
-                            ),
-                          );
-                          if (response == 'getDirection') {
-                            await getDirection();
-                          }
-                        },
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(4),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black12,
-                                blurRadius: 5.0,
-                                spreadRadius: 0.5,
-                                offset: Offset(0.7, 0.7),
-                              ),
-                            ],
+                    ],
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 18,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        SizedBox(height: 5),
+                        Text(
+                          'Nice to see you!',
+                          style: TextStyle(fontSize: 10),
+                        ),
+                        Text(
+                          'Where are you going?',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontFamily: 'Brand-Bold',
                           ),
-                          child: Padding(
-                            padding: const EdgeInsets.all(12.0),
-                            child: Row(
+                        ),
+                        SizedBox(height: 20),
+                        GestureDetector(
+                          onTap: () async {
+                            var response = await Navigator.push(
+                              // pushNamed 대신 push를 사용
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => SearchPage(),
+                              ),
+                            );
+                            if (response == 'getDirection') {
+                              showDetailSheet();
+                            }
+                          },
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(4),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black12,
+                                  blurRadius: 5.0,
+                                  spreadRadius: 0.5,
+                                  offset: Offset(0.7, 0.7),
+                                ),
+                              ],
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.all(12.0),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.search, color: Colors.blueAccent),
+                                  SizedBox(width: 10),
+                                  Text('Search Destination'),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                        SizedBox(height: 22),
+
+                        Row(
+                          children: [
+                            Icon(OMIcons.home, color: BrandColors.colorDimText),
+                            SizedBox(width: 12),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Icon(Icons.search, color: Colors.blueAccent),
-                                SizedBox(width: 10),
-                                Text('Search Destination'),
+                                Text(
+                                  Provider.of<AppData>(
+                                        context,
+                                      ).pickupAddress?.placeName ??
+                                      'Add Home',
+                                ),
+                                SizedBox(height: 3),
+                                Text(
+                                  'Your residential address',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: BrandColors.colorDimText,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                        SizedBox(height: 10),
+
+                        BrandDivider(),
+                        SizedBox(height: 16),
+
+                        Row(
+                          children: [
+                            Icon(
+                              OMIcons.workOutline,
+                              color: BrandColors.colorDimText,
+                            ),
+                            SizedBox(width: 12),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('Add Work'),
+                                SizedBox(height: 3),
+                                Text(
+                                  'Your office address',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: BrandColors.colorDimText,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: -1,
+              child: AnimatedSize(
+                duration: new Duration(milliseconds: 150),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.only(
+                      topLeft: Radius.circular(15),
+                      topRight: Radius.circular(15),
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black26,
+                        blurRadius: 15.0,
+                        spreadRadius: 0.5,
+                        offset: Offset(0.7, 0.7),
+                      ),
+                    ],
+                  ),
+                  height: rideDetailsSheetHeight,
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(vertical: 18),
+                    child: Column(
+                      children: <Widget>[
+                        Container(
+                          width: double.infinity,
+                          color: BrandColors.colorAccent1,
+                          child: Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 16),
+                            child: Row(
+                              children: <Widget>[
+                                Image.asset(
+                                  'images/taxi.png',
+                                  height: 70,
+                                  width: 70,
+                                ),
+                                SizedBox(width: 16),
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: <Widget>[
+                                    Text(
+                                      'Taxi',
+                                      style: TextStyle(
+                                        fontSize: 18,
+                                        fontFamily: 'Brand-Bold',
+                                      ),
+                                    ),
+                                    Text(
+                                      (tripDirectionDetails != null)
+                                          ? tripDirectionDetails!.distanceText
+                                          : '',
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        color: BrandColors.colorTextLight,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                Expanded(child: Container()),
+                                Text(
+                                  (tripDirectionDetails != null)
+                                      ? '\$${HelperMethods.estimateFares(tripDirectionDetails!)}'
+                                      : '',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontFamily: 'Brand-Bold',
+                                  ),
+                                ),
                               ],
                             ),
                           ),
                         ),
-                      ),
-                      SizedBox(height: 22),
 
-                      Row(
-                        children: [
-                          Icon(OMIcons.home, color: BrandColors.colorDimText),
-                          SizedBox(width: 12),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                        SizedBox(height: 22),
+
+                        Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 16),
+                          child: Row(
                             children: [
-                              Text(
-                                Provider.of<AppData>(
-                                      context,
-                                    ).pickupAddress?.placeName ??
-                                    'Add Home',
+                              Icon(
+                                FontAwesomeIcons.moneyBillAlt,
+                                size: 18,
+                                color: BrandColors.colorTextLight,
                               ),
-                              SizedBox(height: 3),
-                              Text(
-                                'Your residential address',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: BrandColors.colorDimText,
-                                ),
+                              SizedBox(width: 16),
+                              Text('Cash'),
+                              SizedBox(width: 5),
+                              Icon(
+                                Icons.keyboard_arrow_down,
+                                size: 16,
+                                color: BrandColors.colorTextLight,
                               ),
                             ],
                           ),
-                        ],
-                      ),
-                      SizedBox(height: 10),
+                        ),
 
-                      BrandDivider(),
-                      SizedBox(height: 16),
+                        SizedBox(height: 22),
 
-                      Row(
-                        children: [
-                          Icon(
-                            OMIcons.workOutline,
-                            color: BrandColors.colorDimText,
+                        Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 16),
+                          child: TaxiButton(
+                            text: 'REQUEST CAB',
+                            color: BrandColors.colorGreen,
+                            onPressed: () {},
                           ),
-                          SizedBox(width: 12),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text('Add Work'),
-                              SizedBox(height: 3),
-                              Text(
-                                'Your office address',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: BrandColors.colorDimText,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ],
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -480,6 +627,10 @@ class _MainPageState extends State<MainPage> {
       pickLatLng,
       destinationLatLng,
     );
+
+    setState(() {
+      tripDirectionDetails = thisDetails;
+    });
 
     Navigator.pop(context);
 
@@ -599,18 +750,20 @@ class _MainPageState extends State<MainPage> {
       setState(() {
         // 마커를 다시 생성하여 InfoWindow가 표시되도록 함
         _Markers.clear();
-        
+
         final updatedPickupMarker = Marker(
           markerId: const MarkerId('pickup'),
           position: pickLatLng,
-          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+          icon: BitmapDescriptor.defaultMarkerWithHue(
+            BitmapDescriptor.hueGreen,
+          ),
           infoWindow: InfoWindow(
             title: pickup.placeName,
             snippet: pickup.placeFormattedAddress,
           ),
           visible: true,
         );
-        
+
         final updatedDestinationMarker = Marker(
           markerId: const MarkerId('destination'),
           position: destinationLatLng,
@@ -621,7 +774,7 @@ class _MainPageState extends State<MainPage> {
           ),
           visible: true,
         );
-        
+
         _Markers.add(updatedPickupMarker);
         _Markers.add(updatedDestinationMarker);
       });
@@ -653,5 +806,20 @@ class _MainPageState extends State<MainPage> {
       _Circles.add(pickupCircle);
       _Circles.add(destinationCircle);
     });
+  }
+
+  resetApp() {
+    setState(() {
+      polylineCoordinates.clear();
+      _polylines.clear();
+      _Markers.clear();
+      _Circles.clear();
+      rideDetailsSheetHeight = 0;
+      searchSheetHeight = (Platform.isAndroid) ? 275 : 300;
+      mapBottomPadding = (Platform.isAndroid) ? 280 : 270;
+      drawerCanOpen = true;
+    });
+
+    SetupPositionLocator();
   }
 }

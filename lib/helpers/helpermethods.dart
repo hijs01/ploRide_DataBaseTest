@@ -15,11 +15,11 @@ class HelperMethods {
     BuildContext context,
   ) async {
     String placeAddress = "";
-    
+
     // 네트워크 연결 상태 확인
     var connectivityResult = await Connectivity().checkConnectivity();
     print('네트워크 연결 상태: $connectivityResult');
-    
+
     if (connectivityResult != ConnectivityResult.mobile &&
         connectivityResult != ConnectivityResult.wifi) {
       print('네트워크 연결이 없습니다.');
@@ -35,7 +35,7 @@ class HelperMethods {
 
     String url =
         "https://maps.googleapis.com/maps/api/geocode/json?latlng=${position.latitude},${position.longitude}&key=$mapKey";
-    
+
     print('Geocoding API 요청 URL: $url');
 
     try {
@@ -59,16 +59,16 @@ class HelperMethods {
           response['results'].length > 0) {
         var result = response['results'][0];
         placeAddress = result['formatted_address'];
-        
+
         print('받아온 전체 주소: $placeAddress');
-        
+
         // 주소의 주요 부분 추출 (더 간단한 표시용)
         String placeName = "";
         if (result['address_components'] != null) {
           for (var component in result['address_components']) {
             var types = component['types'];
             print('주소 컴포넌트: ${component['long_name']} (타입: $types)');
-            if (types.contains('sublocality_level_1') || 
+            if (types.contains('sublocality_level_1') ||
                 types.contains('locality') ||
                 types.contains('sublocality')) {
               placeName = component['long_name'];
@@ -77,7 +77,7 @@ class HelperMethods {
             }
           }
         }
-        
+
         // placeName이 비어있으면 전체 주소 사용
         if (placeName.isEmpty) {
           placeName = placeAddress;
@@ -94,7 +94,9 @@ class HelperMethods {
 
         print('생성된 Address 객체:');
         print('- placeName: ${pickupAddress.placeName}');
-        print('- placeFormattedAddress: ${pickupAddress.placeFormattedAddress}');
+        print(
+          '- placeFormattedAddress: ${pickupAddress.placeFormattedAddress}',
+        );
         print('- placeId: ${pickupAddress.placeId}');
 
         Provider.of<AppData>(
@@ -123,12 +125,16 @@ class HelperMethods {
     return placeAddress;
   }
 
-static Future<Directiondetails?> getDirectionDetails(LatLng startPosition, LatLng endPosition) async {
-    String url = "https://maps.googleapis.com/maps/api/directions/json?origin=${startPosition.latitude},${startPosition.longitude}&destination=${endPosition.latitude},${endPosition.longitude}&key=$mapKey";
+  static Future<Directiondetails?> getDirectionDetails(
+    LatLng startPosition,
+    LatLng endPosition,
+  ) async {
+    String url =
+        "https://maps.googleapis.com/maps/api/directions/json?origin=${startPosition.latitude},${startPosition.longitude}&destination=${endPosition.latitude},${endPosition.longitude}&key=$mapKey";
 
     var response = await RequestHelper.getRequest(url);
 
-    if(response == "failed"){
+    if (response == "failed") {
       return null;
     }
 
@@ -139,6 +145,15 @@ static Future<Directiondetails?> getDirectionDetails(LatLng startPosition, LatLn
       durationValue: response['routes'][0]['legs'][0]['duration']['value'],
       encodedPoints: response['routes'][0]['overview_polyline']['points'],
     );
-}
+  }
 
+  static int estimateFares(Directiondetails details) {
+    double baseFare = 3;
+    double distanceFare = (details.distanceValue / 1000) * 0.3;
+    double timeFare = (details.durationValue / 60) * 0.2;
+
+    double totalFare = baseFare + distanceFare + timeFare;
+
+    return totalFare.truncate();
+  }
 }
