@@ -15,56 +15,109 @@ class HelperMethods {
     BuildContext context,
   ) async {
     String placeAddress = "";
+    
+    // 네트워크 연결 상태 확인
     var connectivityResult = await Connectivity().checkConnectivity();
+    print('네트워크 연결 상태: $connectivityResult');
+    
     if (connectivityResult != ConnectivityResult.mobile &&
         connectivityResult != ConnectivityResult.wifi) {
+      print('네트워크 연결이 없습니다.');
+      // 사용자에게 네트워크 오류 알림
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('네트워크 연결을 확인해주세요.'),
+          duration: Duration(seconds: 3),
+        ),
+      );
       return placeAddress;
     }
 
     String url =
         "https://maps.googleapis.com/maps/api/geocode/json?latlng=${position.latitude},${position.longitude}&key=$mapKey";
+    
+    print('Geocoding API 요청 URL: $url');
 
-    var response = await RequestHelper.getRequest(url);
+    try {
+      var response = await RequestHelper.getRequest(url);
+      print('Geocoding API 응답: $response');
 
-    if (response != "failed" &&
-        response['results'] != null &&
-        response['results'].length > 0) {
-      var result = response['results'][0];
-      placeAddress = result['formatted_address'];
-      
-      // 주소의 주요 부분 추출 (더 간단한 표시용)
-      String placeName = "";
-      if (result['address_components'] != null) {
-        for (var component in result['address_components']) {
-          var types = component['types'];
-          if (types.contains('sublocality_level_1') || 
-              types.contains('locality') ||
-              types.contains('sublocality')) {
-            placeName = component['long_name'];
-            break;
+      if (response == "failed") {
+        print('Geocoding API 요청 실패');
+        // 사용자에게 API 오류 알림
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('주소 정보를 가져오는데 실패했습니다. 잠시 후 다시 시도해주세요.'),
+            duration: Duration(seconds: 3),
+          ),
+        );
+        return placeAddress;
+      }
+
+      if (response != "failed" &&
+          response['results'] != null &&
+          response['results'].length > 0) {
+        var result = response['results'][0];
+        placeAddress = result['formatted_address'];
+        
+        print('받아온 전체 주소: $placeAddress');
+        
+        // 주소의 주요 부분 추출 (더 간단한 표시용)
+        String placeName = "";
+        if (result['address_components'] != null) {
+          for (var component in result['address_components']) {
+            var types = component['types'];
+            print('주소 컴포넌트: ${component['long_name']} (타입: $types)');
+            if (types.contains('sublocality_level_1') || 
+                types.contains('locality') ||
+                types.contains('sublocality')) {
+              placeName = component['long_name'];
+              print('선택된 placeName: $placeName');
+              break;
+            }
           }
         }
-      }
-      
-      // placeName이 비어있으면 전체 주소 사용
-      if (placeName.isEmpty) {
-        placeName = placeAddress;
-      }
+        
+        // placeName이 비어있으면 전체 주소 사용
+        if (placeName.isEmpty) {
+          placeName = placeAddress;
+          print('placeName이 비어있어 전체 주소를 사용: $placeName');
+        }
 
-      Address pickupAddress = Address(
-        placeName: placeName,
-        latitude: position.latitude,
-        longitude: position.longitude,
-        placeId: result['place_id'],
-        placeFormattedAddress: placeAddress,
+        Address pickupAddress = Address(
+          placeName: placeName,
+          latitude: position.latitude,
+          longitude: position.longitude,
+          placeId: result['place_id'],
+          placeFormattedAddress: placeAddress,
+        );
+
+        print('생성된 Address 객체:');
+        print('- placeName: ${pickupAddress.placeName}');
+        print('- placeFormattedAddress: ${pickupAddress.placeFormattedAddress}');
+        print('- placeId: ${pickupAddress.placeId}');
+
+        Provider.of<AppData>(
+          context,
+          listen: false,
+        ).updatePickupAddress(pickupAddress);
+      } else {
+        print('Geocoding API 응답에 결과가 없습니다.');
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('주소 정보를 찾을 수 없습니다.'),
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+    } catch (e) {
+      print('API 요청 중 오류 발생: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('주소 정보를 가져오는 중 오류가 발생했습니다.'),
+          duration: Duration(seconds: 3),
+        ),
       );
-
-      print('Pickup address updated - Name: $placeName, Full: $placeAddress');
-
-      Provider.of<AppData>(
-        context,
-        listen: false,
-      ).updatePickupAddress(pickupAddress);
     }
 
     return placeAddress;

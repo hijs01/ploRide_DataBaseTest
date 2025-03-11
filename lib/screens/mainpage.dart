@@ -16,6 +16,7 @@ import 'package:firebase_database/firebase_database.dart';
 import 'package:cabrider/screens/searchpage.dart';
 import 'package:cabrider/datamodels/directiondetails.dart';
 import 'package:cabrider/datamodels/address.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 
 class MainPage extends StatefulWidget {
   const MainPage({super.key});
@@ -85,18 +86,24 @@ class _MainPageState extends State<MainPage> {
       // 현재 pickup 주소 확인
       var currentPickup =
           Provider.of<AppData>(context, listen: false).pickupAddress;
+      print('현재 pickup 주소 상태: ${currentPickup?.placeName ?? "null"}');
+      
       if (currentPickup == null) {
         // pickup 주소가 없으면 현재 위치로 설정
-        Provider.of<AppData>(context, listen: false).updatePickupAddress(
-          Address(
-            placeName: address,
-            latitude: position.latitude,
-            longitude: position.longitude,
-            placeId: '', // 여기서는 빈 값으로 설정
-            placeFormattedAddress: address,
-          ),
+        var newPickupAddress = Address(
+          placeName: address,
+          latitude: position.latitude,
+          longitude: position.longitude,
+          placeId: '', // 여기서는 빈 값으로 설정
+          placeFormattedAddress: address,
         );
-        print('Pickup address set to current location: $address');
+        
+        Provider.of<AppData>(context, listen: false).updatePickupAddress(
+          newPickupAddress,
+        );
+        print('Pickup 주소 새로 설정됨:');
+        print('- placeName: ${newPickupAddress.placeName}');
+        print('- placeFormattedAddress: ${newPickupAddress.placeFormattedAddress}');
       }
     } catch (e) {
       print('위치 설정 중 오류 발생: $e');
@@ -562,9 +569,8 @@ class _MainPageState extends State<MainPage> {
       icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
       infoWindow: InfoWindow(
         title: pickup.placeName,
-        snippet: 'My Location',
+        snippet: pickup.placeFormattedAddress,
       ),
-      
       visible: true,
     );
 
@@ -574,22 +580,17 @@ class _MainPageState extends State<MainPage> {
       icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
       infoWindow: InfoWindow(
         title: destination.placeName,
-        snippet: 'Destination',
+        snippet: destination.placeFormattedAddress,
       ),
-       
       visible: true,
     );
 
     // Add markers
     setState(() {
-      
-      destination.placeFormattedAddress = destination.placeName;
-      pickup.placeFormattedAddress = pickup.placeName;
       _Markers.add(pickupMarker);
       _Markers.add(destinationMarker);
     });
 
-   
     // 마커 정보창 표시를 위한 지연
     await Future.delayed(const Duration(milliseconds: 300));
 
@@ -605,7 +606,7 @@ class _MainPageState extends State<MainPage> {
           icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
           infoWindow: InfoWindow(
             title: pickup.placeName,
-            snippet: 'My Location',
+            snippet: pickup.placeFormattedAddress,
           ),
           visible: true,
         );
@@ -616,7 +617,7 @@ class _MainPageState extends State<MainPage> {
           icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
           infoWindow: InfoWindow(
             title: destination.placeName,
-            snippet: 'Destination',
+            snippet: destination.placeFormattedAddress,
           ),
           visible: true,
         );
@@ -624,7 +625,6 @@ class _MainPageState extends State<MainPage> {
         _Markers.add(updatedPickupMarker);
         _Markers.add(updatedDestinationMarker);
       });
-      
     }
 
     // 마커 탭 시뮬레이션 실행
