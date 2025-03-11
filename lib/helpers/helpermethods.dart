@@ -8,8 +8,25 @@ import 'package:cabrider/helpers/requesthelper.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart' as auth;
+import 'package:firebase_database/firebase_database.dart';
+import 'package:cabrider/datamodels/user.dart';
 
 class HelperMethods {
+
+  static void getCurrentUserInfo() async{
+    currentFirebaseUser = auth.FirebaseAuth.instance.currentUser;
+    String userID = currentFirebaseUser?.uid ?? '';
+
+    DatabaseReference userRef = FirebaseDatabase.instance.ref().child('users/$userID');
+
+    userRef.once().then((DatabaseEvent event) {
+      if (event.snapshot.value != null) {
+         currentUserInfo = User.fromSnapshot(event.snapshot);
+         print('my name is ${currentUserInfo?.fullName}');
+      }
+    });
+  }
   static Future<String> findCordinateAddress(
     Position position,
     BuildContext context,

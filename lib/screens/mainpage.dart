@@ -20,6 +20,8 @@ import 'package:cabrider/screens/searchpage.dart';
 import 'package:cabrider/datamodels/directiondetails.dart';
 import 'package:cabrider/datamodels/address.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:animated_text_kit/animated_text_kit.dart';
+
 
 class MainPage extends StatefulWidget {
   const MainPage({super.key});
@@ -34,6 +36,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
   double searchSheetHeight = (Platform.isIOS) ? 300 : 275;
   double rideDetailsSheetHeight = 0;
   double requestingSheetHeight = 0;
+
   
 
 
@@ -59,6 +62,16 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
       mapBottomPadding = (Platform.isAndroid) ? 240 : 230;
       drawerCanOpen = false;
     });
+  }
+
+  void showRequestingSheet() {
+    setState(() {
+      rideDetailsSheetHeight = 0;
+      requestingSheetHeight = (Platform.isAndroid) ? 195:220;
+      mapBottomPadding = (Platform.isAndroid) ? 200 : 190;
+
+      drawerCanOpen = true;
+    }); 
   }
 
   // 현재 위치 변수 추가
@@ -341,6 +354,81 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
               right: 0,
               bottom: 0,
               child: AnimatedSize(
+                duration: Duration(milliseconds: 150),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.only(
+                      topLeft: Radius.circular(15), 
+                      topRight: Radius.circular(15),
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black26,
+                        blurRadius: 15,
+                        spreadRadius: 0.5,
+                        offset: Offset(0.7, 0.7),
+                      )
+                    ],
+                  ),
+                  height: 250,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 18),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: <Widget>[
+                        SizedBox(height: 10),
+                        Container(
+                          
+                          padding: EdgeInsets.symmetric(horizontal: 40, vertical: 5),
+                          width: double.infinity,
+                          child: TextLiquidFill(
+                            text: 'Requesting a ride...',
+                            waveColor: BrandColors.colorTextSemiLight,
+                            boxBackgroundColor: Colors.white,
+                            textStyle: TextStyle(
+                              fontSize: 22.0,
+                              fontFamily: 'Brand-Bold',
+                              fontWeight: FontWeight.bold,
+                            ),
+                            boxHeight: 80.0,
+                            loadDuration: Duration(seconds: 3),
+                            waveDuration: Duration(milliseconds: 500),
+                            loadUntil: 0.3,
+                          ),
+                        ),
+                        SizedBox(height: 20),
+                        Container(
+                          height: 50,
+                          width: 50,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(25),
+                            border: Border.all(width: 1.0, color: BrandColors.colorLightGrayFair),
+                          ),
+                          child: Icon(Icons.close, size: 25),
+                        ),
+                        SizedBox(height: 10),
+                        Container(
+                          width: double.infinity,
+                          child: Text(
+                            'Cancel ride',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(fontSize: 12),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: AnimatedSize(
                 duration: new Duration(milliseconds: 150),
                 curve: Curves.easeIn,
                 child: Container(
@@ -587,69 +675,13 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                           child: TaxiButton(
                             text: 'REQUEST CAB',
                             color: BrandColors.colorGreen,
-                            onPressed: () {},
+                            onPressed: () {
+                              showRequestingSheet();
+                            },
                           ),
                         ),
                       ],
                     ),
-                  ),
-                ),
-              ),
-            ),
-
-            Positioned(
-              left: 0,
-              right: 0,
-              child: AnimatedSize(
-                curve: Curves.easeIn,
-                duration: Duration(milliseconds: 150),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.only(
-                      topLeft: Radius.circular(15), 
-                      topRight: Radius.circular(15),
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black26,
-                        blurRadius: 15,
-                        spreadRadius: 0.5,
-                        offset: Offset(0.7, 0.7),
-                      )
-                    ],
-                  ),
-                  height: 250,
-                  child: Column(
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 18),
-                        child: Column(
-                          children: [
-                            SizedBox(height: 20),
-                            Container(
-                              height: 50,
-                              width: 50,
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(25),
-                                border: Border.all(width: 1.0, color: BrandColors.colorLightGrayFair),
-                              ),
-                              child: Icon(Icons.close, size: 25),
-                            ),
-                            SizedBox(height: 10),
-                            Container(
-                              width: double.infinity,
-                              child: Text(
-                                'Cancel ride',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(fontSize: 12),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
                   ),
                 ),
               ),
