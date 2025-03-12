@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:cabrider/datamodels/address.dart';
 import 'package:cabrider/datamodels/directiondetails.dart';
 import 'package:cabrider/dataprovider/appdata.dart';
@@ -13,29 +15,43 @@ import 'package:firebase_database/firebase_database.dart';
 import 'package:cabrider/datamodels/user.dart';
 
 class HelperMethods {
-
   static void getCurrentUserInfo() async {
+    print('getCurrentUserInfo 시작');
     currentFirebaseUser = auth.FirebaseAuth.instance.currentUser;
-    
+
     if (currentFirebaseUser == null) {
       print('로그인되어 있지 않습니다.');
       return;
     }
-    
-    
+
+    print('현재 로그인된 사용자 ID: ${currentFirebaseUser!.uid}');
     String userID = currentFirebaseUser!.uid;
 
-    DatabaseReference userRef = FirebaseDatabase.instance.ref().child('users/$userID');
+    DatabaseReference userRef = FirebaseDatabase.instance.ref().child(
+      'users/$userID',
+    );
+    print('Firebase 참조 경로: users/$userID');
 
-    userRef.once().then((DatabaseEvent event) {
+    try {
+      final event = await userRef.once();
+      print('Firebase 응답 받음');
+
       if (event.snapshot.value != null) {
-         currentUserInfo = User.fromSnapshot(event.snapshot);
-         print('My Name is: ${currentUserInfo?.fullName}');
+        print('사용자 데이터 존재함');
+        currentUserInfo = User.fromSnapshot(event.snapshot);
+        print('사용자 정보 로드 완료:');
+        print('- 이름: ${currentUserInfo?.fullName}');
+        print('- 이메일: ${currentUserInfo?.email}');
+        print('- 전화번호: ${currentUserInfo?.phone}');
       } else {
         print('사용자 정보를 찾을 수 없습니다.');
       }
-    });
+    } catch (e) {
+      print('사용자 정보 조회 중 오류 발생: $e');
+      print('Stack trace: ${StackTrace.current}');
+    }
   }
+
   static Future<String> findCordinateAddress(
     Position position,
     BuildContext context,
@@ -181,5 +197,11 @@ class HelperMethods {
     double totalFare = baseFare + distanceFare + timeFare;
 
     return totalFare.truncate();
+  }
+
+  static double generateRandomNumber(int max) {
+    var randomGenerator = Random();
+    int randInt = randomGenerator.nextInt(max);
+    return randInt.toDouble();
   }
 }

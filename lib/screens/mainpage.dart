@@ -1,8 +1,11 @@
+import 'package:cabrider/datamodels/nearbydriver.dart';
 import 'package:cabrider/globalvariable.dart';
+import 'package:cabrider/helpers/firehelper.dart';
 import 'package:cabrider/widgets/ProgressDialog.dart';
 import 'package:cabrider/widgets/TaxiButton.dart';
 import 'package:flutter/material.dart';
 import 'package:cabrider/dataprovider/appdata.dart';
+import 'package:flutter_geofire/flutter_geofire.dart';
 import 'package:flutter_polyline_points/flutter_polyline_points.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:provider/provider.dart';
@@ -22,7 +25,6 @@ import 'package:cabrider/datamodels/address.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:animated_text_kit/animated_text_kit.dart';
 
-
 class MainPage extends StatefulWidget {
   const MainPage({super.key});
   static const String id = 'mainpage';
@@ -36,15 +38,15 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
   double searchSheetHeight = (Platform.isIOS) ? 300 : 275;
   double rideDetailsSheetHeight = 0;
   double requestingSheetHeight = 0;
+  final Set<String> keysRetrieved = <String>{};
 
-  DatabaseReference rideRef = FirebaseDatabase.instance.ref().child('rideRequest');
+  DatabaseReference rideRef = FirebaseDatabase.instance.ref().child(
+    'rideRequest',
+  );
 
   // 로딩 애니메이션을 위한 컨트롤러 추가
   late AnimationController _loadingController;
   late Animation<double> _animation;
-
-
-
 
   final Completer<GoogleMapController> _controller = Completer();
   late GoogleMapController mapController;
@@ -56,6 +58,8 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
   final Set<Polyline> _polylines = {};
   final Set<Marker> _Markers = {};
   final Set<Circle> _Circles = {};
+
+  late BitmapDescriptor nearbyIcon;
 
   bool drawerCanOpen = true;
 
@@ -70,23 +74,36 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
     });
   }
 
-  
-
   void showRequestingSheet() async {
     await createRideRequest();
-    
+
     setState(() {
       rideDetailsSheetHeight = 0;
-      requestingSheetHeight = (Platform.isAndroid) ? 195:220;
+      requestingSheetHeight = (Platform.isAndroid) ? 195 : 220;
       mapBottomPadding = (Platform.isAndroid) ? 200 : 190;
       drawerCanOpen = true;
-    }); 
+    });
+  }
+
+  void createMarker() {
+    ImageConfiguration imageConfiguration = createLocalImageConfiguration(
+      context,
+      size: Size(2, 2),
+    );
+    BitmapDescriptor.fromAssetImage(
+      imageConfiguration,
+      (Platform.isIOS) ? 'images/car_ios.png' : 'images/car_android.png',
+    ).then((icon) {
+      nearbyIcon = icon;
+    });
   }
 
   // 현재 위치 변수 추가
   Position? currentPosition;
 
   Directiondetails? tripDirectionDetails;
+
+  bool nearbyDriverKeysLoaded = false;
   void SetupPositionLocator() async {
     try {
       Position position = await Geolocator.getCurrentPosition(
@@ -121,6 +138,8 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
         context,
       );
       print('현재 주소: $address');
+
+      startGeofireListener();
 
       // 현재 pickup 주소 확인
       var currentPickup =
@@ -202,7 +221,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
-     // 로딩 애니메이션 컨트롤러 초기화
+    // 로딩 애니메이션 컨트롤러 초기화
     _loadingController = AnimationController(
       vsync: this,
       duration: Duration(seconds: 2),
@@ -213,7 +232,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
       CurvedAnimation(parent: _loadingController, curve: Curves.easeInOutSine),
     );
 
-// 애니메이션 반복 설정
+    // 애니메이션 반복 설정
     _loadingController.addStatusListener((status) {
       if (status == AnimationStatus.completed) {
         _loadingController.reverse();
@@ -224,8 +243,6 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
 
     _loadingController.forward();
 
-
-
     // 앱 시작 시 약간의 지연 후 위치 권한 확인
     Future.delayed(const Duration(seconds: 1), () {
       _checkLocationPermission();
@@ -233,15 +250,15 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
     HelperMethods.getCurrentUserInfo();
   }
 
-   @override
+  @override
   void dispose() {
     _loadingController.dispose();
     super.dispose();
   }
 
-
   @override
   Widget build(BuildContext context) {
+    createMarker();
     return Scaffold(
       key: _scaffoldKey,
       drawer: Container(
@@ -390,10 +407,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
               ),
             ),
 
-
-
-
-//Requesting Sheet
+            //Requesting Sheet
             Positioned(
               left: 0,
               right: 0,
@@ -489,7 +503,10 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                             decoration: BoxDecoration(
                               color: Colors.white,
                               borderRadius: BorderRadius.circular(25),
-                              border: Border.all(width: 1.0, color: BrandColors.colorLightGrayFair),
+                              border: Border.all(
+                                width: 1.0,
+                                color: BrandColors.colorLightGrayFair,
+                              ),
                             ),
                             child: Icon(Icons.close, size: 25),
                           ),
@@ -656,8 +673,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
               ),
             ),
 
-
-//Ride Details Sheet
+            //Ride Details Sheet
             Positioned(
               left: 0,
               right: 0,
@@ -990,8 +1006,99 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
     });
   }
 
+  void startGeofireListener() {
+    if (currentPosition == null) return;
+
+    Geofire.initialize('driversAvailable');
+
+    Geofire.queryAtLocation(
+      currentPosition!.latitude,
+      currentPosition!.longitude,
+      20,
+    )?.listen((map) {
+      print(map);
+
+      if (map != null) {
+        var callBack = map['callBack'];
+
+        //latitude will be retrieved from map['latitude']
+        //longitude will be retrieved from map['longitude']
+
+        switch (callBack) {
+          case Geofire.onKeyEntered:
+            NearbyDriver nearbyDriver = NearbyDriver(
+              key: map['key'],
+              latitude: map['latitude'],
+              longitude: map['longitude'],
+            );
+
+            FireHelper.nearbyDriverList.add(nearbyDriver);
+
+            if (nearbyDriverKeysLoaded) {
+              updateDriversOnMap();
+            }
+
+            break;
+
+          case Geofire.onKeyExited:
+            FireHelper.removeFromList(map['key']);
+            updateDriversOnMap();
+            break;
+
+          case Geofire.onKeyMoved:
+            // Update your key's location
+            FireHelper.nearbyDriverList[map['key']] = NearbyDriver(
+              key: map['key'],
+              latitude: map['latitude'],
+              longitude: map['longitude'],
+            );
+            FireHelper.updateNearbyLocation(
+              NearbyDriver(
+                key: map['key'],
+                latitude: map['latitude'],
+                longitude: map['longitude'],
+              ),
+            );
+            updateDriversOnMap();
+            break;
+
+          case Geofire.onGeoQueryReady:
+            // All Intial Data is loaded
+            nearbyDriverKeysLoaded = true;
+            updateDriversOnMap();
+
+            break;
+        }
+      }
+    });
+  }
+
+  void updateDriversOnMap() {
+    setState(() {
+      _Markers.clear();
+    });
+
+    Set<Marker> tempMarkers = Set<Marker>();
+    for (NearbyDriver driver in FireHelper.nearbyDriverList) {
+      LatLng driverPosition = LatLng(driver.latitude, driver.longitude);
+      Marker thisMarker = Marker(
+        markerId: MarkerId('driver${driver.key}'),
+        position: driverPosition,
+        icon: nearbyIcon ?? BitmapDescriptor.defaultMarker,
+        rotation: HelperMethods.generateRandomNumber(360),
+      );
+      tempMarkers.add(thisMarker);
+
+      setState(() {
+        _Markers.clear();
+        _Markers.addAll(tempMarkers);
+      });
+    }
+  }
+
   Future<void> createRideRequest() async {
     if (currentFirebaseUser == null) {
+      print('로그인 상태 확인: currentFirebaseUser is null');
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('로그인이 필요합니다.'),
@@ -1000,9 +1107,14 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
       );
       return;
     }
+    print('로그인 상태 확인: currentFirebaseUser.uid = ${currentFirebaseUser!.uid}');
 
     var pickup = Provider.of<AppData>(context, listen: false).pickupAddress;
-    var destination = Provider.of<AppData>(context, listen: false).destinationAddress;
+    var destination =
+        Provider.of<AppData>(context, listen: false).destinationAddress;
+
+    print('pickup 주소: ${pickup?.placeName}');
+    print('destination 주소: ${destination?.placeName}');
 
     if (pickup == null || destination == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1015,6 +1127,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
     }
 
     if (currentUserInfo == null) {
+      print('사용자 정보 확인: currentUserInfo is null');
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('사용자 정보를 찾을 수 없습니다.'),
@@ -1023,8 +1136,12 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
       );
       return;
     }
+    print('사용자 정보 확인:');
+    print('- 이름: ${currentUserInfo!.fullName}');
+    print('- 전화번호: ${currentUserInfo!.phone}');
 
     if (tripDirectionDetails == null) {
+      print('경로 정보 확인: tripDirectionDetails is null');
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('경로 정보를 찾을 수 없습니다.'),
@@ -1060,10 +1177,16 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
         'fare': HelperMethods.estimateFares(tripDirectionDetails!),
       };
 
-      await rideRef.push().set(rideMap);
-      
+      print('Firebase에 전송할 데이터:');
+      print(rideMap);
+
+      var newRideRef = await rideRef.push();
+      print('생성된 ride reference: ${newRideRef.key}');
+      await newRideRef.set(rideMap);
+      print('Firebase에 데이터 전송 완료');
     } catch (e) {
       print('요청 생성 중 오류 발생: $e');
+      print('Stack trace: ${StackTrace.current}');
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('요청 전송 중 오류가 발생했습니다. 다시 시도해주세요.'),
@@ -1073,7 +1196,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
     }
   }
 
-  void cancelRequest(){
+  void cancelRequest() {
     rideRef.remove();
   }
 
