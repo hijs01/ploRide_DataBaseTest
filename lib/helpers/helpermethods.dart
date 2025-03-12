@@ -62,8 +62,7 @@ class HelperMethods {
     var connectivityResult = await Connectivity().checkConnectivity();
     print('네트워크 연결 상태: $connectivityResult');
 
-    if (connectivityResult != ConnectivityResult.mobile &&
-        connectivityResult != ConnectivityResult.wifi) {
+    if (connectivityResult == ConnectivityResult.none) {
       print('네트워크 연결이 없습니다.');
       // 사용자에게 네트워크 오류 알림
       ScaffoldMessenger.of(context).showSnackBar(

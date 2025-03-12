@@ -144,7 +144,9 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
       // 현재 pickup 주소 확인
       var currentPickup =
           Provider.of<AppData>(context, listen: false).pickupAddress;
-      print('현재 pickup 주소 상태: ${currentPickup?.placeName ?? "null"}');
+      print(
+        '현재 pickup 주소 상태: ${currentPickup?.placeFormattedAddress ?? "null"}',
+      );
 
       if (currentPickup == null) {
         // pickup 주소가 없으면 현재 위치로 설정
@@ -623,7 +625,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                 Text(
                                   Provider.of<AppData>(
                                         context,
-                                      ).pickupAddress?.placeName ??
+                                      ).pickupAddress?.placeFormattedAddress ??
                                       'Add Home',
                                 ),
                                 SizedBox(height: 3),

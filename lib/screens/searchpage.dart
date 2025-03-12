@@ -64,7 +64,8 @@ class _SearchPageState extends State<SearchPage> {
     setFocus();
 
     String address =
-        Provider.of<AppData>(context).pickupAddress?.placeName ?? '';
+        Provider.of<AppData>(context).pickupAddress?.placeFormattedAddress ??
+        '';
     pickupController.text = address;
 
     return Scaffold(
