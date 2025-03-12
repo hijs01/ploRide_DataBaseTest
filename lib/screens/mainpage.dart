@@ -39,6 +39,12 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
 
   DatabaseReference rideRef = FirebaseDatabase.instance.ref().child('rideRequest');
 
+  // 로딩 애니메이션을 위한 컨트롤러 추가
+  late AnimationController _loadingController;
+  late Animation<double> _animation;
+
+
+
 
   final Completer<GoogleMapController> _controller = Completer();
   late GoogleMapController mapController;
@@ -196,12 +202,43 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
+     // 로딩 애니메이션 컨트롤러 초기화
+    _loadingController = AnimationController(
+      vsync: this,
+      duration: Duration(seconds: 2),
+    );
+
+    // 애니메이션 설정
+    _animation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _loadingController, curve: Curves.easeInOutSine),
+    );
+
+// 애니메이션 반복 설정
+    _loadingController.addStatusListener((status) {
+      if (status == AnimationStatus.completed) {
+        _loadingController.reverse();
+      } else if (status == AnimationStatus.dismissed) {
+        _loadingController.forward();
+      }
+    });
+
+    _loadingController.forward();
+
+
+
     // 앱 시작 시 약간의 지연 후 위치 권한 확인
     Future.delayed(const Duration(seconds: 1), () {
       _checkLocationPermission();
     });
     HelperMethods.getCurrentUserInfo();
   }
+
+   @override
+  void dispose() {
+    _loadingController.dispose();
+    super.dispose();
+  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -354,6 +391,8 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
             ),
 
 
+
+
 //Requesting Sheet
             Positioned(
               left: 0,
@@ -365,7 +404,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.only(
-                      topLeft: Radius.circular(15), 
+                      topLeft: Radius.circular(15),
                       topRight: Radius.circular(15),
                     ),
                     boxShadow: [
@@ -374,36 +413,71 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                         blurRadius: 15,
                         spreadRadius: 0.5,
                         offset: Offset(0.7, 0.7),
-                      )
+                      ),
                     ],
                   ),
                   height: 250,
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 18),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 20,
+                    ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: <Widget>[
                         SizedBox(height: 10),
                         Container(
-                          
-                          padding: EdgeInsets.symmetric(horizontal: 40, vertical: 5),
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 0,
+                            vertical: 5,
+                          ),
                           width: double.infinity,
-                          child: TextLiquidFill(
-                            text: 'Requesting a ride...',
-                            waveColor: BrandColors.colorTextSemiLight,
-                            boxBackgroundColor: Colors.white,
-                            textStyle: TextStyle(
-                              fontSize: 22.0,
-                              fontFamily: 'Brand-Bold',
-                              fontWeight: FontWeight.bold,
-                            ),
-                            boxHeight: 80.0,
-                            loadDuration: Duration(seconds: 3),
-                            waveDuration: Duration(milliseconds: 500),
-                            loadUntil: 0.3,
+                          child: Column(
+                            children: [
+                              Container(
+                                width: 250,
+                                child: Column(
+                                  children: [
+                                    Container(
+                                      decoration: BoxDecoration(
+                                        borderRadius: BorderRadius.circular(10),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: Colors.grey.withOpacity(0.2),
+                                            blurRadius: 2,
+                                            offset: Offset(0, 1),
+                                          ),
+                                        ],
+                                      ),
+                                      child: ClipRRect(
+                                        borderRadius: BorderRadius.circular(10),
+                                        child: LinearProgressIndicator(
+                                          backgroundColor: Colors.grey[200],
+                                          valueColor:
+                                              AlwaysStoppedAnimation<Color>(
+                                                Colors.blue,
+                                              ),
+                                          minHeight: 6,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              SizedBox(height: 15),
+                              Text(
+                                'Requesting a Ride...',
+                                style: TextStyle(
+                                  fontSize: 22.0,
+                                  fontFamily: 'Brand-Bold',
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                        SizedBox(height: 20),
+                        SizedBox(height: 50),
+
                         GestureDetector(
                           onTap: () {
                             cancelRequest();
