@@ -37,7 +37,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
   double rideDetailsSheetHeight = 0;
   double requestingSheetHeight = 0;
 
-  
+  DatabaseReference rideRef = FirebaseDatabase.instance.ref().child('rideRequest');
 
 
   final Completer<GoogleMapController> _controller = Completer();
@@ -64,12 +64,15 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
     });
   }
 
-  void showRequestingSheet() {
+  
+
+  void showRequestingSheet() async {
+    await createRideRequest();
+    
     setState(() {
       rideDetailsSheetHeight = 0;
       requestingSheetHeight = (Platform.isAndroid) ? 195:220;
       mapBottomPadding = (Platform.isAndroid) ? 200 : 190;
-
       drawerCanOpen = true;
     }); 
   }
@@ -197,6 +200,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
     Future.delayed(const Duration(seconds: 1), () {
       _checkLocationPermission();
     });
+    HelperMethods.getCurrentUserInfo();
   }
 
   @override
@@ -349,6 +353,8 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
               ),
             ),
 
+
+//Requesting Sheet
             Positioned(
               left: 0,
               right: 0,
@@ -398,15 +404,21 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                           ),
                         ),
                         SizedBox(height: 20),
-                        Container(
-                          height: 50,
-                          width: 50,
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(25),
-                            border: Border.all(width: 1.0, color: BrandColors.colorLightGrayFair),
+                        GestureDetector(
+                          onTap: () {
+                            cancelRequest();
+                            resetApp();
+                          },
+                          child: Container(
+                            height: 50,
+                            width: 50,
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(25),
+                              border: Border.all(width: 1.0, color: BrandColors.colorLightGrayFair),
+                            ),
+                            child: Icon(Icons.close, size: 25),
                           ),
-                          child: Icon(Icons.close, size: 25),
                         ),
                         SizedBox(height: 10),
                         Container(
@@ -424,6 +436,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
               ),
             ),
 
+            //Search Sheet
             Positioned(
               left: 0,
               right: 0,
@@ -569,6 +582,8 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
               ),
             ),
 
+
+//Ride Details Sheet
             Positioned(
               left: 0,
               right: 0,
@@ -901,6 +916,93 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
     });
   }
 
+  Future<void> createRideRequest() async {
+    if (currentFirebaseUser == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('로그인이 필요합니다.'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
+
+    var pickup = Provider.of<AppData>(context, listen: false).pickupAddress;
+    var destination = Provider.of<AppData>(context, listen: false).destinationAddress;
+
+    if (pickup == null || destination == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('출발지와 목적지를 모두 선택해주세요.'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
+
+    if (currentUserInfo == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('사용자 정보를 찾을 수 없습니다.'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
+
+    if (tripDirectionDetails == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('경로 정보를 찾을 수 없습니다.'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
+
+    try {
+      Map pickupMap = {
+        'latitude': pickup.latitude.toString(),
+        'longitude': pickup.longitude.toString(),
+      };
+
+      Map destinationMap = {
+        'latitude': destination.latitude.toString(),
+        'longitude': destination.longitude.toString(),
+      };
+
+      Map rideMap = {
+        'created_at': DateTime.now().toString(),
+        'rider_name': currentUserInfo!.fullName,
+        'rider_phone': currentUserInfo!.phone,
+        'pickup_address': pickup.placeName,
+        'destination_address': destination.placeName,
+        'location': pickupMap,
+        'destination': destinationMap,
+        'payment_method': 'card',
+        'driver_id': 'waiting',
+        'status': 'pending',
+        'user_id': currentFirebaseUser!.uid,
+        'fare': HelperMethods.estimateFares(tripDirectionDetails!),
+      };
+
+      await rideRef.push().set(rideMap);
+      
+    } catch (e) {
+      print('요청 생성 중 오류 발생: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('요청 전송 중 오류가 발생했습니다. 다시 시도해주세요.'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
+  void cancelRequest(){
+    rideRef.remove();
+  }
+
   resetApp() {
     setState(() {
       polylineCoordinates.clear();
@@ -908,6 +1010,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
       _Markers.clear();
       _Circles.clear();
       rideDetailsSheetHeight = 0;
+      requestingSheetHeight = 0;
       searchSheetHeight = (Platform.isAndroid) ? 275 : 300;
       mapBottomPadding = (Platform.isAndroid) ? 280 : 270;
       drawerCanOpen = true;

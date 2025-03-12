@@ -14,16 +14,25 @@ import 'package:cabrider/datamodels/user.dart';
 
 class HelperMethods {
 
-  static void getCurrentUserInfo() async{
+  static void getCurrentUserInfo() async {
     currentFirebaseUser = auth.FirebaseAuth.instance.currentUser;
-    String userID = currentFirebaseUser?.uid ?? '';
+    
+    if (currentFirebaseUser == null) {
+      print('로그인되어 있지 않습니다.');
+      return;
+    }
+    
+    
+    String userID = currentFirebaseUser!.uid;
 
     DatabaseReference userRef = FirebaseDatabase.instance.ref().child('users/$userID');
 
     userRef.once().then((DatabaseEvent event) {
       if (event.snapshot.value != null) {
          currentUserInfo = User.fromSnapshot(event.snapshot);
-         print('my name is ${currentUserInfo?.fullName}');
+         print('My Name is: ${currentUserInfo?.fullName}');
+      } else {
+        print('사용자 정보를 찾을 수 없습니다.');
       }
     });
   }

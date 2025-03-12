@@ -15,8 +15,15 @@ class User {
 
   User.fromSnapshot(DataSnapshot snapshot) {
     id = snapshot.key ?? '';
-    phone = (snapshot.value as Map)['phone'] ?? '';
-    fullName = (snapshot.value as Map)['fullName'] ?? '';
-    email = (snapshot.value as Map)['email'] ?? '';
+    Map<dynamic, dynamic> values = snapshot.value as Map<dynamic, dynamic>;
+    phone = values['phone']?.toString() ?? '';
+    fullName = values['fullname']?.toString() ?? '';
+    email = values['email']?.toString() ?? '';
+    
+    print('Firebase에서 받은 데이터:');
+    print('id: $id');
+    print('phone: $phone');
+    print('fullName: $fullName');
+    print('email: $email');
   }
 }
