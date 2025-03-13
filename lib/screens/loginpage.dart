@@ -1,5 +1,6 @@
 import 'package:cabrider/brand_colors.dart';
 import 'package:cabrider/screens/mainpage.dart';
+import 'package:cabrider/screens/registrationpage.dart';
 import 'package:cabrider/widgets/ProgressDialog.dart';
 import 'package:cabrider/widgets/TaxiButton.dart';
 import 'package:flutter/foundation.dart';
@@ -165,7 +166,13 @@ class _LoginpageState extends State<Loginpage> {
                 ),
 
                 TextButton(
-                  onPressed: () {},
+                  onPressed: () {
+                    Navigator.pushNamedAndRemoveUntil(
+                      context,
+                      RegistrationPage.id,
+                      (route) => false,
+                    );
+                  },
                   child: Text(
                     'Don\'t have an account? Create Account',
                     style: TextStyle(color: Colors.black),

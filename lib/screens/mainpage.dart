@@ -1,6 +1,7 @@
 import 'package:cabrider/datamodels/nearbydriver.dart';
 import 'package:cabrider/globalvariable.dart';
 import 'package:cabrider/helpers/firehelper.dart';
+import 'package:cabrider/widgets/NoDriverDialog.dart';
 import 'package:cabrider/widgets/ProgressDialog.dart';
 import 'package:cabrider/widgets/TaxiButton.dart';
 import 'package:flutter/material.dart';
@@ -103,7 +104,10 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
 
   Directiondetails? tripDirectionDetails;
 
+  List<NearbyDriver> availableDrivers = [];
+
   bool nearbyDriverKeysLoaded = false;
+
   void SetupPositionLocator() async {
     try {
       Position position = await Geolocator.getCurrentPosition(
@@ -623,10 +627,10 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  Provider.of<AppData>(
-                                        context,
-                                      ).pickupAddress?.placeFormattedAddress ??
-                                      'Add Home',
+                                  // Provider.of<AppData>(
+                                  //       context,
+                                  //     ).pickupAddress?.placeFormattedAddress ??
+                                  'Add Home',
                                 ),
                                 SizedBox(height: 3),
                                 Text(
@@ -784,6 +788,10 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                             color: BrandColors.colorGreen,
                             onPressed: () {
                               showRequestingSheet();
+
+                              availableDrivers = FireHelper.nearbyDriverList;
+
+                              findDriver();
                             },
                           ),
                         ),
@@ -1009,8 +1017,14 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
   }
 
   void startGeofireListener() {
-    if (currentPosition == null) return;
+    if (currentPosition == null) {
+      print('현재 위치가 null이어서 Geofire 리스너를 시작할 수 없습니다.');
+      return;
+    }
 
+    print(
+      'Geofire 리스너 시작: 위치(${currentPosition!.latitude}, ${currentPosition!.longitude}), 반경 20km',
+    );
     Geofire.initialize('driversAvailable');
 
     Geofire.queryAtLocation(
@@ -1018,57 +1032,61 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
       currentPosition!.longitude,
       20,
     )?.listen((map) {
-      print(map);
-
       if (map != null) {
         var callBack = map['callBack'];
+        var key = map['key'];
+        var lat = map['latitude'];
+        var lng = map['longitude'];
 
-        //latitude will be retrieved from map['latitude']
-        //longitude will be retrieved from map['longitude']
+        print('Geofire 이벤트: $callBack, 드라이버: $key, 위치: $lat, $lng');
 
         switch (callBack) {
           case Geofire.onKeyEntered:
+            print('새 드라이버 발견: $key, 위치: $lat, $lng');
             NearbyDriver nearbyDriver = NearbyDriver(
-              key: map['key'],
-              latitude: map['latitude'],
-              longitude: map['longitude'],
+              key: key,
+              latitude: lat,
+              longitude: lng,
             );
 
             FireHelper.nearbyDriverList.add(nearbyDriver);
+            print('현재 가용 드라이버 수: ${FireHelper.nearbyDriverList.length}');
 
             if (nearbyDriverKeysLoaded) {
               updateDriversOnMap();
             }
-
             break;
 
           case Geofire.onKeyExited:
-            FireHelper.removeFromList(map['key']);
+            print('드라이버 이탈: $key');
+            FireHelper.removeFromList(key);
             updateDriversOnMap();
             break;
 
           case Geofire.onKeyMoved:
-            // Update your key's location
-            FireHelper.nearbyDriverList[map['key']] = NearbyDriver(
-              key: map['key'],
-              latitude: map['latitude'],
-              longitude: map['longitude'],
+            print('드라이버 이동: $key, 새 위치: $lat, $lng');
+            // 드라이버 위치 업데이트 로직 수정
+            int index = FireHelper.nearbyDriverList.indexWhere(
+              (driver) => driver.key == key,
             );
-            FireHelper.updateNearbyLocation(
-              NearbyDriver(
-                key: map['key'],
-                latitude: map['latitude'],
-                longitude: map['longitude'],
-              ),
-            );
+            if (index >= 0) {
+              FireHelper.nearbyDriverList[index].latitude = lat;
+              FireHelper.nearbyDriverList[index].longitude = lng;
+            } else {
+              print('경고: 이동한 드라이버 $key를 목록에서 찾을 수 없습니다.');
+              FireHelper.nearbyDriverList.add(
+                NearbyDriver(key: key, latitude: lat, longitude: lng),
+              );
+            }
             updateDriversOnMap();
             break;
 
           case Geofire.onGeoQueryReady:
-            // All Intial Data is loaded
+            print(
+              'Geofire 초기 데이터 로드 완료. 가용 드라이버 수: ${FireHelper.nearbyDriverList.length}',
+            );
             nearbyDriverKeysLoaded = true;
             updateDriversOnMap();
-
             break;
         }
       }
@@ -1216,5 +1234,121 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
     });
 
     SetupPositionLocator();
+  }
+
+  void noDriverFound() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) => const NoDriverDialog(),
+    );
+  }
+
+  void findDriver() {
+    if (availableDrivers.isEmpty) {
+      print('사용 가능한 드라이버가 없습니다.');
+      cancelRequest();
+      resetApp();
+      noDriverFound();
+      return;
+    }
+
+    print('사용 가능한 드라이버 수: ${availableDrivers.length}');
+    print('사용 가능한 드라이버 목록:');
+    for (var driver in availableDrivers) {
+      print(
+        '- 드라이버 ID: ${driver.key}, 위치: ${driver.latitude}, ${driver.longitude}',
+      );
+    }
+
+    var driver = availableDrivers[0];
+    print('선택된 드라이버: ${driver.key}');
+
+    // 드라이버에게 알림 전송
+    notifyDriver(driver);
+
+    // 다음 드라이버를 위해 목록에서 제거
+    availableDrivers.removeAt(0);
+
+    // 10초 후에도 응답이 없으면 다음 드라이버에게 알림
+    Future.delayed(Duration(seconds: 10), () {
+      // 드라이버 응답 확인
+      DatabaseReference driverResponseRef = FirebaseDatabase.instance
+          .ref()
+          .child('rideRequest/${rideRef.key}/status');
+
+      driverResponseRef.once().then((DatabaseEvent event) {
+        if (event.snapshot.value == 'pending' && availableDrivers.isNotEmpty) {
+          print('첫 번째 드라이버가 응답하지 않았습니다. 다음 드라이버에게 알림을 보냅니다.');
+          findDriver();
+        }
+      });
+    });
+  }
+
+  void notifyDriver(NearbyDriver driver) {
+    // 드라이버 ID 로깅
+    print('알림을 보낼 드라이버 ID: ${driver.key}');
+
+    // 드라이버에게 직접 알림 전송
+    HelperMethods.sendNotification(driver.key, context, rideRef.key);
+
+    // 테스트용: 모든 가능한 경로에 알림 데이터 저장
+    testAllNotificationPaths(driver.key, rideRef.key);
+  }
+
+  // 테스트용: 모든 가능한 경로에 알림 데이터 저장
+  void testAllNotificationPaths(String driverId, String? rideId) async {
+    if (rideId == null) return;
+
+    try {
+      print('===== 테스트: 모든 가능한 경로에 알림 데이터 저장 =====');
+
+      // 1. drivers/{driverId}/newtrip 경로
+      await FirebaseDatabase.instance
+          .ref()
+          .child('drivers/$driverId/newtrip')
+          .set(rideId);
+      print('1. drivers/$driverId/newtrip 경로에 저장 완료');
+
+      // 2. drivers/{driverId}/newRequest 경로
+      await FirebaseDatabase.instance
+          .ref()
+          .child('drivers/$driverId/newRequest')
+          .set(rideId);
+      print('2. drivers/$driverId/newRequest 경로에 저장 완료');
+
+      // 3. driver_notifications/{driverId} 경로
+      var notificationData = {
+        'ride_id': rideId,
+        'timestamp': DateTime.now().millisecondsSinceEpoch,
+        'status': 'new',
+      };
+      await FirebaseDatabase.instance
+          .ref()
+          .child('driver_notifications/$driverId')
+          .push()
+          .set(notificationData);
+      print('3. driver_notifications/$driverId 경로에 저장 완료');
+
+      // 4. driversAvailable/{driverId}/notifications 경로
+      await FirebaseDatabase.instance
+          .ref()
+          .child('driversAvailable/$driverId/notifications')
+          .set(rideId);
+      print('4. driversAvailable/$driverId/notifications 경로에 저장 완료');
+
+      // 5. notifications/{driverId} 경로
+      await FirebaseDatabase.instance
+          .ref()
+          .child('notifications/$driverId')
+          .push()
+          .set(notificationData);
+      print('5. notifications/$driverId 경로에 저장 완료');
+
+      print('===== 테스트 완료: 모든 가능한 경로에 알림 데이터 저장됨 =====');
+    } catch (e) {
+      print('테스트 중 오류 발생: $e');
+    }
   }
 }

@@ -1,7 +1,9 @@
 import 'package:cabrider/dataprovider/appdata.dart';
+import 'package:cabrider/globalvariable.dart';
 import 'package:cabrider/screens/loginpage.dart';
 import 'package:cabrider/screens/mainpage.dart';
 import 'package:cabrider/screens/registrationpage.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'dart:io';
@@ -29,6 +31,8 @@ Future<void> main() async {
             ),
   );
 
+  currentFirebaseUser = await FirebaseAuth.instance.currentUser;
+
   runApp(const MyApp());
 }
 
@@ -46,7 +50,8 @@ class MyApp extends StatelessWidget {
           fontFamily: 'Brand-Regular',
           primarySwatch: Colors.blue,
         ),
-        initialRoute: RegistrationPage.id,
+        initialRoute:
+            (currentFirebaseUser == null) ? Loginpage.id : MainPage.id,
         routes: {
           MainPage.id: (context) => MainPage(),
           RegistrationPage.id: (context) => RegistrationPage(),

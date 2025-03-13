@@ -1,4 +1,5 @@
 import 'dart:math';
+import 'dart:convert';
 
 import 'package:cabrider/datamodels/address.dart';
 import 'package:cabrider/datamodels/directiondetails.dart';
@@ -8,11 +9,13 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:cabrider/globalvariable.dart';
 import 'package:cabrider/helpers/requesthelper.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart' as auth;
 import 'package:firebase_database/firebase_database.dart';
 import 'package:cabrider/datamodels/user.dart';
+import 'package:flutter/foundation.dart';
 
 class HelperMethods {
   static void getCurrentUserInfo() async {
@@ -202,5 +205,142 @@ class HelperMethods {
     var randomGenerator = Random();
     int randInt = randomGenerator.nextInt(max);
     return randInt.toDouble();
+  }
+
+  static Future<void> sendNotification(
+    String driverId,
+    BuildContext context,
+    String? ride_id,
+  ) async {
+    if (ride_id == null) {
+      print('ride_id가 null입니다');
+      return;
+    }
+
+    var destination =
+        Provider.of<AppData>(context, listen: false).destinationAddress;
+
+    // 알림 전송 정보 로깅
+    print('===== 드라이버 알림 정보 =====');
+    print('드라이버 ID: $driverId');
+    print('목적지: ${destination?.placeName}');
+    print('라이드 ID: $ride_id');
+    print('============================');
+
+    // 드라이버 상태 확인
+    try {
+      // 1. 드라이버 기본 정보 확인
+      DatabaseReference driverRef = FirebaseDatabase.instance.ref().child(
+        'drivers/$driverId',
+      );
+
+      final driverSnapshot = await driverRef.once();
+      if (driverSnapshot.snapshot.value == null) {
+        print('경고: 드라이버 ID $driverId에 해당하는 데이터가 없습니다!');
+
+        // 드라이버 노드 생성 시도
+        await driverRef.set({
+          'newtrip': ride_id,
+          'created_at': DateTime.now().toString(),
+        });
+        print('드라이버 노드를 새로 생성했습니다: drivers/$driverId');
+      } else {
+        print('드라이버 데이터 확인: ${driverSnapshot.snapshot.value}');
+      }
+
+      // 2. 드라이버 온라인 상태 확인
+      DatabaseReference availableDriversRef = FirebaseDatabase.instance
+          .ref()
+          .child('driversAvailable/$driverId');
+
+      final availableSnapshot = await availableDriversRef.once();
+      if (availableSnapshot.snapshot.value == null) {
+        print('경고: 드라이버가 온라인 상태가 아닙니다!');
+
+        // 테스트용: 온라인 상태로 설정
+        await availableDriversRef.set({
+          'latitude': 37.42796133580664,
+          'longitude': -122.085749655962,
+          'timestamp': DateTime.now().millisecondsSinceEpoch,
+        });
+        print('드라이버를 온라인 상태로 설정했습니다: driversAvailable/$driverId');
+      } else {
+        print('드라이버 온라인 상태 확인: ${availableSnapshot.snapshot.value}');
+      }
+    } catch (e) {
+      print('드라이버 상태 확인 중 오류 발생: $e');
+    }
+
+    // Firebase Database를 통한 직접 알림
+    try {
+      // 1. 드라이버의 newtrip 필드에 ride_id 저장
+      DatabaseReference driverTripRef = FirebaseDatabase.instance.ref().child(
+        'drivers/$driverId/newtrip',
+      );
+      await driverTripRef.set(ride_id);
+      print('1. 드라이버 데이터베이스에 라이드 ID 저장 완료: drivers/$driverId/newtrip');
+
+      // 2. 드라이버의 newRequest 필드에도 저장 (다른 이름으로 시도)
+      DatabaseReference driverRequestRef = FirebaseDatabase.instance
+          .ref()
+          .child('drivers/$driverId/newRequest');
+      await driverRequestRef.set(ride_id);
+      print('2. 드라이버 데이터베이스에 라이드 ID 저장 완료: drivers/$driverId/newRequest');
+
+      // 3. 드라이버 알림 데이터 저장
+      DatabaseReference notificationsRef = FirebaseDatabase.instance
+          .ref()
+          .child('driver_notifications/$driverId');
+
+      Map<String, dynamic> notificationData = {
+        'ride_id': ride_id,
+        'timestamp': ServerValue.timestamp,
+        'destination': destination?.placeName ?? 'Unknown',
+        'status': 'new',
+        'pickup_address':
+            Provider.of<AppData>(
+              context,
+              listen: false,
+            ).pickupAddress?.placeName ??
+            'Unknown',
+        'rider_name': currentUserInfo?.fullName ?? 'Unknown',
+        'rider_phone': currentUserInfo?.phone ?? 'Unknown',
+      };
+
+      await notificationsRef.push().set(notificationData);
+      print('3. 드라이버 알림 데이터 저장 완료: driver_notifications/$driverId');
+
+      // 4. 일반 notifications 경로에도 저장
+      DatabaseReference generalNotificationsRef = FirebaseDatabase.instance
+          .ref()
+          .child('notifications/$driverId');
+      await generalNotificationsRef.push().set(notificationData);
+      print('4. 일반 알림 데이터 저장 완료: notifications/$driverId');
+
+      // 성공 메시지 표시
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('드라이버에게 요청이 전송되었습니다'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+    } catch (e) {
+      print('드라이버 데이터베이스 업데이트 중 오류 발생: $e');
+
+      // 오류 메시지 표시
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('드라이버 알림 전송 실패: ${e.toString()}'),
+          duration: Duration(seconds: 2),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  // 이 메서드는 더 이상 사용되지 않습니다
+  static Future<String> getAccessToken() async {
+    print('FCM HTTP v1 API를 사용하려면 서버 측 구현이 필요합니다');
+    return 'access_token_here';
   }
 }
