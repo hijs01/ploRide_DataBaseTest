@@ -1,6 +1,8 @@
 import 'package:cabrider/datamodels/nearbydriver.dart';
 import 'package:cabrider/globalvariable.dart';
 import 'package:cabrider/helpers/firehelper.dart';
+import 'package:cabrider/rideVariables.dart';
+import 'package:cabrider/widgets/CollectPaymentDialog.dart';
 import 'package:cabrider/widgets/NoDriverDialog.dart';
 import 'package:cabrider/widgets/ProgressDialog.dart';
 import 'package:cabrider/widgets/TaxiButton.dart';
@@ -39,7 +41,18 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
   double searchSheetHeight = (Platform.isIOS) ? 300 : 275;
   double rideDetailsSheetHeight = 0;
   double requestingSheetHeight = 0;
+  double tripsheetHeight = 0;
+
   final Set<String> keysRetrieved = <String>{};
+  late DatabaseReference driverTripRef;
+  int driverRequestTimeout = 30;
+  String status = '';
+  String driverCarDetails = '';
+  String driverFullName = '';
+  String driverPhoneNumber = '';
+  String tripStatusDisplay = 'Driver is Arriving';
+  bool isRequestingLocationDetails = false;
+  late StreamSubscription<DatabaseEvent> rideSubscription;
 
   DatabaseReference rideRef = FirebaseDatabase.instance.ref().child(
     'rideRequest',
@@ -62,7 +75,15 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
 
   late BitmapDescriptor nearbyIcon;
 
+  String appState = "NORMAL";
+
   bool drawerCanOpen = true;
+
+  Directiondetails? tripDirectionDetails;
+
+  List<NearbyDriver> availableDrivers = [];
+
+  bool nearbyDriverKeysLoaded = false;
 
   void showDetailSheet() async {
     await getDirection();
@@ -86,6 +107,14 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
     });
   }
 
+  void showTripSheet() {
+    setState(() {
+      requestingSheetHeight = 0;
+      tripsheetHeight = (Platform.isAndroid) ? 275 : 300;
+      mapBottomPadding = (Platform.isAndroid) ? 280 : 270;
+    });
+  }
+
   void createMarker() {
     ImageConfiguration imageConfiguration = createLocalImageConfiguration(
       context,
@@ -101,12 +130,6 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
 
   // 현재 위치 변수 추가
   Position? currentPosition;
-
-  Directiondetails? tripDirectionDetails;
-
-  List<NearbyDriver> availableDrivers = [];
-
-  bool nearbyDriverKeysLoaded = false;
 
   void SetupPositionLocator() async {
     try {
@@ -259,6 +282,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
   @override
   void dispose() {
     _loadingController.dispose();
+    rideSubscription.cancel();
     super.dispose();
   }
 
@@ -539,7 +563,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
               right: 0,
               bottom: 0,
               child: AnimatedSize(
-                duration: new Duration(milliseconds: 150),
+                duration: Duration(milliseconds: 150),
                 curve: Curves.easeIn,
                 child: Container(
                   height: searchSheetHeight,
@@ -685,7 +709,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
               right: 0,
               bottom: -1,
               child: AnimatedSize(
-                duration: new Duration(milliseconds: 150),
+                duration: Duration(milliseconds: 150),
                 child: Container(
                   decoration: BoxDecoration(
                     color: Colors.white,
@@ -787,6 +811,10 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                             text: 'REQUEST CAB',
                             color: BrandColors.colorGreen,
                             onPressed: () {
+                              setState(() {
+                                appState = "REQUESTING";
+                              });
+
                               showRequestingSheet();
 
                               availableDrivers = FireHelper.nearbyDriverList;
@@ -794,6 +822,135 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                               findDriver();
                             },
                           ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
+            //Trip sheet
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: AnimatedSize(
+                duration: Duration(milliseconds: 150),
+                curve: Curves.easeIn,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.only(
+                      topLeft: Radius.circular(15),
+                      topRight: Radius.circular(15),
+                    ),
+                  ),
+                  height: tripsheetHeight,
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: <Widget>[
+                        SizedBox(height: 5),
+
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              tripStatusDisplay,
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontFamily: 'Brand-Bold',
+                                color: BrandColors.colorTextDark,
+                              ),
+                            ),
+                          ],
+                        ),
+
+                        SizedBox(height: 20),
+
+                        BrandDivider(),
+
+                        SizedBox(height: 20),
+
+                        Text(
+                          driverCarDetails,
+                          style: TextStyle(color: BrandColors.colorTextLight),
+                        ),
+
+                        Text(driverFullName, style: TextStyle(fontSize: 20)),
+
+                        SizedBox(height: 20),
+
+                        BrandDivider(),
+
+                        SizedBox(height: 20),
+
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                          children: [
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                Container(
+                                  height: 50,
+                                  width: 50,
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(25),
+                                    border: Border.all(
+                                      width: 1,
+                                      color: BrandColors.colorTextLight,
+                                    ),
+                                  ),
+                                  child: Icon(Icons.call),
+                                ),
+                                SizedBox(height: 10),
+                                Text('Call'),
+                              ],
+                            ),
+
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                Container(
+                                  height: 50,
+                                  width: 50,
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(25),
+                                    border: Border.all(
+                                      width: 1,
+                                      color: BrandColors.colorTextLight,
+                                    ),
+                                  ),
+                                  child: Icon(Icons.list),
+                                ),
+                                SizedBox(height: 10),
+                                Text('Details'),
+                              ],
+                            ),
+
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                Container(
+                                  height: 50,
+                                  width: 50,
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(25),
+                                    border: Border.all(
+                                      width: 1,
+                                      color: BrandColors.colorTextLight,
+                                    ),
+                                  ),
+                                  child: Icon(OMIcons.clear),
+                                ),
+                                SizedBox(height: 10),
+                                Text('Cancel'),
+                              ],
+                            ),
+                          ],
                         ),
                       ],
                     ),
@@ -1214,10 +1371,168 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
         ),
       );
     }
+
+    rideSubscription = rideRef.onValue.listen((DatabaseEvent event) async {
+      // check for null snapshot
+      if (event.snapshot.value == null) {
+        return;
+      }
+
+      // Firebase 데이터를 Map으로 캐스팅
+      Map<dynamic, dynamic> rideData =
+          event.snapshot.value as Map<dynamic, dynamic>;
+
+      //get car details
+      if (rideData['car_details'] != null) {
+        setState(() {
+          driverCarDetails = rideData['car_details'].toString();
+        });
+      }
+
+      //get driver name
+      if (rideData['driver_name'] != null) {
+        setState(() {
+          driverFullName = rideData['driver_name'].toString();
+        });
+      }
+
+      //get driver phone number
+      if (rideData['driver_phone'] != null) {
+        setState(() {
+          driverPhoneNumber = rideData['driver_phone'].toString();
+        });
+      }
+
+      //get and use driver location updates
+      if (rideData['driver_location'] != null) {
+        Map<dynamic, dynamic> location =
+            rideData['driver_location'] as Map<dynamic, dynamic>;
+        double driverLat = double.parse(location['latitude'].toString());
+        double driverLng = double.parse(location['longitude'].toString());
+        LatLng driverLocation = LatLng(driverLat, driverLng);
+
+        if (status == 'accepted') {
+          updateToPickup(driverLocation);
+        } else if (status == 'ontrip') {
+          updateToDestination(driverLocation);
+        } else if (status == 'arrived') {
+          setState(() {
+            tripStatusDisplay = 'Driver has arrived';
+          });
+        }
+      }
+
+      // status 확인 및 업데이트
+      if (rideData['status'] != null) {
+        setState(() {
+          status = rideData['status'].toString();
+        });
+      }
+
+      // status가 accepted이면 trip sheet 표시
+      if (status == 'accepted') {
+        showTripSheet();
+        removeGeofireMarkers();
+      }
+
+      if (status == 'ended') {
+        if (event.snapshot.value != null) {
+          Map<dynamic, dynamic> rideData =
+              event.snapshot.value as Map<dynamic, dynamic>;
+          if (rideData['fares'] != null) {
+            int fares = int.parse(rideData['fares'].toString());
+
+            var response = await showDialog(
+              context: context,
+              barrierDismissible: false,
+              builder:
+                  (BuildContext context) =>
+                      CollectPayment(paymentMethod: 'cash', fares: fares),
+            );
+
+            if (response == 'close') {
+              rideRef.onDisconnect();
+              rideSubscription.cancel();
+
+              // 새로운 참조로 초기화
+              rideRef = FirebaseDatabase.instance.ref().child('rideRequest');
+              rideSubscription = rideRef.onValue.listen((event) {});
+
+              resetApp();
+            }
+          }
+        }
+      }
+    });
+  }
+
+  void removeGeofireMarkers() {
+    setState(() {
+      _Markers.removeWhere((m) => m.markerId.value.contains('driver'));
+    });
+  }
+
+  void updateToPickup(LatLng driverLocation) async {
+    if (!isRequestingLocationDetails) {
+      isRequestingLocationDetails = true;
+
+      var positionLatLng = LatLng(
+        currentPosition!.latitude,
+        currentPosition!.longitude,
+      );
+
+      var thisDetails = await HelperMethods.getDirectionDetails(
+        driverLocation,
+        positionLatLng,
+      );
+
+      if (thisDetails == null) {
+        return;
+      }
+
+      setState(() {
+        tripStatusDisplay = 'Driver is Arriving - ${thisDetails.durationText}';
+      });
+
+      isRequestingLocationDetails = false;
+    }
+  }
+
+  void updateToDestination(LatLng driverLocation) async {
+    if (!isRequestingLocationDetails) {
+      isRequestingLocationDetails = true;
+
+      var destination =
+          Provider.of<AppData>(context, listen: false).destinationAddress;
+
+      var destinationLatLng = LatLng(
+        destination!.latitude,
+        destination.longitude,
+      );
+
+      var thisDetails = await HelperMethods.getDirectionDetails(
+        driverLocation,
+        destinationLatLng,
+      );
+
+      if (thisDetails == null) {
+        return;
+      }
+
+      setState(() {
+        tripStatusDisplay =
+            'Driving to Destination - ${thisDetails.durationText}';
+      });
+
+      isRequestingLocationDetails = false;
+    }
   }
 
   void cancelRequest() {
     rideRef.remove();
+    setState(() {
+      appState = "NORMAL";
+    });
   }
 
   resetApp() {
@@ -1228,9 +1543,16 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
       _Circles.clear();
       rideDetailsSheetHeight = 0;
       requestingSheetHeight = 0;
+      tripsheetHeight = 0;
       searchSheetHeight = (Platform.isAndroid) ? 275 : 300;
       mapBottomPadding = (Platform.isAndroid) ? 280 : 270;
       drawerCanOpen = true;
+
+      status = '';
+      driverFullName = '';
+      driverPhoneNumber = '';
+      driverCarDetails = '';
+      tripStatusDisplay = 'Driver is Arriving';
     });
 
     SetupPositionLocator();
@@ -1290,8 +1612,49 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
     // 드라이버 ID 로깅
     print('알림을 보낼 드라이버 ID: ${driver.key}');
 
+    // 드라이버 reference 초기화
+    driverTripRef = FirebaseDatabase.instance.ref().child(
+      'drivers/${driver.key}/newtrip',
+    );
+
     // 드라이버에게 직접 알림 전송
     HelperMethods.sendNotification(driver.key, context, rideRef.key);
+
+    // 30초 지나면 나가기
+    const oneSecTick = Duration(seconds: 1);
+
+    var timer = Timer.periodic(oneSecTick, (timer) {
+      // ride request 취소되면 타이머 멈추기
+      if (appState != "REQUESTING") {
+        driverTripRef.set('cancelled');
+        driverTripRef.onDisconnect();
+        timer.cancel();
+        driverRequestTimeout = 30;
+      }
+
+      driverRequestTimeout--;
+
+      // a value event listener for driver accepting the ride
+      driverTripRef.onValue.listen((event) {
+        // confirms that driver accepted the ride
+        if (event.snapshot.value.toString() == 'accepted') {
+          driverTripRef.onDisconnect();
+          timer.cancel();
+          driverRequestTimeout = 30;
+        }
+      });
+
+      if (driverRequestTimeout == 0) {
+        // 드라이버한터 타임아웃 알려주기
+        driverTripRef.set('timeout');
+        driverTripRef.onDisconnect();
+        driverRequestTimeout = 30;
+        timer.cancel();
+
+        // 다음 가장 가까운 드라이버 선택
+        findDriver();
+      }
+    });
 
     // 테스트용: 모든 가능한 경로에 알림 데이터 저장
     testAllNotificationPaths(driver.key, rideRef.key);
