@@ -1618,7 +1618,11 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
     );
 
     // 드라이버에게 직접 알림 전송
-    HelperMethods.sendNotification(driver.key, context, rideRef.key);
+    HelperMethods.sendNotification(
+      driverId: driver.key,
+      context: context,
+      ride_id: rideRef.key,
+    );
 
     // 30초 지나면 나가기
     const oneSecTick = Duration(seconds: 1);

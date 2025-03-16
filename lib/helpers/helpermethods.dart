@@ -16,6 +16,8 @@ import 'package:firebase_auth/firebase_auth.dart' as auth;
 import 'package:firebase_database/firebase_database.dart';
 import 'package:cabrider/datamodels/user.dart';
 import 'package:flutter/foundation.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter_geofire/flutter_geofire.dart';
 
 class HelperMethods {
   static void getCurrentUserInfo() async {
@@ -207,11 +209,11 @@ class HelperMethods {
     return randInt.toDouble();
   }
 
-  static Future<void> sendNotification(
-    String driverId,
-    BuildContext context,
-    String? ride_id,
-  ) async {
+  static Future<void> sendNotification({
+    required String driverId,
+    required BuildContext context,
+    required String? ride_id,
+  }) async {
     if (ride_id == null) {
       print('ride_id가 null입니다');
       return;
@@ -219,10 +221,12 @@ class HelperMethods {
 
     var destination =
         Provider.of<AppData>(context, listen: false).destinationAddress;
+    var pickup = Provider.of<AppData>(context, listen: false).pickupAddress;
 
     // 알림 전송 정보 로깅
     print('===== 드라이버 알림 정보 =====');
     print('드라이버 ID: $driverId');
+    print('픽업 지점: ${pickup?.placeName}');
     print('목적지: ${destination?.placeName}');
     print('라이드 ID: $ride_id');
     print('============================');
@@ -271,61 +275,46 @@ class HelperMethods {
       print('드라이버 상태 확인 중 오류 발생: $e');
     }
 
-    // Firebase Database를 통한 직접 알림
+    // Firebase Cloud Function을 호출하여 드라이버에게 알림 전송
     try {
-      // 1. 드라이버의 newtrip 필드에 ride_id 저장
-      DatabaseReference driverTripRef = FirebaseDatabase.instance.ref().child(
-        'drivers/$driverId/newtrip',
-      );
-      await driverTripRef.set(ride_id);
-      print('1. 드라이버 데이터베이스에 라이드 ID 저장 완료: drivers/$driverId/newtrip');
+      // Cloud Function URL
+      String url =
+          'https://us-central1-geetaxi-aa379.cloudfunctions.net/sendPushToDriver';
 
-      // 2. 드라이버의 newRequest 필드에도 저장 (다른 이름으로 시도)
-      DatabaseReference driverRequestRef = FirebaseDatabase.instance
-          .ref()
-          .child('drivers/$driverId/newRequest');
-      await driverRequestRef.set(ride_id);
-      print('2. 드라이버 데이터베이스에 라이드 ID 저장 완료: drivers/$driverId/newRequest');
-
-      // 3. 드라이버 알림 데이터 저장
-      DatabaseReference notificationsRef = FirebaseDatabase.instance
-          .ref()
-          .child('driver_notifications/$driverId');
-
-      Map<String, dynamic> notificationData = {
-        'ride_id': ride_id,
-        'timestamp': ServerValue.timestamp,
-        'destination': destination?.placeName ?? 'Unknown',
-        'status': 'new',
-        'pickup_address':
-            Provider.of<AppData>(
-              context,
-              listen: false,
-            ).pickupAddress?.placeName ??
-            'Unknown',
-        'rider_name': currentUserInfo?.fullName ?? 'Unknown',
-        'rider_phone': currentUserInfo?.phone ?? 'Unknown',
+      // 요청 데이터 준비
+      Map<String, dynamic> requestData = {
+        'driverId': driverId,
+        'rideId': ride_id,
+        'pickup_address': pickup?.placeName ?? '',
+        'destination_address': destination?.placeName ?? '',
       };
 
-      await notificationsRef.push().set(notificationData);
-      print('3. 드라이버 알림 데이터 저장 완료: driver_notifications/$driverId');
+      print('Cloud Function 호출: $url');
+      print('요청 데이터: $requestData');
 
-      // 4. 일반 notifications 경로에도 저장
-      DatabaseReference generalNotificationsRef = FirebaseDatabase.instance
-          .ref()
-          .child('notifications/$driverId');
-      await generalNotificationsRef.push().set(notificationData);
-      print('4. 일반 알림 데이터 저장 완료: notifications/$driverId');
-
-      // 성공 메시지 표시
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('드라이버에게 요청이 전송되었습니다'),
-          duration: Duration(seconds: 2),
-        ),
+      // HTTP POST 요청 보내기
+      var response = await http.post(
+        Uri.parse(url),
+        body: jsonEncode(requestData),
+        headers: {'Content-Type': 'application/json'},
       );
+
+      print('응답 상태 코드: ${response.statusCode}');
+      print('응답 내용: ${response.body}');
+
+      if (response.statusCode == 200) {
+        // 성공 메시지 표시
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('드라이버에게 요청이 전송되었습니다'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      } else {
+        throw Exception('요청 실패: ${response.statusCode}');
+      }
     } catch (e) {
-      print('드라이버 데이터베이스 업데이트 중 오류 발생: $e');
+      print('드라이버 알림 전송 중 오류 발생: $e');
 
       // 오류 메시지 표시
       ScaffoldMessenger.of(context).showSnackBar(
@@ -338,9 +327,64 @@ class HelperMethods {
     }
   }
 
-  // 이 메서드는 더 이상 사용되지 않습니다
-  static Future<String> getAccessToken() async {
-    print('FCM HTTP v1 API를 사용하려면 서버 측 구현이 필요합니다');
-    return 'access_token_here';
+  // 문제가 되는 함수들 주석 처리
+  /*
+  static void disableHomTabLocationUpdates() {
+    homeTabPositionStream?.pause();
+    Geofire.removeLocation(currentFirebaseUser!.uid);
   }
+
+  static void enableHomTabLocationUpdates() {
+    homeTabPositionStream?.resume();
+    Geofire.setLocation(
+      currentFirebaseUser!.uid,
+      currentPosition!.latitude,
+      currentPosition!.longitude,
+    );
+  }
+  */
+
+  // FCM 토큰을 Firebase Database에 저장
+  static Future<void> updateDriverFcmToken() async {
+    // Firebase Messaging 인스턴스 확인
+    final FirebaseMessaging fcm = FirebaseMessaging.instance;
+
+    // 현재 FCM 토큰 가져오기
+    String? token = await fcm.getToken();
+
+    // 토큰과 사용자 ID가 유효한지 확인
+    if (token != null && currentFirebaseUser != null) {
+      // drivers/{driverId}/fcm_token 경로에 토큰 저장
+      DatabaseReference tokenRef = FirebaseDatabase.instance.ref().child(
+        'drivers/${currentFirebaseUser!.uid}/fcm_token',
+      );
+
+      await tokenRef.set(token);
+      print('드라이버 FCM 토큰 저장 완료: $token');
+
+      // FCM 토큰 갱신 리스너 설정
+      fcm.onTokenRefresh.listen((newToken) {
+        DatabaseReference newTokenRef = FirebaseDatabase.instance.ref().child(
+          'drivers/${currentFirebaseUser!.uid}/fcm_token',
+        );
+        newTokenRef.set(newToken);
+        print('드라이버 FCM 토큰 갱신됨: $newToken');
+      });
+    } else {
+      print('FCM 토큰 저장 실패: 토큰 또는 사용자 ID가 없습니다.');
+    }
+  }
+
+  // ProgressDialog 관련 함수 주석 처리
+  /*
+  static void showProgressDialog(context) {
+    showDialog(
+      barrierDismissible: false,
+      context: context,
+      builder:
+          (BuildContext context) =>
+              const ProgressDialog(status: "Please wait..."),
+    );
+  }
+  */
 }

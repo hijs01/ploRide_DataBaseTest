@@ -1,6 +1,5 @@
 # Uncomment this line to define a global platform for your project
-  # platform :ios, '12.0'
-  # use_frameworks!
+platform :ios, '15.0'
 
 # CocoaPods analytics sends network stats synchronously affecting flutter build latency.
 ENV['COCOAPODS_DISABLE_STATS'] = 'true'
@@ -29,16 +28,44 @@ require File.expand_path(File.join('packages', 'flutter_tools', 'bin', 'podhelpe
 flutter_ios_podfile_setup
 
 target 'Runner' do
+  # 정적 링키지 대신 동적 링키지 사용
   use_frameworks!
+  use_modular_headers!
 
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
-  target 'RunnerTests' do
-    inherit! :search_paths
-  end
+
+  # Firebase 설정 업데이트
+  pod 'Firebase', :modular_headers => true
+  pod 'FirebaseCore', :modular_headers => true
+  pod 'GoogleUtilities', :modular_headers => true
+  
+  # 추가 Firebase 패키지
+  pod 'FirebaseMessaging', :modular_headers => true
+  pod 'FirebaseDatabase', :modular_headers => true
+  pod 'FirebaseAuth', :modular_headers => true
 end
 
 post_install do |installer|
+  # Flutter post install
   installer.pods_project.targets.each do |target|
     flutter_additional_ios_build_settings(target)
+    
+    # 모든 타겟에 대해 설정
+    target.build_configurations.each do |config|
+      config.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
+      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'
+      config.build_settings['BUILD_LIBRARY_FOR_DISTRIBUTION'] = 'YES'
+      
+      # 추가 설정
+      config.build_settings['ENABLE_BITCODE'] = 'NO'
+      
+      # Add the preprocessor definition
+      config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] ||= [
+        '$(inherited)',
+        'COCOAPODS=1',
+        'LIBRARY_SEARCH_PATHS="$(TOOLCHAIN_DIR)/usr/lib/swift/$(PLATFORM_NAME)"',
+        'SWIFT_VERSION=5.0'
+      ]
+    end
   end
 end
