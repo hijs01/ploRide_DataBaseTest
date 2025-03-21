@@ -7,7 +7,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_database/firebase_database.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 
 class Loginpage extends StatefulWidget {
@@ -56,21 +56,29 @@ class _LoginpageState extends State<Loginpage> {
       final User? user = userCredential.user;
 
       if (user != null) {
-        DatabaseReference userRef = FirebaseDatabase.instance.ref().child(
-          'users/${user.uid}',
-        );
-        userRef.once().then((DatabaseEvent event) {
-          if (event.snapshot.value != null) {
-            Navigator.pushNamedAndRemoveUntil(
-              context,
-              MainPage.id,
-              (route) => false,
-            );
-          }
-        });
+        final userDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .get();
+
+        if (userDoc.exists) {
+          Navigator.pop(context);
+          Navigator.pushNamedAndRemoveUntil(
+            context,
+            MainPage.id,
+            (route) => false,
+          );
+        } else {
+          Navigator.pop(context);
+          showSnackBar('User data not found');
+        }
       }
     } on FirebaseAuthException catch (e) {
+      Navigator.pop(context);
       showSnackBar(e.message ?? 'An error occurred during sign in');
+    } catch (e) {
+      Navigator.pop(context);
+      showSnackBar('An unexpected error occurred');
     }
   }
 
