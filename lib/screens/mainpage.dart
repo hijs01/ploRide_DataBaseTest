@@ -1,3 +1,4 @@
+import 'dart:io' show Platform;
 import 'package:cabrider/datamodels/nearbydriver.dart';
 import 'package:cabrider/globalvariable.dart';
 import 'package:cabrider/helpers/firehelper.dart';
@@ -17,7 +18,6 @@ import 'dart:async';
 import 'package:geolocator/geolocator.dart';
 import 'package:cabrider/brand_colors.dart';
 import 'package:outline_material_icons/outline_material_icons.dart';
-import 'dart:io' show Platform;
 import 'package:cabrider/helpers/helpermethods.dart';
 import 'package:cabrider/styles/styles.dart';
 import 'package:cabrider/widgets/BrandDivider.dart';
@@ -27,6 +27,8 @@ import 'package:cabrider/datamodels/directiondetails.dart';
 import 'package:cabrider/datamodels/address.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:animated_text_kit/animated_text_kit.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_database/firebase_database.dart';
 
 class MainPage extends StatefulWidget {
   const MainPage({super.key});
@@ -1329,18 +1331,18 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
     }
 
     try {
-      Map pickupMap = {
+      Map<String, dynamic> pickupMap = {
         'latitude': pickup.latitude.toString(),
         'longitude': pickup.longitude.toString(),
       };
 
-      Map destinationMap = {
+      Map<String, dynamic> destinationMap = {
         'latitude': destination.latitude.toString(),
         'longitude': destination.longitude.toString(),
       };
 
-      Map rideMap = {
-        'created_at': DateTime.now().toString(),
+      Map<String, dynamic> rideMap = {
+        'created_at': FieldValue.serverTimestamp(),
         'rider_name': currentUserInfo!.fullName,
         'rider_phone': currentUserInfo!.phone,
         'pickup_address': pickup.placeName,
@@ -1354,13 +1356,74 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
         'fare': HelperMethods.estimateFares(tripDirectionDetails!),
       };
 
-      print('Firebase에 전송할 데이터:');
+      print('Firestore에 전송할 데이터:');
       print(rideMap);
 
-      var newRideRef = await rideRef.push();
-      print('생성된 ride reference: ${newRideRef.key}');
-      await newRideRef.set(rideMap);
-      print('Firebase에 데이터 전송 완료');
+      // Firestore에 라이드 요청 저장
+      DocumentReference newRideRef = await FirebaseFirestore.instance
+          .collection('rideRequests')
+          .add(rideMap);
+      
+      print('생성된 ride reference: ${newRideRef.id}');
+      
+      // 실시간 업데이트 리스너 설정
+      newRideRef.snapshots().listen((DocumentSnapshot snapshot) {
+        if (snapshot.exists) {
+          Map<String, dynamic> rideData = snapshot.data() as Map<String, dynamic>;
+          
+          // 차량 정보 업데이트
+          if (rideData['car_details'] != null) {
+            setState(() {
+              driverCarDetails = rideData['car_details'].toString();
+            });
+          }
+
+          // 드라이버 정보 업데이트
+          if (rideData['driver_name'] != null) {
+            setState(() {
+              driverFullName = rideData['driver_name'].toString();
+            });
+          }
+
+          // 드라이버 전화번호 업데이트
+          if (rideData['driver_phone'] != null) {
+            setState(() {
+              driverPhoneNumber = rideData['driver_phone'].toString();
+            });
+          }
+
+          // 드라이버 위치 업데이트
+          if (rideData['driver_location'] != null) {
+            Map<String, dynamic> location = rideData['driver_location'] as Map<String, dynamic>;
+            double driverLat = double.parse(location['latitude'].toString());
+            double driverLng = double.parse(location['longitude'].toString());
+            LatLng driverLocation = LatLng(driverLat, driverLng);
+
+            if (rideData['status'] == 'accepted') {
+              updateToPickup(driverLocation);
+            } else if (rideData['status'] == 'ontrip') {
+              updateToDestination(driverLocation);
+            } else if (rideData['status'] == 'arrived') {
+              setState(() {
+                tripStatusDisplay = 'Driver has arrived';
+              });
+            }
+          }
+
+          // 상태 업데이트
+          if (rideData['status'] != null) {
+            setState(() {
+              status = rideData['status'].toString();
+            });
+          }
+
+          // accepted 상태일 때 trip sheet 표시
+          if (status == 'accepted') {
+            showTripSheet();
+            removeGeofireMarkers();
+          }
+        }
+      });
     } catch (e) {
       print('요청 생성 중 오류 발생: $e');
       print('Stack trace: ${StackTrace.current}');
@@ -1371,99 +1434,6 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
         ),
       );
     }
-
-    rideSubscription = rideRef.onValue.listen((DatabaseEvent event) async {
-      // check for null snapshot
-      if (event.snapshot.value == null) {
-        return;
-      }
-
-      // Firebase 데이터를 Map으로 캐스팅
-      Map<dynamic, dynamic> rideData =
-          event.snapshot.value as Map<dynamic, dynamic>;
-
-      //get car details
-      if (rideData['car_details'] != null) {
-        setState(() {
-          driverCarDetails = rideData['car_details'].toString();
-        });
-      }
-
-      //get driver name
-      if (rideData['driver_name'] != null) {
-        setState(() {
-          driverFullName = rideData['driver_name'].toString();
-        });
-      }
-
-      //get driver phone number
-      if (rideData['driver_phone'] != null) {
-        setState(() {
-          driverPhoneNumber = rideData['driver_phone'].toString();
-        });
-      }
-
-      //get and use driver location updates
-      if (rideData['driver_location'] != null) {
-        Map<dynamic, dynamic> location =
-            rideData['driver_location'] as Map<dynamic, dynamic>;
-        double driverLat = double.parse(location['latitude'].toString());
-        double driverLng = double.parse(location['longitude'].toString());
-        LatLng driverLocation = LatLng(driverLat, driverLng);
-
-        if (status == 'accepted') {
-          updateToPickup(driverLocation);
-        } else if (status == 'ontrip') {
-          updateToDestination(driverLocation);
-        } else if (status == 'arrived') {
-          setState(() {
-            tripStatusDisplay = 'Driver has arrived';
-          });
-        }
-      }
-
-      // status 확인 및 업데이트
-      if (rideData['status'] != null) {
-        setState(() {
-          status = rideData['status'].toString();
-        });
-      }
-
-      // status가 accepted이면 trip sheet 표시
-      if (status == 'accepted') {
-        showTripSheet();
-        removeGeofireMarkers();
-      }
-
-      if (status == 'ended') {
-        if (event.snapshot.value != null) {
-          Map<dynamic, dynamic> rideData =
-              event.snapshot.value as Map<dynamic, dynamic>;
-          if (rideData['fares'] != null) {
-            int fares = int.parse(rideData['fares'].toString());
-
-            var response = await showDialog(
-              context: context,
-              barrierDismissible: false,
-              builder:
-                  (BuildContext context) =>
-                      CollectPayment(paymentMethod: 'cash', fares: fares),
-            );
-
-            if (response == 'close') {
-              rideRef.onDisconnect();
-              rideSubscription.cancel();
-
-              // 새로운 참조로 초기화
-              rideRef = FirebaseDatabase.instance.ref().child('rideRequest');
-              rideSubscription = rideRef.onValue.listen((event) {});
-
-              resetApp();
-            }
-          }
-        }
-      }
-    });
   }
 
   void removeGeofireMarkers() {

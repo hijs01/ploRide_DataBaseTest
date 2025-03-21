@@ -5,7 +5,7 @@ import 'package:cabrider/widgets/ProgressDialog.dart';
 import 'package:cabrider/widgets/taxi_button.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_database/firebase_database.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -46,33 +46,28 @@ class _RegistrationPageState extends State<RegistrationPage> {
               ProgressDialog(status: 'Registering you...'),
     );
 
-    final User? user =
-        (await _auth
-            .createUserWithEmailAndPassword(
-              email: emailController.text,
-              password: passwordController.text,
-            )
-            .catchError((ex) {
-              Navigator.pop(context);
-              PlatformException thisEx = ex;
-              showSnackBar(thisEx.message ?? 'An error occurred');
-            })).user;
-
-    Navigator.pop(context);
-    if (user != null) {
-      DatabaseReference newUserRef = FirebaseDatabase.instance.ref().child(
-        'users/${user.uid}',
+    try {
+      final UserCredential userCredential = await _auth.createUserWithEmailAndPassword(
+        email: emailController.text,
+        password: passwordController.text,
       );
 
-      Map userMap = {
-        'fullname': fullnameController.text,
-        'email': emailController.text,
-        'phone': phoneController.text,
-      };
+      final User? user = userCredential.user;
 
-      newUserRef.set(userMap);
+      if (user != null) {
+        await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+          'fullname': fullnameController.text,
+          'email': emailController.text,
+          'phone': phoneController.text,
+          'created_at': FieldValue.serverTimestamp(),
+        });
 
-      Navigator.pushNamedAndRemoveUntil(context, MainPage.id, (route) => false);
+        Navigator.pop(context);
+        Navigator.pushNamedAndRemoveUntil(context, MainPage.id, (route) => false);
+      }
+    } catch (e) {
+      Navigator.pop(context);
+      showSnackBar(e.toString());
     }
   }
 
