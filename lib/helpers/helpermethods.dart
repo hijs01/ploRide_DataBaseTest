@@ -35,11 +35,12 @@ class HelperMethods {
 
     try {
       // Firestore에서 사용자 데이터 조회
-      DocumentSnapshot userDoc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(userID)
-          .get();
-      
+      DocumentSnapshot userDoc =
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(userID)
+              .get();
+
       print('Firestore 응답 받음');
 
       if (userDoc.exists) {
@@ -235,19 +236,23 @@ class HelperMethods {
     // 드라이버 상태 확인
     try {
       // 1. Firestore에서 드라이버 정보 확인
-      DocumentSnapshot driverDoc = await FirebaseFirestore.instance
-          .collection('drivers')
-          .doc(driverId)
-          .get();
+      DocumentSnapshot driverDoc =
+          await FirebaseFirestore.instance
+              .collection('drivers')
+              .doc(driverId)
+              .get();
 
       if (!driverDoc.exists) {
         print('경고: 드라이버 ID $driverId에 해당하는 데이터가 없습니다!');
 
         // 드라이버 문서 생성 시도
-        await FirebaseFirestore.instance.collection('drivers').doc(driverId).set({
-          'newtrip': ride_id,
-          'created_at': FieldValue.serverTimestamp(),
-        });
+        await FirebaseFirestore.instance
+            .collection('drivers')
+            .doc(driverId)
+            .set({
+              'newtrip': ride_id,
+              'created_at': FieldValue.serverTimestamp(),
+            });
         print('드라이버 문서를 새로 생성했습니다: drivers/$driverId');
       } else {
         print('드라이버 데이터 확인: ${driverDoc.data()}');
@@ -269,7 +274,7 @@ class HelperMethods {
           .doc(driverId)
           .collection('notifications')
           .add(notificationData);
-      
+
       print('Firestore에 알림 저장 완료: ${notificationRef.id}');
 
       // 3. 드라이버 문서에 새 알림 정보 업데이트
@@ -277,11 +282,11 @@ class HelperMethods {
           .collection('drivers')
           .doc(driverId)
           .update({
-        'has_new_notification': true,
-        'last_notification': notificationData,
-        'last_notification_time': FieldValue.serverTimestamp(),
-      });
-      
+            'has_new_notification': true,
+            'last_notification': notificationData,
+            'last_notification_time': FieldValue.serverTimestamp(),
+          });
+
       print('드라이버 문서 업데이트 완료');
     } catch (e) {
       print('드라이버 알림 저장 중 오류 발생: $e');
@@ -403,4 +408,33 @@ class HelperMethods {
     );
   }
   */
+
+  static double calculateDistance(
+    double lat1,
+    double lon1,
+    double lat2,
+    double lon2,
+  ) {
+    const double earthRadius = 6371; // 지구 반지름 (km)
+
+    // 위도/경도를 라디안으로 변환
+    double lat1Rad = lat1 * (pi / 180);
+    double lon1Rad = lon1 * (pi / 180);
+    double lat2Rad = lat2 * (pi / 180);
+    double lon2Rad = lon2 * (pi / 180);
+
+    // 위도/경도 차이
+    double dLat = lat2Rad - lat1Rad;
+    double dLon = lon2Rad - lon1Rad;
+
+    // Haversine 공식
+    double a =
+        sin(dLat / 2) * sin(dLat / 2) +
+        cos(lat1Rad) * cos(lat2Rad) * sin(dLon / 2) * sin(dLon / 2);
+
+    double c = 2 * atan2(sqrt(a), sqrt(1 - a));
+    double distance = earthRadius * c;
+
+    return distance;
+  }
 }

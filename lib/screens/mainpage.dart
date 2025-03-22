@@ -106,12 +106,21 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
   void showRequestingSheet() async {
     await createRideRequest();
 
-    setState(() {
-      rideDetailsSheetHeight = 0;
-      requestingSheetHeight = (Platform.isAndroid) ? 195 : 220;
-      mapBottomPadding = (Platform.isAndroid) ? 200 : 190;
-      drawerCanOpen = true;
-    });
+    // 라이드 요청이 성공적으로 생성되었는지 확인
+    if (currentRideRef != null) {
+      setState(() {
+        rideDetailsSheetHeight = 0;
+        requestingSheetHeight = (Platform.isAndroid) ? 195 : 220;
+        mapBottomPadding = (Platform.isAndroid) ? 200 : 190;
+        drawerCanOpen = true;
+      });
+
+      availableDrivers = FireHelper.nearbyDriverList;
+      findDriver();
+    } else {
+      print('라이드 요청 생성 실패');
+      resetApp();
+    }
   }
 
   void showTripSheet() {
@@ -1182,77 +1191,77 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
 
   void startGeofireListener() {
     if (currentPosition == null) {
-      print('현재 위치가 null이어서 Geofire 리스너를 시작할 수 없습니다.');
+      print('현재 위치가 null이어서 리스너를 시작할 수 없습니다.');
       return;
     }
 
     print(
-      'Geofire 리스너 시작: 위치(${currentPosition!.latitude}, ${currentPosition!.longitude}), 반경 20km',
+      'Firestore 드라이버 위치 리스너 시작: 위치(${currentPosition!.latitude}, ${currentPosition!.longitude})',
     );
-    Geofire.initialize('driversAvailable');
 
-    Geofire.queryAtLocation(
-      currentPosition!.latitude,
-      currentPosition!.longitude,
-      20,
-    )?.listen((map) {
-      if (map != null) {
-        var callBack = map['callBack'];
-        var key = map['key'];
-        var lat = map['latitude'];
-        var lng = map['longitude'];
+    // Firestore에서 드라이버 위치 실시간 업데이트 구독
+    FirebaseFirestore.instance.collection('driversAvailable').snapshots().listen((
+      snapshot,
+    ) {
+      // 기존 드라이버 목록 초기화
+      FireHelper.nearbyDriverList.clear();
 
-        print('Geofire 이벤트: $callBack, 드라이버: $key, 위치: $lat, $lng');
+      for (var doc in snapshot.docs) {
+        try {
+          // 드라이버 위치 데이터 가져오기
+          Map<String, dynamic> data = doc.data();
 
-        switch (callBack) {
-          case Geofire.onKeyEntered:
-            print('새 드라이버 발견: $key, 위치: $lat, $lng');
-            NearbyDriver nearbyDriver = NearbyDriver(
-              key: key,
-              latitude: lat,
-              longitude: lng,
+          // driver_id 필드 확인
+          String driverId = data['driver_id'] ?? doc.id;
+
+          // position 객체에서 위치 데이터 확인
+          if (data['position'] != null) {
+            Map<String, dynamic> position = data['position'];
+            double? lat = double.tryParse(
+              position['latitude']?.toString() ?? '',
+            );
+            double? lng = double.tryParse(
+              position['longitude']?.toString() ?? '',
             );
 
-            FireHelper.nearbyDriverList.add(nearbyDriver);
-            print('현재 가용 드라이버 수: ${FireHelper.nearbyDriverList.length}');
-
-            if (nearbyDriverKeysLoaded) {
-              updateDriversOnMap();
-            }
-            break;
-
-          case Geofire.onKeyExited:
-            print('드라이버 이탈: $key');
-            FireHelper.removeFromList(key);
-            updateDriversOnMap();
-            break;
-
-          case Geofire.onKeyMoved:
-            print('드라이버 이동: $key, 새 위치: $lat, $lng');
-            // 드라이버 위치 업데이트 로직 수정
-            int index = FireHelper.nearbyDriverList.indexWhere(
-              (driver) => driver.key == key,
-            );
-            if (index >= 0) {
-              FireHelper.nearbyDriverList[index].latitude = lat;
-              FireHelper.nearbyDriverList[index].longitude = lng;
-            } else {
-              print('경고: 이동한 드라이버 $key를 목록에서 찾을 수 없습니다.');
-              FireHelper.nearbyDriverList.add(
-                NearbyDriver(key: key, latitude: lat, longitude: lng),
+            if (lat != null && lng != null) {
+              // 현재 위치와의 거리 계산 (20km 이내만 표시)
+              double distance = HelperMethods.calculateDistance(
+                currentPosition!.latitude,
+                currentPosition!.longitude,
+                lat,
+                lng,
               );
-            }
-            updateDriversOnMap();
-            break;
 
-          case Geofire.onGeoQueryReady:
-            print(
-              'Geofire 초기 데이터 로드 완료. 가용 드라이버 수: ${FireHelper.nearbyDriverList.length}',
-            );
-            nearbyDriverKeysLoaded = true;
-            updateDriversOnMap();
-            break;
+              print(
+                '드라이버 발견: $driverId, 위치: ($lat, $lng), 거리: ${distance.toStringAsFixed(2)}km',
+              );
+
+              if (distance <= 20) {
+                // 20km 이내의 드라이버만 추가
+                NearbyDriver nearbyDriver = NearbyDriver(
+                  key: driverId,
+                  latitude: lat,
+                  longitude: lng,
+                );
+
+                FireHelper.nearbyDriverList.add(nearbyDriver);
+                print('드라이버 추가됨: $driverId');
+              }
+            }
+          } else {
+            print('드라이버 위치 데이터 누락: $driverId');
+            print('데이터 내용: $data');
+          }
+        } catch (e) {
+          print('드라이버 데이터 처리 중 오류: ${doc.id}, 오류: $e');
+          print('원본 데이터: ${doc.data()}');
         }
+      }
+
+      print('가용 드라이버 수: ${FireHelper.nearbyDriverList.length}');
+      if (FireHelper.nearbyDriverList.isNotEmpty) {
+        updateDriversOnMap();
       }
     });
   }
@@ -1368,17 +1377,18 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
       DocumentReference newRideRef = await FirebaseFirestore.instance
           .collection('rideRequests')
           .add(rideMap);
-      
+
       // 현재 요청 참조 저장
       currentRideRef = newRideRef;
-      
+
       print('생성된 ride reference: ${newRideRef.id}');
-      
+
       // 실시간 업데이트 리스너 설정
       newRideRef.snapshots().listen((DocumentSnapshot snapshot) {
         if (snapshot.exists) {
-          Map<String, dynamic> rideData = snapshot.data() as Map<String, dynamic>;
-          
+          Map<String, dynamic> rideData =
+              snapshot.data() as Map<String, dynamic>;
+
           // 차량 정보 업데이트
           if (rideData['car_details'] != null) {
             setState(() {
@@ -1402,7 +1412,8 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
 
           // 드라이버 위치 업데이트
           if (rideData['driver_location'] != null) {
-            Map<String, dynamic> location = rideData['driver_location'] as Map<String, dynamic>;
+            Map<String, dynamic> location =
+                rideData['driver_location'] as Map<String, dynamic>;
             double driverLat = double.parse(location['latitude'].toString());
             double driverLng = double.parse(location['longitude'].toString());
             LatLng driverLocation = LatLng(driverLat, driverLng);
@@ -1509,16 +1520,19 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
   void cancelRequest() {
     // Firestore에서 현재 라이드 요청 삭제
     if (currentRideRef != null) {
-      currentRideRef!.delete().then((_) {
-        print('라이드 요청 삭제 성공');
-      }).catchError((error) {
-        print('라이드 요청 삭제 실패: $error');
-      });
-      
+      currentRideRef!
+          .delete()
+          .then((_) {
+            print('라이드 요청 삭제 성공');
+          })
+          .catchError((error) {
+            print('라이드 요청 삭제 실패: $error');
+          });
+
       // 현재 요청 참조 초기화
       currentRideRef = null;
     }
-    
+
     setState(() {
       appState = "NORMAL";
     });
@@ -1575,6 +1589,12 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
     var driver = availableDrivers[0];
     print('선택된 드라이버: ${driver.key}');
 
+    // 현재 라이드 요청 ID 확인
+    if (currentRideRef == null) {
+      print('라이드 요청이 아직 생성되지 않았습니다.');
+      return;
+    }
+
     // 드라이버에게 알림 전송
     notifyDriver(driver);
 
@@ -1611,14 +1631,17 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
     String? rideId = currentRideRef?.id;
 
     // 드라이버 문서 업데이트
-    driverDocRef.update({
-      'newtrip': rideId,
-      'last_notification_time': FieldValue.serverTimestamp(),
-    }).then((_) {
-      print('드라이버 문서 업데이트 완료: newtrip = $rideId');
-    }).catchError((error) {
-      print('드라이버 문서 업데이트 실패: $error');
-    });
+    driverDocRef
+        .update({
+          'newtrip': rideId,
+          'last_notification_time': FieldValue.serverTimestamp(),
+        })
+        .then((_) {
+          print('드라이버 문서 업데이트 완료: newtrip = $rideId');
+        })
+        .catchError((error) {
+          print('드라이버 문서 업데이트 실패: $error');
+        });
 
     // 드라이버에게 직접 알림 전송
     HelperMethods.sendNotification(
@@ -1691,9 +1714,9 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
           .collection('drivers')
           .doc(driverId)
           .update({
-        'newtrip': rideId,
-        'last_updated': FieldValue.serverTimestamp(),
-      });
+            'newtrip': rideId,
+            'last_updated': FieldValue.serverTimestamp(),
+          });
       print('1. drivers/$driverId 문서 업데이트 완료');
 
       // 2. drivers/{driverId}/notifications 컬렉션에 알림 추가
@@ -1702,20 +1725,23 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
           .doc(driverId)
           .collection('notifications')
           .add(notificationData);
-      print('2. drivers/$driverId/notifications 컬렉션에 알림 추가 완료: ${notificationRef.id}');
+      print(
+        '2. drivers/$driverId/notifications 컬렉션에 알림 추가 완료: ${notificationRef.id}',
+      );
 
       // 3. drivers/{driverId} 문서에 알림 표시 업데이트
       await FirebaseFirestore.instance
           .collection('drivers')
           .doc(driverId)
           .update({
-        'has_new_notification': true,
-        'last_notification': notificationData,
-      });
+            'has_new_notification': true,
+            'last_notification': notificationData,
+          });
       print('3. drivers/$driverId 문서에 알림 표시 업데이트 완료');
 
       // 4. 알림 테스트용 HTTP 엔드포인트 호출
-      String url = 'https://us-central1-geetaxi-aa379.cloudfunctions.net/sendPushToDriver';
+      String url =
+          'https://us-central1-geetaxi-aa379.cloudfunctions.net/sendPushToDriver';
       Map<String, dynamic> requestData = {
         'driverId': driverId,
         'rideId': rideId,
