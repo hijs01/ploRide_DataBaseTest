@@ -234,46 +234,57 @@ class HelperMethods {
 
     // 드라이버 상태 확인
     try {
-      // 1. 드라이버 기본 정보 확인
-      DatabaseReference driverRef = FirebaseDatabase.instance.ref().child(
-        'drivers/$driverId',
-      );
+      // 1. Firestore에서 드라이버 정보 확인
+      DocumentSnapshot driverDoc = await FirebaseFirestore.instance
+          .collection('drivers')
+          .doc(driverId)
+          .get();
 
-      final driverSnapshot = await driverRef.once();
-      if (driverSnapshot.snapshot.value == null) {
+      if (!driverDoc.exists) {
         print('경고: 드라이버 ID $driverId에 해당하는 데이터가 없습니다!');
 
-        // 드라이버 노드 생성 시도
-        await driverRef.set({
+        // 드라이버 문서 생성 시도
+        await FirebaseFirestore.instance.collection('drivers').doc(driverId).set({
           'newtrip': ride_id,
-          'created_at': DateTime.now().toString(),
+          'created_at': FieldValue.serverTimestamp(),
         });
-        print('드라이버 노드를 새로 생성했습니다: drivers/$driverId');
+        print('드라이버 문서를 새로 생성했습니다: drivers/$driverId');
       } else {
-        print('드라이버 데이터 확인: ${driverSnapshot.snapshot.value}');
+        print('드라이버 데이터 확인: ${driverDoc.data()}');
       }
 
-      // 2. 드라이버 온라인 상태 확인
-      DatabaseReference availableDriversRef = FirebaseDatabase.instance
-          .ref()
-          .child('driversAvailable/$driverId');
+      // 2. 드라이버에게 알림 저장
+      Map<String, dynamic> notificationData = {
+        'ride_id': ride_id,
+        'pickup_address': pickup?.placeName ?? '',
+        'destination_address': destination?.placeName ?? '',
+        'timestamp': FieldValue.serverTimestamp(),
+        'status': 'pending',
+        'read': false,
+      };
 
-      final availableSnapshot = await availableDriversRef.once();
-      if (availableSnapshot.snapshot.value == null) {
-        print('경고: 드라이버가 온라인 상태가 아닙니다!');
+      // Firestore에 알림 저장
+      DocumentReference notificationRef = await FirebaseFirestore.instance
+          .collection('drivers')
+          .doc(driverId)
+          .collection('notifications')
+          .add(notificationData);
+      
+      print('Firestore에 알림 저장 완료: ${notificationRef.id}');
 
-        // 테스트용: 온라인 상태로 설정
-        await availableDriversRef.set({
-          'latitude': 37.42796133580664,
-          'longitude': -122.085749655962,
-          'timestamp': DateTime.now().millisecondsSinceEpoch,
-        });
-        print('드라이버를 온라인 상태로 설정했습니다: driversAvailable/$driverId');
-      } else {
-        print('드라이버 온라인 상태 확인: ${availableSnapshot.snapshot.value}');
-      }
+      // 3. 드라이버 문서에 새 알림 정보 업데이트
+      await FirebaseFirestore.instance
+          .collection('drivers')
+          .doc(driverId)
+          .update({
+        'has_new_notification': true,
+        'last_notification': notificationData,
+        'last_notification_time': FieldValue.serverTimestamp(),
+      });
+      
+      print('드라이버 문서 업데이트 완료');
     } catch (e) {
-      print('드라이버 상태 확인 중 오류 발생: $e');
+      print('드라이버 알림 저장 중 오류 발생: $e');
     }
 
     // Firebase Cloud Function을 호출하여 드라이버에게 알림 전송
@@ -312,17 +323,21 @@ class HelperMethods {
           ),
         );
       } else {
-        throw Exception('요청 실패: ${response.statusCode}');
+        // 오류 메시지 표시
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('드라이버 알림 전송에 실패했습니다'),
+            duration: Duration(seconds: 2),
+          ),
+        );
       }
     } catch (e) {
-      print('드라이버 알림 전송 중 오류 발생: $e');
-
+      print('HTTP 요청 중 오류 발생: $e');
       // 오류 메시지 표시
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('드라이버 알림 전송 실패: ${e.toString()}'),
+        const SnackBar(
+          content: Text('네트워크 오류로 알림 전송에 실패했습니다'),
           duration: Duration(seconds: 2),
-          backgroundColor: Colors.red,
         ),
       );
     }

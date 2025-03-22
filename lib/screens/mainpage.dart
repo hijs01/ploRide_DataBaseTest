@@ -29,6 +29,8 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:animated_text_kit/animated_text_kit.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
 class MainPage extends StatefulWidget {
   const MainPage({super.key});
@@ -1581,17 +1583,18 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
 
     // 10초 후에도 응답이 없으면 다음 드라이버에게 알림
     Future.delayed(Duration(seconds: 10), () {
-      // 드라이버 응답 확인
-      DatabaseReference driverResponseRef = FirebaseDatabase.instance
-          .ref()
-          .child('rideRequest/${rideRef.key}/status');
-
-      driverResponseRef.once().then((DatabaseEvent event) {
-        if (event.snapshot.value == 'pending' && availableDrivers.isNotEmpty) {
-          print('첫 번째 드라이버가 응답하지 않았습니다. 다음 드라이버에게 알림을 보냅니다.');
-          findDriver();
-        }
-      });
+      // Firestore에서 드라이버 응답 확인
+      if (currentRideRef != null) {
+        currentRideRef!.get().then((DocumentSnapshot snapshot) {
+          if (snapshot.exists) {
+            Map<String, dynamic> data = snapshot.data() as Map<String, dynamic>;
+            if (data['status'] == 'pending' && availableDrivers.isNotEmpty) {
+              print('첫 번째 드라이버가 응답하지 않았습니다. 다음 드라이버에게 알림을 보냅니다.');
+              findDriver();
+            }
+          }
+        });
+      }
     });
   }
 
@@ -1599,46 +1602,61 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
     // 드라이버 ID 로깅
     print('알림을 보낼 드라이버 ID: ${driver.key}');
 
-    // 드라이버 reference 초기화
-    driverTripRef = FirebaseDatabase.instance.ref().child(
-      'drivers/${driver.key}/newtrip',
-    );
+    // 드라이버 문서 참조
+    DocumentReference driverDocRef = FirebaseFirestore.instance
+        .collection('drivers')
+        .doc(driver.key);
+
+    // 현재 라이드 요청 ID 저장
+    String? rideId = currentRideRef?.id;
+
+    // 드라이버 문서 업데이트
+    driverDocRef.update({
+      'newtrip': rideId,
+      'last_notification_time': FieldValue.serverTimestamp(),
+    }).then((_) {
+      print('드라이버 문서 업데이트 완료: newtrip = $rideId');
+    }).catchError((error) {
+      print('드라이버 문서 업데이트 실패: $error');
+    });
 
     // 드라이버에게 직접 알림 전송
     HelperMethods.sendNotification(
       driverId: driver.key,
       context: context,
-      ride_id: rideRef.key,
+      ride_id: rideId,
     );
 
-    // 30초 지나면 나가기
+    // 30초 지나면 타임아웃으로 처리
     const oneSecTick = Duration(seconds: 1);
 
     var timer = Timer.periodic(oneSecTick, (timer) {
       // ride request 취소되면 타이머 멈추기
       if (appState != "REQUESTING") {
-        driverTripRef.set('cancelled');
-        driverTripRef.onDisconnect();
+        driverDocRef.update({'newtrip': 'cancelled'});
         timer.cancel();
         driverRequestTimeout = 30;
       }
 
       driverRequestTimeout--;
 
-      // a value event listener for driver accepting the ride
-      driverTripRef.onValue.listen((event) {
-        // confirms that driver accepted the ride
-        if (event.snapshot.value.toString() == 'accepted') {
-          driverTripRef.onDisconnect();
-          timer.cancel();
-          driverRequestTimeout = 30;
-        }
-      });
+      // 드라이버 응답 확인을 위한 리스너 설정
+      if (currentRideRef != null) {
+        currentRideRef!.snapshots().listen((DocumentSnapshot snapshot) {
+          if (snapshot.exists) {
+            Map<String, dynamic> data = snapshot.data() as Map<String, dynamic>;
+            // 드라이버가 수락한 경우
+            if (data['status'] == 'accepted') {
+              timer.cancel();
+              driverRequestTimeout = 30;
+            }
+          }
+        });
+      }
 
       if (driverRequestTimeout == 0) {
-        // 드라이버한터 타임아웃 알려주기
-        driverTripRef.set('timeout');
-        driverTripRef.onDisconnect();
+        // 드라이버에게 타임아웃 알려주기
+        driverDocRef.update({'newtrip': 'timeout'});
         driverRequestTimeout = 30;
         timer.cancel();
 
@@ -1648,7 +1666,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
     });
 
     // 테스트용: 모든 가능한 경로에 알림 데이터 저장
-    testAllNotificationPaths(driver.key, rideRef.key);
+    testAllNotificationPaths(driver.key, rideId);
   }
 
   // 테스트용: 모든 가능한 경로에 알림 데이터 저장
@@ -1658,47 +1676,61 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
     try {
       print('===== 테스트: 모든 가능한 경로에 알림 데이터 저장 =====');
 
-      // 1. drivers/{driverId}/newtrip 경로
-      await FirebaseDatabase.instance
-          .ref()
-          .child('drivers/$driverId/newtrip')
-          .set(rideId);
-      print('1. drivers/$driverId/newtrip 경로에 저장 완료');
-
-      // 2. drivers/{driverId}/newRequest 경로
-      await FirebaseDatabase.instance
-          .ref()
-          .child('drivers/$driverId/newRequest')
-          .set(rideId);
-      print('2. drivers/$driverId/newRequest 경로에 저장 완료');
-
-      // 3. driver_notifications/{driverId} 경로
+      // 기본 알림 데이터
       var notificationData = {
         'ride_id': rideId,
-        'timestamp': DateTime.now().millisecondsSinceEpoch,
+        'timestamp': FieldValue.serverTimestamp(),
         'status': 'new',
+        'pickup_address': '테스트 출발지',
+        'destination_address': '테스트 목적지',
+        'read': false,
       };
-      await FirebaseDatabase.instance
-          .ref()
-          .child('driver_notifications/$driverId')
-          .push()
-          .set(notificationData);
-      print('3. driver_notifications/$driverId 경로에 저장 완료');
 
-      // 4. driversAvailable/{driverId}/notifications 경로
-      await FirebaseDatabase.instance
-          .ref()
-          .child('driversAvailable/$driverId/notifications')
-          .set(rideId);
-      print('4. driversAvailable/$driverId/notifications 경로에 저장 완료');
+      // 1. drivers/{driverId} 문서 업데이트
+      await FirebaseFirestore.instance
+          .collection('drivers')
+          .doc(driverId)
+          .update({
+        'newtrip': rideId,
+        'last_updated': FieldValue.serverTimestamp(),
+      });
+      print('1. drivers/$driverId 문서 업데이트 완료');
 
-      // 5. notifications/{driverId} 경로
-      await FirebaseDatabase.instance
-          .ref()
-          .child('notifications/$driverId')
-          .push()
-          .set(notificationData);
-      print('5. notifications/$driverId 경로에 저장 완료');
+      // 2. drivers/{driverId}/notifications 컬렉션에 알림 추가
+      DocumentReference notificationRef = await FirebaseFirestore.instance
+          .collection('drivers')
+          .doc(driverId)
+          .collection('notifications')
+          .add(notificationData);
+      print('2. drivers/$driverId/notifications 컬렉션에 알림 추가 완료: ${notificationRef.id}');
+
+      // 3. drivers/{driverId} 문서에 알림 표시 업데이트
+      await FirebaseFirestore.instance
+          .collection('drivers')
+          .doc(driverId)
+          .update({
+        'has_new_notification': true,
+        'last_notification': notificationData,
+      });
+      print('3. drivers/$driverId 문서에 알림 표시 업데이트 완료');
+
+      // 4. 알림 테스트용 HTTP 엔드포인트 호출
+      String url = 'https://us-central1-geetaxi-aa379.cloudfunctions.net/sendPushToDriver';
+      Map<String, dynamic> requestData = {
+        'driverId': driverId,
+        'rideId': rideId,
+        'pickup_address': '테스트 출발지',
+        'destination_address': '테스트 목적지',
+      };
+
+      var response = await http.post(
+        Uri.parse(url),
+        body: jsonEncode(requestData),
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      print('4. HTTP 요청 결과: ${response.statusCode}');
+      print('응답: ${response.body}');
 
       print('===== 테스트 완료: 모든 가능한 경로에 알림 데이터 저장됨 =====');
     } catch (e) {
