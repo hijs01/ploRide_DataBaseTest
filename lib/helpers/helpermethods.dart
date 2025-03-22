@@ -18,6 +18,7 @@ import 'package:cabrider/datamodels/user.dart';
 import 'package:flutter/foundation.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_geofire/flutter_geofire.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class HelperMethods {
   static void getCurrentUserInfo() async {
@@ -32,18 +33,18 @@ class HelperMethods {
     print('현재 로그인된 사용자 ID: ${currentFirebaseUser!.uid}');
     String userID = currentFirebaseUser!.uid;
 
-    DatabaseReference userRef = FirebaseDatabase.instance.ref().child(
-      'users/$userID',
-    );
-    print('Firebase 참조 경로: users/$userID');
-
     try {
-      final event = await userRef.once();
-      print('Firebase 응답 받음');
+      // Firestore에서 사용자 데이터 조회
+      DocumentSnapshot userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userID)
+          .get();
+      
+      print('Firestore 응답 받음');
 
-      if (event.snapshot.value != null) {
+      if (userDoc.exists) {
         print('사용자 데이터 존재함');
-        currentUserInfo = User.fromSnapshot(event.snapshot);
+        currentUserInfo = User.fromFirestore(userDoc);
         print('사용자 정보 로드 완료:');
         print('- 이름: ${currentUserInfo?.fullName}');
         print('- 이메일: ${currentUserInfo?.email}');

@@ -87,6 +87,9 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
 
   bool nearbyDriverKeysLoaded = false;
 
+  // 현재 요청의 Document Reference를 저장할 변수
+  DocumentReference? currentRideRef;
+
   void showDetailSheet() async {
     await getDirection();
 
@@ -1364,6 +1367,9 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
           .collection('rideRequests')
           .add(rideMap);
       
+      // 현재 요청 참조 저장
+      currentRideRef = newRideRef;
+      
       print('생성된 ride reference: ${newRideRef.id}');
       
       // 실시간 업데이트 리스너 설정
@@ -1499,7 +1505,18 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
   }
 
   void cancelRequest() {
-    rideRef.remove();
+    // Firestore에서 현재 라이드 요청 삭제
+    if (currentRideRef != null) {
+      currentRideRef!.delete().then((_) {
+        print('라이드 요청 삭제 성공');
+      }).catchError((error) {
+        print('라이드 요청 삭제 실패: $error');
+      });
+      
+      // 현재 요청 참조 초기화
+      currentRideRef = null;
+    }
+    
     setState(() {
       appState = "NORMAL";
     });
