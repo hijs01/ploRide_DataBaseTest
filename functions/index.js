@@ -213,7 +213,7 @@ exports.sendPushToDriver = functions.https.onRequest(async (req, res) => {
     }
     
     const driverData = driverDoc.data();
-    if (!driverData.fcm_token) {
+    if (!driverData.token) {
       res.status(404).send({ error: '드라이버 FCM 토큰을 찾을 수 없습니다' });
       return;
     }
@@ -230,7 +230,7 @@ exports.sendPushToDriver = functions.https.onRequest(async (req, res) => {
         destination: destination_address || '',
         pickup: pickup_address || '',
       },
-      token: driverData.fcm_token,
+      token: driverData.token,
     };
 
     // FCM 메시지 전송

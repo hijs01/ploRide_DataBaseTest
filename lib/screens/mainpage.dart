@@ -21,14 +21,12 @@ import 'package:outline_material_icons/outline_material_icons.dart';
 import 'package:cabrider/helpers/helpermethods.dart';
 import 'package:cabrider/styles/styles.dart';
 import 'package:cabrider/widgets/BrandDivider.dart';
-import 'package:firebase_database/firebase_database.dart';
 import 'package:cabrider/screens/searchpage.dart';
 import 'package:cabrider/datamodels/directiondetails.dart';
 import 'package:cabrider/datamodels/address.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:animated_text_kit/animated_text_kit.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_database/firebase_database.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 
@@ -48,7 +46,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
   double tripsheetHeight = 0;
 
   final Set<String> keysRetrieved = <String>{};
-  late DatabaseReference driverTripRef;
+  late DocumentReference driverTripRef;
   int driverRequestTimeout = 30;
   String status = '';
   String driverCarDetails = '';
@@ -56,11 +54,9 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
   String driverPhoneNumber = '';
   String tripStatusDisplay = 'Driver is Arriving';
   bool isRequestingLocationDetails = false;
-  late StreamSubscription<DatabaseEvent> rideSubscription;
+  late StreamSubscription<DocumentSnapshot> rideSubscription;
 
-  DatabaseReference rideRef = FirebaseDatabase.instance.ref().child(
-    'rideRequest',
-  );
+  CollectionReference rideRef = FirebaseFirestore.instance.collection('rideRequests');
 
   // 로딩 애니메이션을 위한 컨트롤러 추가
   late AnimationController _loadingController;

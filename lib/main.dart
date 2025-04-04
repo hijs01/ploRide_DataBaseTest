@@ -3,13 +3,13 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:firebase_database/firebase_database.dart';
 import 'package:cabrider/screens/loginpage.dart';
 import 'package:cabrider/screens/registrationpage.dart';
 import 'package:cabrider/screens/mainpage.dart';
 import 'package:cabrider/globalvariable.dart';
 import 'package:provider/provider.dart';
 import 'package:cabrider/dataprovider/appdata.dart';
+import 'package:cabrider/helpers/helpermethods.dart';
 
 // 백그라운드 메시지 핸들러
 @pragma('vm:entry-point')
@@ -22,55 +22,57 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 }
 
 // FCM 토큰을 Firebase Database에 저장하는 함수
-Future<void> _updateDriverFcmToken() async {
-  if (currentFirebaseUser != null) {
-    // FCM 토큰 가져오기
-    String? token = await FirebaseMessaging.instance.getToken();
-    if (token != null) {
-      // 토큰 저장
-      DatabaseReference tokenRef = FirebaseDatabase.instance.ref().child(
-        'drivers/${currentFirebaseUser!.uid}/fcm_token',
-      );
-      await tokenRef.set(token);
-      print('드라이버 FCM 토큰 저장 완료: $token');
+// Future<void> _updateDriverFcmToken() async {
+//   if (currentFirebaseUser != null) {
+//     // FCM 토큰 가져오기
+//     String? token = await FirebaseMessaging.instance.getToken();
+//     if (token != null) {
+//       // 토큰 저장
+//       DatabaseReference tokenRef = FirebaseDatabase.instance.ref().child(
+//         'drivers/${currentFirebaseUser!.uid}/fcm_token',
+//       );
+//       await tokenRef.set(token);
+//       print('드라이버 FCM 토큰 저장 완료: $token');
 
-      // 토큰 갱신 설정
-      FirebaseMessaging.instance.onTokenRefresh.listen((newToken) {
-        tokenRef.set(newToken);
-        print('드라이버 FCM 토큰 갱신됨: $newToken');
-      });
-    }
-  }
-}
+//       // 토큰 갱신 설정
+//       FirebaseMessaging.instance.onTokenRefresh.listen((newToken) {
+//         tokenRef.set(newToken);
+//         print('드라이버 FCM 토큰 갱신됨: $newToken');
+//       });
+//     }
+//   }
+// }
 
 Future<void> main() async {
   try {
     WidgetsFlutterBinding.ensureInitialized();
 
     // Firebase 초기화
-    await Firebase.initializeApp(
-      options:
-          Platform.isIOS
-              ? const FirebaseOptions(
-                apiKey: 'AIzaSyBbAeoUHY5ptkBe-xR54A45fVnJX7iS3YA',
-                appId: '1:425631894947:ios:e9b63aa2e048a45095de16',
-                messagingSenderId: '425631894947',
-                projectId: 'geetaxi-aa379',
-                databaseURL:
-                    'https://geetaxi-aa379-default-rtdb.firebaseio.com',
-                storageBucket: 'geetaxi-aa379.firebasestorage.app',
-                iosClientId: '425631894947-xxxxx.apps.googleusercontent.com',
-              )
-              : const FirebaseOptions(
-                apiKey: 'AIzaSyAknGQdA7yAS5SICTW8lOKilEN7FBpNS-U',
-                appId: '1:425631894947:android:783ac2ba27d2db6e95de16',
-                messagingSenderId: '425631894947',
-                projectId: 'geetaxi-aa379',
-                databaseURL:
-                    'https://geetaxi-aa379-default-rtdb.firebaseio.com',
-                storageBucket: 'geetaxi-aa379.firebasestorage.app',
-              ),
-    );
+    if (Firebase.apps.isEmpty) {
+      await Firebase.initializeApp(
+        options:
+            Platform.isIOS
+                ? const FirebaseOptions(
+                  apiKey: 'AIzaSyBbAeoUHY5ptkBe-xR54A45fVnJX7iS3YA',
+                  appId: '1:425631894947:ios:e9b63aa2e048a45095de16',
+                  messagingSenderId: '425631894947',
+                  projectId: 'geetaxi-aa379',
+                  databaseURL:
+                      'https://geetaxi-aa379-default-rtdb.firebaseio.com',
+                  storageBucket: 'geetaxi-aa379.firebasestorage.app',
+                  iosClientId: '425631894947-xxxxx.apps.googleusercontent.com',
+                )
+                : const FirebaseOptions(
+                  apiKey: 'AIzaSyAknGQdA7yAS5SICTW8lOKilEN7FBpNS-U',
+                  appId: '1:425631894947:android:783ac2ba27d2db6e95de16',
+                  messagingSenderId: '425631894947',
+                  projectId: 'geetaxi-aa379',
+                  databaseURL:
+                      'https://geetaxi-aa379-default-rtdb.firebaseio.com',
+                  storageBucket: 'geetaxi-aa379.firebasestorage.app',
+                ),
+      );
+    }
 
     // currentFirebaseUser 초기화
     currentFirebaseUser = FirebaseAuth.instance.currentUser;
@@ -105,7 +107,7 @@ Future<void> main() async {
 
     // FCM 토큰 저장
     if (currentFirebaseUser != null) {
-      await _updateDriverFcmToken();
+      await HelperMethods.updateDriverFcmToken();
     }
 
     // 포그라운드 메시지 핸들러 등록
