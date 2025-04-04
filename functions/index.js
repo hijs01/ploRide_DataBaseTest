@@ -46,7 +46,7 @@ exports.sendFirestoreRideRequestNotification = onDocumentCreated('rideRequests/{
     
     const driverData = driverDoc.data();
 
-    if (!driverData || !driverData.fcm_token) {
+    if (!driverData || !driverData.token) {
       console.log('드라이버 FCM 토큰을 찾을 수 없습니다');
       return null;
     }
@@ -65,7 +65,7 @@ exports.sendFirestoreRideRequestNotification = onDocumentCreated('rideRequests/{
         rider_name: rideData.rider_name || '',
         rider_phone: rideData.rider_phone || '',
       },
-      token: driverData.fcm_token,
+      token: driverData.token,
     };
 
     // FCM 메시지 전송
@@ -208,12 +208,17 @@ exports.sendPushToDriver = functions.https.onRequest(async (req, res) => {
       .get();
       
     if (!driverDoc.exists) {
+      console.log('드라이버 문서가 존재하지 않음:', driverId);
       res.status(404).send({ error: '드라이버를 찾을 수 없습니다' });
       return;
     }
     
     const driverData = driverDoc.data();
+    console.log('드라이버 데이터:', driverData);
+    console.log('토큰 값:', driverData.token);
+    
     if (!driverData.token) {
+      console.log('토큰이 없음. 전체 데이터:', JSON.stringify(driverData));
       res.status(404).send({ error: '드라이버 FCM 토큰을 찾을 수 없습니다' });
       return;
     }
