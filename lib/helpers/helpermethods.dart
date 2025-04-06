@@ -354,36 +354,37 @@ class HelperMethods {
     // 토큰과 사용자 ID가 유효한지 확인
     if (token != null && currentFirebaseUser != null) {
       try {
-        // drivers 컬렉션에 토큰 저장
+        // 라이더 앱이므로 users 컬렉션에 토큰 저장 (drivers가 아님)
         await FirebaseFirestore.instance
-            .collection('drivers')
+            .collection('users')
             .doc(currentFirebaseUser!.uid)
             .set({
-          'token': token,
-          'last_updated': FieldValue.serverTimestamp(),
-        }, SetOptions(merge: true));
-        
-        print('드라이버 FCM 토큰 저장 완료: $token');
-        print('저장된 드라이버 ID: ${currentFirebaseUser!.uid}');
+              'token': token,
+              'last_updated': FieldValue.serverTimestamp(),
+            }, SetOptions(merge: true));
+
+        print('사용자 FCM 토큰 저장 완료: $token');
+        print('저장된 사용자 ID: ${currentFirebaseUser!.uid}');
 
         // 저장 후 확인
-        final doc = await FirebaseFirestore.instance
-            .collection('drivers')
-            .doc(currentFirebaseUser!.uid)
-            .get();
+        final doc =
+            await FirebaseFirestore.instance
+                .collection('users')
+                .doc(currentFirebaseUser!.uid)
+                .get();
         print('저장 후 확인: ${doc.data()}');
 
         // FCM 토큰 갱신 리스너 설정
         fcm.onTokenRefresh.listen((newToken) async {
           print('토큰 갱신됨: $newToken');
           await FirebaseFirestore.instance
-              .collection('drivers')
+              .collection('users')
               .doc(currentFirebaseUser!.uid)
               .set({
-            'token': newToken,
-            'last_updated': FieldValue.serverTimestamp(),
-          }, SetOptions(merge: true));
-          print('드라이버 FCM 토큰 갱신됨: $newToken');
+                'token': newToken,
+                'last_updated': FieldValue.serverTimestamp(),
+              }, SetOptions(merge: true));
+          print('사용자 FCM 토큰 갱신됨: $newToken');
         });
       } catch (e) {
         print('토큰 저장 중 오류 발생: $e');

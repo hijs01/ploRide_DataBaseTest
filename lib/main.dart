@@ -16,6 +16,7 @@ import 'package:cabrider/globalvariable.dart';
 import 'package:provider/provider.dart';
 import 'package:cabrider/dataprovider/appdata.dart';
 import 'package:cabrider/helpers/helpermethods.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 // 백그라운드 메시지 핸들러
 @pragma('vm:entry-point')

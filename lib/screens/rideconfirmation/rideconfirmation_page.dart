@@ -4,6 +4,7 @@ import 'package:cabrider/dataprovider/appdata.dart';
 import 'package:cabrider/datamodels/address.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart' show FirebaseException;
 import 'package:cabrider/globalvariable.dart';
 // 알림 관련 임포트 주석 처리
 // import 'package:cabrider/helpers/helpermethods.dart';
@@ -28,23 +29,16 @@ class _RideConfirmationPageState extends State<RideConfirmationPage>
 
   // 슬라이더 값 상태 추가
   double _sliderValue = 0.0;
-  // 슬라이더 너비 저장 변수 추가
-  double _maxSliderWidth = 0.0;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    // 초기화 시점에서는 슬라이더 값 리셋
-    _sliderValue = 0.0;
   }
 
   @override
   void dispose() {
     _disposed = true;
-    // 진행 중인 비동기 작업 취소 로직
-    _isProcessing = false;
-    _isLoading = false;
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -71,55 +65,35 @@ class _RideConfirmationPageState extends State<RideConfirmationPage>
     // 이미 처리 중이면 무시
     if (_isLoading || _isProcessing) return;
 
-    // 슬라이더 위치 계산 방식 개선
-    try {
-      final RenderBox box = context.findRenderObject() as RenderBox;
-      _maxSliderWidth = box.size.width - 92;
+    // 드래그 위치를 계산하여 슬라이더 값 업데이트
+    final double maxWidth = MediaQuery.of(context).size.width - 92;
+    double newPosition = _sliderValue + details.delta.dx / maxWidth;
 
-      // 유효하지 않은 너비는 처리하지 않음
-      if (_maxSliderWidth <= 0) return;
+    setState(() {
+      _sliderValue = newPosition.clamp(0.0, 1.0);
+    });
 
-      double newPosition = _sliderValue + details.delta.dx / _maxSliderWidth;
-      // 안전하게 값 범위 제한
-      newPosition = newPosition.clamp(0.0, 1.0);
+    // 예약 확정 조건
+    if (_sliderValue >= 0.9 && !_isLoading && !_isProcessing) {
+      // 슬라이더 값을 리셋하고 로딩 상태로 전환
+      setState(() {
+        _sliderValue = 0.0;
+        _isLoading = true;
+      });
 
-      if (mounted && !_disposed) {
-        setState(() {
-          _sliderValue = newPosition;
-        });
-      }
-
-      // 예약 확정 조건
-      if (_sliderValue >= 0.9 && !_isLoading && !_isProcessing) {
+      // 안전하게 UI 업데이트 후 다이얼로그 표시
+      WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted && !_disposed) {
-          setState(() {
-            _sliderValue = 0.0;
-            _isLoading = true;
-          });
+          _showMatchingDialog(context);
         }
-
-        // 안전하게 UI 업데이트 후 다이얼로그 표시 (메인 스레드에서)
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted && !_disposed) {
-            _showMatchingDialog(context);
-          }
-        });
-      }
-    } catch (e) {
-      print('슬라이더 업데이트 오류: $e');
-      // 오류 발생 시 슬라이더 리셋
-      if (mounted && !_disposed) {
-        setState(() {
-          _sliderValue = 0.0;
-        });
-      }
+      });
     }
   }
 
   // 예약 확정 버튼 슬라이드 종료 처리 함수
   void _handleSliderEnd(DragEndDetails details) {
     // 이미 처리 중이면 무시
-    if (_isLoading || _isProcessing || !mounted || _disposed) return;
+    if (_isLoading || _isProcessing) return;
 
     // 사용자가 끝까지 슬라이드하지 않은 경우 초기 위치로 돌아감
     if (_sliderValue < 0.9) {
@@ -676,8 +650,8 @@ class _RideConfirmationPageState extends State<RideConfirmationPage>
 
   // 매칭 중 다이얼로그를 표시하는 함수
   void _showMatchingDialog(BuildContext context) {
-    // 이미 처리 중이거나 위젯이 종료된 경우 실행 방지
-    if (_isProcessing || !mounted || _disposed) return;
+    // 이미 처리 중이면 중복 실행 방지
+    if (_isProcessing) return;
 
     // 상태 설정
     setState(() {
@@ -698,115 +672,99 @@ class _RideConfirmationPageState extends State<RideConfirmationPage>
 
     // 안전하게 다이얼로그 표시
     if (mounted) {
-      try {
-        showDialog(
-          context: context,
-          barrierDismissible: false, // 배경 터치로 닫기 방지
-          barrierColor: Colors.black54, // 배경을 더 어둡게 처리
-          builder: (BuildContext context) {
-            dialogContext = context;
-            return WillPopScope(
-              // 뒤로가기 버튼 비활성화
-              onWillPop: () async => false,
-              child: Dialog(
-                backgroundColor: cardColor,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20.0),
-                ),
-                child: Container(
-                  width: MediaQuery.of(context).size.width * 0.8,
-                  padding: EdgeInsets.all(20),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      SizedBox(height: 8),
-                      // 개선된 로딩 애니메이션
-                      Container(
-                        width: 60,
-                        height: 60,
-                        decoration: BoxDecoration(
-                          color: primaryColor.withOpacity(0.1),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Padding(
-                          padding: EdgeInsets.all(12),
-                          child: CircularProgressIndicator(
-                            valueColor: AlwaysStoppedAnimation<Color>(
-                              primaryColor,
-                            ),
-                            strokeWidth: 3,
+      showDialog(
+        context: context,
+        barrierDismissible: false, // 배경 터치로 닫기 방지
+        barrierColor: Colors.black54, // 배경을 더 어둡게 처리
+        builder: (BuildContext context) {
+          dialogContext = context;
+          return WillPopScope(
+            // 뒤로가기 버튼 비활성화
+            onWillPop: () async => false,
+            child: Dialog(
+              backgroundColor: cardColor,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20.0),
+              ),
+              child: Container(
+                width: MediaQuery.of(context).size.width * 0.8,
+                padding: EdgeInsets.all(20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SizedBox(height: 8),
+                    // 개선된 로딩 애니메이션
+                    Container(
+                      width: 60,
+                      height: 60,
+                      decoration: BoxDecoration(
+                        color: primaryColor.withOpacity(0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Padding(
+                        padding: EdgeInsets.all(12),
+                        child: CircularProgressIndicator(
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            primaryColor,
                           ),
+                          strokeWidth: 3,
                         ),
                       ),
-                      SizedBox(height: 20),
-                      Text(
-                        '비슷한 일정의 예약자와\n매칭중 입니다.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: textColor,
-                        ),
+                    ),
+                    SizedBox(height: 20),
+                    Text(
+                      '비슷한 일정의 예약자와\n매칭중 입니다.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: textColor,
                       ),
-                      SizedBox(height: 12),
-                      Text(
-                        '예약 정보 처리 및 채팅방 생성 중',
-                        style: TextStyle(fontSize: 14, color: subtitleColor),
-                      ),
-                      SizedBox(height: 8),
-                      Text(
-                        '같은 시간대(±1시간)의 여행자들과\n자동으로 채팅방이 연결됩니다',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 12, color: subtitleColor),
-                      ),
-                      SizedBox(height: 16),
-                    ],
-                  ),
+                    ),
+                    SizedBox(height: 12),
+                    Text(
+                      '예약 정보 처리 및 채팅방 생성 중',
+                      style: TextStyle(fontSize: 14, color: subtitleColor),
+                    ),
+                    SizedBox(height: 8),
+                    Text(
+                      '같은 시간대(±1시간)의 여행자들과\n자동으로 채팅방이 연결됩니다',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 12, color: subtitleColor),
+                    ),
+                    SizedBox(height: 16),
+                  ],
                 ),
               ),
-            );
-          },
-        );
-      } catch (e) {
-        print('다이얼로그 표시 중 오류: $e');
-        // 다이얼로그 오류 시 처리 상태 초기화
-        if (mounted && !_disposed) {
-          setState(() {
-            _isProcessing = false;
-            _isLoading = false;
-          });
-        }
-        return;
-      }
+            ),
+          );
+        },
+      );
     }
 
     // 다이얼로그 표시 후 처리 시작
     _safeConfirmRide()
         .then((_) {
           // 성공 시 다이얼로그 닫기 및 상태 업데이트
-          if (mounted && !_disposed) {
-            _closeDialogAndUpdateUI(
-              dialogContext: dialogContext,
-              isSuccess: true,
-              message: '예약이 완료되었습니다! 채팅방에서 다른 여행자들과 소통하세요.',
-            );
-          }
+          _closeDialogAndUpdateUI(
+            dialogContext: dialogContext,
+            isSuccess: true,
+            message: '예약이 완료되었습니다! 채팅방에서 다른 여행자들과 소통하세요.',
+          );
         })
         .catchError((e) {
           print('예약 처리 오류: $e');
 
           // 오류 발생 시 다이얼로그 닫기 및 상태 업데이트
-          if (mounted && !_disposed) {
-            _closeDialogAndUpdateUI(
-              dialogContext: dialogContext,
-              isSuccess: false,
-              message: e.toString(),
-            );
-          }
+          _closeDialogAndUpdateUI(
+            dialogContext: dialogContext,
+            isSuccess: false,
+            message: e.toString(),
+          );
         })
         .whenComplete(() {
           // 무슨 일이 있어도 상태 업데이트
-          if (mounted && !_disposed) {
+          if (mounted) {
             setState(() {
               _isLoading = false;
               _isProcessing = false;
@@ -824,29 +782,25 @@ class _RideConfirmationPageState extends State<RideConfirmationPage>
     // 다이얼로그 닫기
     if (dialogContext != null && mounted) {
       try {
-        Navigator.of(dialogContext, rootNavigator: true).pop();
+        Navigator.of(dialogContext).pop();
       } catch (e) {
         print('다이얼로그 닫기 오류: $e');
       }
     }
 
-    if (!mounted || _disposed) return;
+    if (!mounted) return;
 
     // 스낵바 표시
-    try {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(message),
-          backgroundColor: isSuccess ? Colors.green : Colors.red,
-          duration: Duration(seconds: isSuccess ? 4 : 6),
-        ),
-      );
-    } catch (e) {
-      print('스낵바 표시 오류: $e');
-    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: isSuccess ? Colors.green : Colors.red,
+        duration: Duration(seconds: isSuccess ? 4 : 6),
+      ),
+    );
 
     // 성공 시 홈페이지로 이동
-    if (isSuccess && mounted && !_disposed) {
+    if (isSuccess && mounted) {
       // 알림 전송 부분 주석 처리
       /*
       try {
@@ -856,19 +810,12 @@ class _RideConfirmationPageState extends State<RideConfirmationPage>
       }
       */
 
-      // 약간의 지연 후 네비게이션
       Future.delayed(Duration(milliseconds: 500), () {
-        if (mounted && !_disposed) {
-          try {
-            Navigator.pushAndRemoveUntil(
-              context,
-              MaterialPageRoute(builder: (context) => HomePage()),
-              (route) => false,
-            );
-          } catch (e) {
-            print('네비게이션 오류: $e');
-          }
-        }
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (context) => HomePage()),
+          (route) => false,
+        );
       });
     }
   }
@@ -876,11 +823,6 @@ class _RideConfirmationPageState extends State<RideConfirmationPage>
   // 예약 처리 로직을 별도 함수로 분리
   Future<void> _processRide() async {
     try {
-      // 이미 처리 중이거나 위젯이 종료된 경우 실행 방지
-      if (_isProcessing || !mounted || _disposed) {
-        return;
-      }
-
       final appData = Provider.of<AppData>(context, listen: false);
       final pickup = appData.pickupAddress;
       final destination = appData.destinationAddress;
@@ -888,7 +830,7 @@ class _RideConfirmationPageState extends State<RideConfirmationPage>
       final rideDate = appData.rideDate;
       final rideTime = appData.rideTime;
 
-      // 필수 정보 확인 - 더 엄격한 체크
+      // 필수 정보 확인
       if (pickup == null ||
           destination == null ||
           rideDate == null ||
@@ -1018,213 +960,203 @@ class _RideConfirmationPageState extends State<RideConfirmationPage>
       DocumentReference chatRoomRef;
 
       try {
-        // 안전한 비동기 작업을 위한 Future 처리
-        final timeout = Duration(seconds: 25); // 더 긴 타임아웃 설정
-
-        // 1. 기존 채팅방 검색 작업
-        // 해당 컬렉션에서 같은 날짜와 비슷한 시간대의 채팅방 찾기
-        QuerySnapshot existingChatRooms = await FirebaseFirestore.instance
-            .collection(chatRoomCollection)
-            .where('location_identifier', isEqualTo: locationIdentifier)
-            .where('date_str', isEqualTo: formattedDate)
-            .get()
-            .timeout(timeout);
-
-        if (!mounted || _disposed) {
-          throw Exception('화면이 종료되었습니다');
-        }
-
-        print('같은 날짜/위치의 기존 채팅방 수: ${existingChatRooms.docs.length}');
-
-        // 비슷한 시간대(±1시간)의 채팅방 찾기
-        bool foundMatchingRoom = false;
-        chatRoomRef =
-            FirebaseFirestore.instance
+        // 타임아웃 설정으로 비동기 작업 보호
+        await Future.wait([
+          // 1. 기존 채팅방 검색 작업
+          Future(() async {
+            // 해당 컬렉션에서 같은 날짜와 비슷한 시간대의 채팅방 찾기
+            QuerySnapshot existingChatRooms = await FirebaseFirestore.instance
                 .collection(chatRoomCollection)
-                .doc(); // 초기 빈 참조로 초기화
+                .where('location_identifier', isEqualTo: locationIdentifier)
+                .where('date_str', isEqualTo: formattedDate)
+                .get()
+                .timeout(Duration(seconds: 5));
 
-        // 기존 채팅방 중에서 시간이 맞고 인원 여유가 있는 채팅방 찾기
-        if (existingChatRooms.docs.isNotEmpty) {
-          for (var doc in existingChatRooms.docs) {
-            Map<String, dynamic> roomData = doc.data() as Map<String, dynamic>;
+            print('같은 날짜/위치의 기존 채팅방 수: ${existingChatRooms.docs.length}');
 
-            // 채팅방의 탑승 시간 확인
-            if (roomData.containsKey('ride_date_timestamp')) {
-              Timestamp rideTimestamp =
-                  roomData['ride_date_timestamp'] as Timestamp;
-              DateTime roomRideDateTime = rideTimestamp.toDate();
-
-              // 시간 차이 계산 (절대값)
-              Duration timeDifference =
-                  roomRideDateTime.difference(rideDateTime).abs();
-
-              // 채팅방 멤버 수 확인
-              List<dynamic> members = roomData['members'] ?? [];
-
-              // 시간 차이가 1시간 이내이고, 멤버 수가 4명 미만이며, 해당 사용자가 멤버가 아닌 경우
-              if (timeDifference.inHours <= 1 &&
-                  members.length < 4 &&
-                  !members.contains(user.uid)) {
-                chatRoomId = doc.id;
-                chatRoomRef = FirebaseFirestore.instance
+            // 비슷한 시간대(±1시간)의 채팅방 찾기
+            bool foundMatchingRoom = false;
+            chatRoomRef =
+                FirebaseFirestore.instance
                     .collection(chatRoomCollection)
-                    .doc(chatRoomId);
+                    .doc(); // 초기 빈 참조로 초기화
 
-                print(
-                  '비슷한 시간대의 채팅방을 찾았습니다: $chatRoomId (시간 차이: ${timeDifference.inMinutes}분)',
-                );
-                foundMatchingRoom = true;
-                break;
-              }
-            }
-          }
-        }
+            // 기존 채팅방 중에서 시간이 맞고 인원 여유가 있는 채팅방 찾기
+            if (existingChatRooms.docs.isNotEmpty) {
+              for (var doc in existingChatRooms.docs) {
+                Map<String, dynamic> roomData =
+                    doc.data() as Map<String, dynamic>;
 
-        if (!mounted || _disposed) {
-          throw Exception('화면이 종료되었습니다');
-        }
+                // 채팅방의 탑승 시간 확인
+                if (roomData.containsKey('ride_date_timestamp')) {
+                  Timestamp rideTimestamp =
+                      roomData['ride_date_timestamp'] as Timestamp;
+                  DateTime roomRideDateTime = rideTimestamp.toDate();
 
-        // 적합한 채팅방을 찾지 못한 경우 새 채팅방 생성
-        if (!foundMatchingRoom) {
-          // 새 채팅방 번호 결정 (기존 채팅방 중 가장 큰 번호 + 1)
-          int maxRoomNumber = 0;
+                  // 시간 차이 계산 (절대값)
+                  Duration timeDifference =
+                      roomRideDateTime.difference(rideDateTime).abs();
 
-          for (var doc in existingChatRooms.docs) {
-            String docId = doc.id;
+                  // 채팅방 멤버 수 확인
+                  List<dynamic> members = roomData['members'] ?? [];
 
-            // 문서 ID에서 번호 부분 추출 (예: jfk_1 -> 1)
-            List<String> parts = docId.split('_');
-            if (parts.length > 1) {
-              try {
-                int roomNumber = int.parse(parts.last);
-                if (roomNumber > maxRoomNumber) {
-                  maxRoomNumber = roomNumber;
+                  // 시간 차이가 1시간 이내이고, 멤버 수가 4명 미만이며, 해당 사용자가 멤버가 아닌 경우
+                  if (timeDifference.inHours <= 1 &&
+                      members.length < 4 &&
+                      !members.contains(user.uid)) {
+                    chatRoomId = doc.id;
+                    chatRoomRef = FirebaseFirestore.instance
+                        .collection(chatRoomCollection)
+                        .doc(chatRoomId);
+
+                    print(
+                      '비슷한 시간대의 채팅방을 찾았습니다: $chatRoomId (시간 차이: ${timeDifference.inMinutes}분)',
+                    );
+                    foundMatchingRoom = true;
+                    break;
+                  }
                 }
-              } catch (e) {
-                print('채팅방 번호 추출 오류: $e');
               }
             }
-          }
 
-          chatRoomNumber = maxRoomNumber + 1;
-          // 새 채팅방 ID 생성 (locationIdentifier_번호)
-          chatRoomId = "${locationIdentifier}_$chatRoomNumber";
+            // 적합한 채팅방을 찾지 못한 경우 새 채팅방 생성
+            if (!foundMatchingRoom) {
+              // 새 채팅방 번호 결정 (기존 채팅방 중 가장 큰 번호 + 1)
+              int maxRoomNumber = 0;
 
-          print('새 채팅방 생성: $chatRoomId');
+              for (var doc in existingChatRooms.docs) {
+                String docId = doc.id;
 
-          // 채팅방 참조
-          chatRoomRef = FirebaseFirestore.instance
-              .collection(chatRoomCollection)
-              .doc(chatRoomId);
+                // 문서 ID에서 번호 부분 추출 (예: jfk_1 -> 1)
+                List<String> parts = docId.split('_');
+                if (parts.length > 1) {
+                  try {
+                    int roomNumber = int.parse(parts.last);
+                    if (roomNumber > maxRoomNumber) {
+                      maxRoomNumber = roomNumber;
+                    }
+                  } catch (e) {
+                    print('채팅방 번호 추출 오류: $e');
+                  }
+                }
+              }
 
-          // 새 채팅방 데이터
-          Map<String, dynamic> chatRoomData = {
-            'created_at': FieldValue.serverTimestamp(),
-            'location_identifier': locationIdentifier,
-            'ride_date': rideDateTime,
-            'ride_date_timestamp': Timestamp.fromDate(rideDateTime),
-            'date_str': formattedDate,
-            'time_slot': timeSlot,
-            'pickup_info': pickupMap,
-            'destination_info': destinationMap,
-            'members': [user.uid],
-            'member_count': 1,
-            'last_message': '새로운 그룹이 생성되었습니다.',
-            'last_message_time': FieldValue.serverTimestamp(),
-            'room_number': chatRoomNumber,
-            'collection_name': chatRoomCollection,
-          };
+              chatRoomNumber = maxRoomNumber + 1;
+              // 새 채팅방 ID 생성 (locationIdentifier_번호)
+              chatRoomId = "${locationIdentifier}_$chatRoomNumber";
 
-          // 채팅방 생성
-          await chatRoomRef.set(chatRoomData).timeout(timeout);
+              print('새 채팅방 생성: $chatRoomId');
 
-          // 시스템 메시지 추가
-          await FirebaseFirestore.instance
-              .collection(chatRoomCollection)
-              .doc(chatRoomId)
-              .collection('messages')
-              .add({
-                'text':
-                    '${currentUserInfo?.fullName ?? user.displayName ?? '이름 없음'}님이 그룹에 참여했습니다.',
-                'sender_id': 'system',
-                'sender_name': '시스템',
-                'timestamp': FieldValue.serverTimestamp(),
-                'type': 'system',
-              })
-              .timeout(timeout);
+              // 채팅방 참조
+              chatRoomRef = FirebaseFirestore.instance
+                  .collection(chatRoomCollection)
+                  .doc(chatRoomId);
 
-          print('새 채팅방 생성 완료: $chatRoomId in $chatRoomCollection');
-        }
-        // 적합한 채팅방을 찾은 경우, 해당 채팅방에 사용자 추가
-        else {
-          print('기존 채팅방에 사용자 추가: $chatRoomId');
+              // 새 채팅방 데이터
+              Map<String, dynamic> chatRoomData = {
+                'created_at': FieldValue.serverTimestamp(),
+                'location_identifier': locationIdentifier,
+                'ride_date': rideDateTime,
+                'ride_date_timestamp': Timestamp.fromDate(rideDateTime),
+                'date_str': formattedDate,
+                'time_slot': timeSlot,
+                'pickup_info': pickupMap,
+                'destination_info': destinationMap,
+                'members': [user.uid],
+                'member_count': 1,
+                'last_message': '새로운 그룹이 생성되었습니다.',
+                'last_message_time': FieldValue.serverTimestamp(),
+                'room_number': chatRoomNumber,
+                'collection_name': chatRoomCollection,
+              };
 
-          if (!mounted || _disposed) {
-            throw Exception('화면이 종료되었습니다');
-          }
+              // 채팅방 생성
+              await chatRoomRef.set(chatRoomData).timeout(Duration(seconds: 5));
 
-          DocumentSnapshot chatRoomDoc = await chatRoomRef.get().timeout(
-            timeout,
-          );
+              // 시스템 메시지 추가
+              await FirebaseFirestore.instance
+                  .collection(chatRoomCollection)
+                  .doc(chatRoomId)
+                  .collection('messages')
+                  .add({
+                    'text':
+                        '${currentUserInfo?.fullName ?? user.displayName ?? '이름 없음'}님이 그룹에 참여했습니다.',
+                    'sender_id': 'system',
+                    'sender_name': '시스템',
+                    'timestamp': FieldValue.serverTimestamp(),
+                    'type': 'system',
+                  })
+                  .timeout(Duration(seconds: 5));
 
-          if (!chatRoomDoc.exists) {
-            throw Exception('채팅방을 찾을 수 없습니다');
-          }
+              print('새 채팅방 생성 완료: $chatRoomId in $chatRoomCollection');
+            }
+            // 적합한 채팅방을 찾은 경우, 해당 채팅방에 사용자 추가
+            else {
+              print('기존 채팅방에 사용자 추가: $chatRoomId');
 
-          Map<String, dynamic> chatRoomData =
-              chatRoomDoc.data() as Map<String, dynamic>;
-          List<dynamic> members = chatRoomData['members'] ?? [];
+              DocumentSnapshot chatRoomDoc = await chatRoomRef.get().timeout(
+                Duration(seconds: 5),
+              );
+              Map<String, dynamic> chatRoomData =
+                  chatRoomDoc.data() as Map<String, dynamic>;
+              List<dynamic> members = chatRoomData['members'] ?? [];
 
-          if (!members.contains(user.uid)) {
-            // 채팅방 멤버 목록에 사용자 추가
-            members.add(user.uid);
+              if (!members.contains(user.uid)) {
+                // 채팅방 멤버 목록에 사용자 추가
+                members.add(user.uid);
 
-            // 채팅방 업데이트
-            await chatRoomRef
-                .update({'members': members, 'member_count': members.length})
-                .timeout(timeout);
+                // 채팅방 업데이트
+                await chatRoomRef
+                    .update({
+                      'members': members,
+                      'member_count': members.length,
+                    })
+                    .timeout(Duration(seconds: 5));
 
-            // 참여 메시지 추가
-            await FirebaseFirestore.instance
-                .collection(chatRoomCollection)
-                .doc(chatRoomId)
-                .collection('messages')
-                .add({
-                  'text':
-                      '${currentUserInfo?.fullName ?? user.displayName ?? '이름 없음'}님이 그룹에 참여했습니다.',
-                  'sender_id': 'system',
-                  'sender_name': '시스템',
-                  'timestamp': FieldValue.serverTimestamp(),
-                  'type': 'system',
-                })
-                .timeout(timeout);
+                // 참여 메시지 추가
+                await FirebaseFirestore.instance
+                    .collection(chatRoomCollection)
+                    .doc(chatRoomId)
+                    .collection('messages')
+                    .add({
+                      'text':
+                          '${currentUserInfo?.fullName ?? user.displayName ?? '이름 없음'}님이 그룹에 참여했습니다.',
+                      'sender_id': 'system',
+                      'sender_name': '시스템',
+                      'timestamp': FieldValue.serverTimestamp(),
+                      'type': 'system',
+                    })
+                    .timeout(Duration(seconds: 5));
 
-            print('사용자를 기존 채팅방에 추가했습니다.');
-          } else {
-            print('사용자가 이미 채팅방에 존재합니다.');
-          }
-        }
+                print('사용자를 기존 채팅방에 추가했습니다.');
+              } else {
+                print('사용자가 이미 채팅방에 존재합니다.');
+              }
+            }
+          }).timeout(Duration(seconds: 15)),
+        ]);
       } catch (e) {
         print('채팅방 생성/검색 중 오류: $e');
         throw Exception('채팅방 처리 중 오류가 발생했습니다. 다시 시도해주세요.');
       }
 
-      if (!mounted || _disposed) {
-        throw Exception('화면이 종료되었습니다');
-      }
-
       // --------- 사용자 정보 및 라이드 요청 저장 로직 ---------
 
       try {
-        final timeout = Duration(seconds: 15);
-
         // 사용자의 채팅방 목록에 추가
         String userChatRoomPath = '$chatRoomCollection/$chatRoomId';
+
+        // 고유한 문서 ID 생성 (안전한 방법)
+        String safeDocId = "${chatRoomCollection}_${chatRoomId}".replaceAll(
+          '/',
+          '_',
+        );
+
         await FirebaseFirestore.instance
             .collection('users')
             .doc(user.uid)
             .collection('chatRooms')
-            .doc(userChatRoomPath)
+            .doc(safeDocId) // 안전하게 처리된 ID 사용
             .set({
               'chat_room_collection': chatRoomCollection,
               'chat_room_id': chatRoomId,
@@ -1232,13 +1164,9 @@ class _RideConfirmationPageState extends State<RideConfirmationPage>
               'joined_at': FieldValue.serverTimestamp(),
               'ride_date': rideDateTime,
             })
-            .timeout(timeout);
+            .timeout(Duration(seconds: 5));
 
         print('사용자의 채팅방 목록에 추가 완료');
-
-        if (!mounted || _disposed) {
-          throw Exception('화면이 종료되었습니다');
-        }
 
         // Firestore에 라이드 요청 저장 (채팅방 정보 포함)
         rideMap['chat_room_collection'] = chatRoomCollection;
@@ -1248,7 +1176,7 @@ class _RideConfirmationPageState extends State<RideConfirmationPage>
         DocumentReference rideRef = await FirebaseFirestore.instance
             .collection('rideRequests')
             .add(rideMap)
-            .timeout(timeout);
+            .timeout(Duration(seconds: 5));
 
         print('라이드 요청 생성 성공: ${rideRef.id}');
       } catch (e) {
@@ -1278,12 +1206,9 @@ class _RideConfirmationPageState extends State<RideConfirmationPage>
   Future<void> _safeConfirmRide() async {
     int retryCount = 0;
     const int maxRetries = 2;
+    const Duration baseDelay = Duration(milliseconds: 500);
 
     while (retryCount <= maxRetries) {
-      if (!mounted || _disposed) {
-        throw Exception('화면이 종료되었습니다');
-      }
-
       try {
         await _processRide();
         return; // 성공하면 즉시 반환
@@ -1292,11 +1217,23 @@ class _RideConfirmationPageState extends State<RideConfirmationPage>
         print('예약 시도 $retryCount 실패: $e');
 
         if (retryCount > maxRetries) {
-          rethrow; // 최대 재시도 횟수 초과 시 예외를 다시 던짐
+          if (e is FirebaseException) {
+            // Firebase 관련 구체적인 오류 처리
+            if (e.code == 'permission-denied') {
+              throw Exception('권한이 없습니다. 다시 로그인해주세요.');
+            } else if (e.code == 'not-found') {
+              throw Exception('요청한 정보를 찾을 수 없습니다.');
+            } else {
+              throw Exception('Firebase 오류: ${e.message}');
+            }
+          } else {
+            rethrow; // 최대 재시도 횟수 초과 시 예외를 다시 던짐
+          }
         }
 
-        // 잠시 대기 후 재시도 (재시도 간격 늘림)
-        await Future.delayed(Duration(seconds: retryCount));
+        // 지수 백오프로 대기 시간 증가
+        final delay = baseDelay * (retryCount * 2);
+        await Future.delayed(delay);
       }
     }
   }
