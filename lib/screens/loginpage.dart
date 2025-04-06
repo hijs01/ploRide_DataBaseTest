@@ -80,6 +80,31 @@ class _LoginpageState extends State<Loginpage>
   }
 
   void login() async {
+    // 이메일 형식 검증
+    if (emailController.text.isEmpty) {
+      showSnackBar('이메일을 입력해주세요', isError: true);
+      return;
+    }
+
+    final RegExp emailRegex = RegExp(
+      r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$',
+    );
+    if (!emailRegex.hasMatch(emailController.text)) {
+      showSnackBar('올바른 이메일 형식이 아닙니다', isError: true);
+      return;
+    }
+
+    // 비밀번호 검증
+    if (passwordController.text.isEmpty) {
+      showSnackBar('비밀번호를 입력해주세요', isError: true);
+      return;
+    }
+
+    if (passwordController.text.length < 6) {
+      showSnackBar('비밀번호는 6자리 이상이어야 합니다', isError: true);
+      return;
+    }
+
     // 로딩 상태 설정
     setState(() {
       _isLoading = true;
@@ -90,14 +115,7 @@ class _LoginpageState extends State<Loginpage>
           .signInWithEmailAndPassword(
             email: emailController.text,
             password: passwordController.text,
-          )
-          .catchError((ex) {
-            setState(() {
-              _isLoading = false;
-            });
-            PlatformException thisEx = ex;
-            showSnackBar(thisEx.message ?? '오류가 발생했습니다', isError: true);
-          });
+          );
 
       final User? user = userCredential.user;
 
@@ -152,19 +170,22 @@ class _LoginpageState extends State<Loginpage>
       String errorMessage = '로그인 중 오류가 발생했습니다.';
       switch (e.code) {
         case 'user-not-found':
-          errorMessage = '등록되지 않은 이메일 주소입니다.';
-          break;
         case 'wrong-password':
-          errorMessage = '비밀번호가 일치하지 않습니다.';
+          errorMessage = '이메일이나 비밀번호가 틀렸습니다.';
           break;
         case 'invalid-email':
           errorMessage = '유효하지 않은 이메일 형식입니다.';
           break;
         default:
-          errorMessage = e.message ?? errorMessage;
+          errorMessage = '이메일이나 비밀번호가 틀렸습니다.';
       }
 
       showSnackBar(errorMessage, isError: true);
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
+      showSnackBar('이메일이나 비밀번호가 틀렸습니다.', isError: true);
     }
   }
 
@@ -529,29 +550,6 @@ class _LoginpageState extends State<Loginpage>
                                                 ConnectivityResult.none) {
                                               showSnackBar(
                                                 '인터넷 연결이 없습니다',
-                                                isError: true,
-                                              );
-                                              return;
-                                            }
-
-                                            // 이메일 형식 검증
-                                            final RegExp emailRegex = RegExp(
-                                              r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$',
-                                            );
-                                            if (!emailRegex.hasMatch(
-                                              emailController.text,
-                                            )) {
-                                              showSnackBar(
-                                                '유효한 이메일 주소를 입력해주세요',
-                                                isError: true,
-                                              );
-                                              return;
-                                            }
-
-                                            if (passwordController.text.length <
-                                                6) {
-                                              showSnackBar(
-                                                '비밀번호는 최소 6자 이상이어야 합니다',
                                                 isError: true,
                                               );
                                               return;
