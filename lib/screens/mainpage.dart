@@ -2,8 +2,6 @@ import 'dart:io' show Platform;
 import 'package:cabrider/datamodels/nearbydriver.dart';
 import 'package:cabrider/globalvariable.dart';
 import 'package:cabrider/helpers/firehelper.dart';
-import 'package:cabrider/rideVariables.dart';
-import 'package:cabrider/widgets/CollectPaymentDialog.dart';
 import 'package:cabrider/widgets/NoDriverDialog.dart';
 import 'package:cabrider/widgets/ProgressDialog.dart';
 import 'package:cabrider/widgets/TaxiButton.dart';
@@ -29,9 +27,22 @@ import 'package:animated_text_kit/animated_text_kit.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:cabrider/data/psu_locations.dart'; // PSU 위치 데이터 임포트
 
 class MainPage extends StatefulWidget {
-  const MainPage({super.key});
+  final bool showDirections;
+  final bool showPickupLocation;
+  final double? pickupLatitude;
+  final double? pickupLongitude;
+
+  const MainPage({
+    Key? key,
+    this.showDirections = false,
+    this.showPickupLocation = false,
+    this.pickupLatitude,
+    this.pickupLongitude,
+  }) : super(key: key);
+
   static const String id = 'mainpage';
 
   @override
@@ -46,7 +57,6 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
   double tripsheetHeight = 0;
 
   final Set<String> keysRetrieved = <String>{};
-  late DocumentReference driverTripRef;
   int driverRequestTimeout = 30;
   String status = '';
   String driverCarDetails = '';
@@ -54,9 +64,12 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
   String driverPhoneNumber = '';
   String tripStatusDisplay = 'Driver is Arriving';
   bool isRequestingLocationDetails = false;
-  late StreamSubscription<DocumentSnapshot> rideSubscription;
+  StreamSubscription<DocumentSnapshot>? rideSubscription;
 
-  CollectionReference rideRef = FirebaseFirestore.instance.collection('rideRequests');
+  // Firestore 레퍼런스 설정
+  CollectionReference rideRef = FirebaseFirestore.instance.collection(
+    'rideRequests',
+  );
 
   // 로딩 애니메이션을 위한 컨트롤러 추가
   late AnimationController _loadingController;
@@ -87,6 +100,9 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
 
   // 현재 요청의 Document Reference를 저장할 변수
   DocumentReference? currentRideRef;
+
+  // 현재 위치 변수 추가
+  Position? currentPosition;
 
   void showDetailSheet() async {
     await getDirection();
@@ -140,11 +156,12 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
     });
   }
 
-  // 현재 위치 변수 추가
-  Position? currentPosition;
-
   void SetupPositionLocator() async {
     try {
+      // AppData에서 임시 위치 확인
+      var appData = Provider.of<AppData>(context, listen: false);
+
+      // 먼저 현재 기기 위치 가져오기 (기본 위치로 사용)
       Position position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.bestForNavigation,
       );
@@ -154,7 +171,38 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
         currentPosition = position;
       });
 
-      LatLng pos = LatLng(position.latitude, position.longitude);
+      LatLng pos;
+
+      // 임시 픽업 위치가 있는 경우 해당 위치를 카메라 위치로 사용
+      if (appData.tempPickupAddress != null) {
+        // 임시 위치의 좌표로 지도 이동
+        pos = LatLng(
+          appData.tempPickupAddress!.latitude ?? position.latitude,
+          appData.tempPickupAddress!.longitude ?? position.longitude,
+        );
+
+        // 임시 위치의 마커 추가
+        _Markers.clear();
+        _Markers.add(
+          Marker(
+            markerId: MarkerId('tempPickup'),
+            position: pos,
+            icon: BitmapDescriptor.defaultMarkerWithHue(
+              BitmapDescriptor.hueGreen,
+            ),
+            infoWindow: InfoWindow(
+              title: appData.tempPickupAddress!.placeName ?? 'New Pickup',
+              snippet:
+                  appData.tempPickupAddress!.placeFormattedAddress ??
+                  'Pickup location',
+            ),
+          ),
+        );
+      } else {
+        // 기존 방식대로 현재 위치 사용
+        pos = LatLng(position.latitude, position.longitude);
+      }
+
       CameraPosition cp = CameraPosition(target: pos, zoom: 14);
 
       try {
@@ -171,42 +219,41 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
         print('지도 이동 실패: $e');
       }
 
-      // 실제 주소 변환 결과를 사용
-      String address = await HelperMethods.findCordinateAddress(
-        position,
-        context,
-      );
-      print('현재 주소: $address');
+      // 주소 변환 작업은 실제 위치 확정 시에만 수행
+      if (appData.tempPickupAddress == null || appData.isPickupConfirmed) {
+        // 실제 주소 변환 결과를 사용
+        String address = await HelperMethods.findCordinateAddress(
+          position,
+          context,
+        );
+        print('현재 주소: $address');
+
+        // 현재 pickup 주소 확인
+        var currentPickup = appData.pickupAddress;
+        print(
+          '현재 pickup 주소 상태: ${currentPickup?.placeFormattedAddress ?? "null"}',
+        );
+
+        if (currentPickup == null) {
+          // pickup 주소가 없으면 현재 위치로 설정
+          var newPickupAddress = Address(
+            placeName: address,
+            latitude: position.latitude,
+            longitude: position.longitude,
+            placeId: '', // 여기서는 빈 값으로 설정
+            placeFormattedAddress: address,
+          );
+
+          appData.updatePickupAddress(newPickupAddress);
+          print('Pickup 주소 새로 설정됨:');
+          print('- placeName: ${newPickupAddress.placeName}');
+          print(
+            '- placeFormattedAddress: ${newPickupAddress.placeFormattedAddress}',
+          );
+        }
+      }
 
       startGeofireListener();
-
-      // 현재 pickup 주소 확인
-      var currentPickup =
-          Provider.of<AppData>(context, listen: false).pickupAddress;
-      print(
-        '현재 pickup 주소 상태: ${currentPickup?.placeFormattedAddress ?? "null"}',
-      );
-
-      if (currentPickup == null) {
-        // pickup 주소가 없으면 현재 위치로 설정
-        var newPickupAddress = Address(
-          placeName: address,
-          latitude: position.latitude,
-          longitude: position.longitude,
-          placeId: '', // 여기서는 빈 값으로 설정
-          placeFormattedAddress: address,
-        );
-
-        Provider.of<AppData>(
-          context,
-          listen: false,
-        ).updatePickupAddress(newPickupAddress);
-        print('Pickup 주소 새로 설정됨:');
-        print('- placeName: ${newPickupAddress.placeName}');
-        print(
-          '- placeFormattedAddress: ${newPickupAddress.placeFormattedAddress}',
-        );
-      }
     } catch (e) {
       print('위치 설정 중 오류 발생: $e');
     }
@@ -287,14 +334,24 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
     // 앱 시작 시 약간의 지연 후 위치 권한 확인
     Future.delayed(const Duration(seconds: 1), () {
       _checkLocationPermission();
+
+      // 지도가 로드된 후 임시 위치 확인
+      Future.delayed(const Duration(seconds: 2), () {
+        // 임시 위치가 있으면 마커 표시
+        final appData = Provider.of<AppData>(context, listen: false);
+        if (appData.tempPickupAddress != null && !appData.isPickupConfirmed) {
+          updatePickupMarker();
+        }
+      });
     });
+
     HelperMethods.getCurrentUserInfo();
   }
 
   @override
   void dispose() {
     _loadingController.dispose();
-    rideSubscription.cancel();
+    rideSubscription?.cancel();
     super.dispose();
   }
 
@@ -303,6 +360,50 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
     createMarker();
     return Scaffold(
       key: _scaffoldKey,
+      appBar: PreferredSize(
+        preferredSize: Size.fromHeight(60), // AppBar 높이 조정
+        child: AppBar(
+          backgroundColor: Colors.black,
+          elevation: 1,
+          automaticallyImplyLeading: false, // 뒤로 가기 버튼 제거
+          title: GestureDetector(
+            onTap: () {
+              _showPickupLocationListModal(); // 출발지 목록 모달 표시
+            },
+            child: Container(
+              height: 40,
+              padding: EdgeInsets.symmetric(horizontal: 15),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade800,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: Colors.grey.shade600, width: 1),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.location_on, color: Colors.white, size: 18),
+                  SizedBox(width: 10),
+                  Expanded(
+                    child: Consumer<AppData>(
+                      builder: (context, appData, child) {
+                        return Text(
+                          appData.pickupAddress?.placeName ?? "출발지 선택",
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        );
+                      },
+                    ),
+                  ),
+                  Icon(Icons.arrow_drop_down, color: Colors.white),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
       drawer: Container(
         width: 250,
         color: Colors.white,
@@ -328,7 +429,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Text(
-                            'John Doe',
+                            currentUserInfo?.fullName ?? 'User',
                             style: TextStyle(
                               fontSize: 20,
                               fontFamily: 'Brand-Bold',
@@ -404,7 +505,17 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                   });
 
                   await Future.delayed(const Duration(milliseconds: 200));
-                  SetupPositionLocator();
+
+                  // 임시 위치가 있는지 확인 후 처리
+                  final appData = Provider.of<AppData>(context, listen: false);
+                  if (appData.tempPickupAddress != null &&
+                      !appData.isPickupConfirmed) {
+                    // 임시 위치가 있으면 해당 위치의 마커 표시
+                    updatePickupMarker();
+                  } else {
+                    // 임시 위치가 없으면 일반적인 위치 설정
+                    SetupPositionLocator();
+                  }
                 },
                 onTap: (_) {
                   // 지도를 탭했을 때 InfoWindow가 닫히지 않도록
@@ -472,7 +583,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                       ),
                     ],
                   ),
-                  height: 250,
+                  height: requestingSheetHeight,
                   child: Padding(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 20,
@@ -970,6 +1081,114 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                 ),
               ),
             ),
+
+            // 출발 위치 확인 버튼
+            Positioned(
+              bottom: 300, // 다른 UI와 겹치지 않도록 위치 조정
+              left: 0,
+              right: 0,
+              child: Consumer<AppData>(
+                builder: (context, appData, child) {
+                  // 임시 출발 위치가 있고 확정되지 않았을 때만 표시
+                  if (appData.tempPickupAddress != null &&
+                      !appData.isPickupConfirmed) {
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black26,
+                              blurRadius: 10.0,
+                              spreadRadius: 0.5,
+                              offset: Offset(0.7, 0.7),
+                            ),
+                          ],
+                        ),
+                        padding: EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(Icons.location_on, color: Colors.blue),
+                                SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        '출발 위치 확인',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 16,
+                                        ),
+                                      ),
+                                      SizedBox(height: 4),
+                                      Text(
+                                        appData.tempPickupAddress?.placeName ??
+                                            '',
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          color: Colors.grey[600],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                            SizedBox(height: 16),
+                            Container(
+                              width: double.infinity,
+                              child: ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Color(0xFF3F51B5),
+                                  padding: EdgeInsets.symmetric(vertical: 12),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                ),
+                                onPressed: () {
+                                  // 임시 주소를 실제 주소로 확정
+                                  Provider.of<AppData>(
+                                    context,
+                                    listen: false,
+                                  ).confirmPickupAddress();
+
+                                  // 기존 위치 설정 함수 호출
+                                  SetupPositionLocator();
+
+                                  // 필요한 UI 상태 업데이트
+                                  setState(() {
+                                    searchSheetHeight =
+                                        (Platform.isAndroid) ? 275 : 300;
+                                    mapBottomPadding =
+                                        (Platform.isAndroid) ? 280 : 270;
+                                  });
+                                },
+                                child: Text(
+                                  '출발 위치로 설정',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  } else {
+                    return SizedBox.shrink(); // 임시 위치가 없거나 이미 확정된 경우 표시하지 않음
+                  }
+                },
+              ),
+            ),
           ],
         ),
       ),
@@ -989,8 +1208,11 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
       return;
     }
 
-    var pickLatLng = LatLng(pickup.latitude, pickup.longitude);
-    var destinationLatLng = LatLng(destination.latitude, destination.longitude);
+    var pickLatLng = LatLng(pickup.latitude ?? 0.0, pickup.longitude ?? 0.0);
+    var destinationLatLng = LatLng(
+      destination.latitude ?? 0.0,
+      destination.longitude ?? 0.0,
+    );
 
     showDialog(
       barrierDismissible: false,
@@ -1096,8 +1318,8 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
       position: pickLatLng,
       icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
       infoWindow: InfoWindow(
-        title: pickup.placeName,
-        snippet: pickup.placeFormattedAddress,
+        title: pickup.placeName ?? 'Pickup',
+        snippet: pickup.placeFormattedAddress ?? 'No address available',
       ),
       visible: true,
     );
@@ -1107,8 +1329,8 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
       position: destinationLatLng,
       icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
       infoWindow: InfoWindow(
-        title: destination.placeName,
-        snippet: destination.placeFormattedAddress,
+        title: destination.placeName ?? 'Destination',
+        snippet: destination.placeFormattedAddress ?? 'No address available',
       ),
       visible: true,
     );
@@ -1135,8 +1357,8 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
             BitmapDescriptor.hueGreen,
           ),
           infoWindow: InfoWindow(
-            title: pickup.placeName,
-            snippet: pickup.placeFormattedAddress,
+            title: pickup.placeName ?? 'Pickup',
+            snippet: pickup.placeFormattedAddress ?? 'No address available',
           ),
           visible: true,
         );
@@ -1146,8 +1368,9 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
           position: destinationLatLng,
           icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
           infoWindow: InfoWindow(
-            title: destination.placeName,
-            snippet: destination.placeFormattedAddress,
+            title: destination.placeName ?? 'Destination',
+            snippet:
+                destination.placeFormattedAddress ?? 'No address available',
           ),
           visible: true,
         );
@@ -1380,7 +1603,9 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
       print('생성된 ride reference: ${newRideRef.id}');
 
       // 실시간 업데이트 리스너 설정
-      newRideRef.snapshots().listen((DocumentSnapshot snapshot) {
+      rideSubscription = newRideRef.snapshots().listen((
+        DocumentSnapshot snapshot,
+      ) {
         if (snapshot.exists) {
           Map<String, dynamic> rideData =
               snapshot.data() as Map<String, dynamic>;
@@ -1491,8 +1716,8 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
           Provider.of<AppData>(context, listen: false).destinationAddress;
 
       var destinationLatLng = LatLng(
-        destination!.latitude,
-        destination.longitude,
+        destination!.latitude ?? 0.0,
+        destination.longitude ?? 0.0,
       );
 
       var thisDetails = await HelperMethods.getDirectionDetails(
@@ -1758,5 +1983,206 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
     } catch (e) {
       print('테스트 중 오류 발생: $e');
     }
+  }
+
+  // 임시 픽업 마커 업데이트 메서드
+  void updatePickupMarker() {
+    var appData = Provider.of<AppData>(context, listen: false);
+
+    // 임시 픽업 주소가 있으면 해당 위치를 마커로 표시
+    if (appData.tempPickupAddress != null) {
+      double lat = appData.tempPickupAddress!.latitude ?? 0.0;
+      double lng = appData.tempPickupAddress!.longitude ?? 0.0;
+
+      if (lat != 0.0 && lng != 0.0) {
+        LatLng pos = LatLng(lat, lng);
+
+        // 마커 추가
+        _Markers.clear();
+        final marker = Marker(
+          markerId: MarkerId('tempPickup'),
+          position: pos,
+          icon: BitmapDescriptor.defaultMarkerWithHue(
+            BitmapDescriptor.hueGreen,
+          ),
+          infoWindow: InfoWindow(
+            title: appData.tempPickupAddress!.placeName ?? 'New Pickup',
+            snippet:
+                appData.tempPickupAddress!.placeFormattedAddress ??
+                'Pickup location',
+          ),
+        );
+
+        setState(() {
+          _Markers.add(marker);
+        });
+
+        // 카메라 이동
+        mapController.animateCamera(CameraUpdate.newLatLngZoom(pos, 14));
+      }
+    }
+  }
+
+  // 출발지 위치 목록을 표시하는 모달 함수
+  void _showPickupLocationListModal() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.black,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return Container(
+          height: MediaQuery.of(context).size.height * 0.7,
+          color: Colors.black,
+          child: Column(
+            children: [
+              // 상단 헤더
+              Container(
+                padding: EdgeInsets.symmetric(vertical: 15, horizontal: 20),
+                decoration: BoxDecoration(
+                  color: Colors.black,
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                ),
+                child: Row(
+                  children: [
+                    Text(
+                      "출발지 선택",
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                    Spacer(),
+                    IconButton(
+                      icon: Icon(Icons.close, color: Colors.white),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ],
+                ),
+              ),
+              Divider(
+                height: 1,
+                thickness: 1.5,
+                color: Colors.white.withOpacity(0.6),
+              ),
+              // 출발지 목록
+              Expanded(
+                child: ListView.separated(
+                  padding: EdgeInsets.symmetric(vertical: 8),
+                  itemCount: PsuLocationsData.locations.length,
+                  itemBuilder: (context, index) {
+                    final location = PsuLocationsData.locations[index];
+                    return _buildLocationItem(
+                      location.name,
+                      location.address,
+                      location.latitude,
+                      location.longitude,
+                    );
+                  },
+                  separatorBuilder: (context, index) {
+                    return Divider(
+                      height: 1,
+                      thickness: 1.0,
+                      color: Colors.white.withOpacity(0.3),
+                      indent: 20, // 왼쪽 여백 20px
+                      endIndent: 20, // 오른쪽 여백 20px
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  // 위치 항목 위젯
+  Widget _buildLocationItem(
+    String name,
+    String address,
+    double latitude,
+    double longitude,
+  ) {
+    return ListTile(
+      leading: Icon(Icons.location_on, color: Colors.white),
+      title: Text(
+        name,
+        style: TextStyle(color: Colors.white, fontWeight: FontWeight.w500),
+      ),
+      subtitle: Text(address, style: TextStyle(color: Colors.grey.shade400)),
+      tileColor: Colors.transparent,
+      onTap: () {
+        // 위치 선택 시 처리
+        _updatePickupLocation(name, address, latitude, longitude);
+        Navigator.pop(context); // 모달 닫기
+      },
+    );
+  }
+
+  // 선택한 위치로 업데이트
+  void _updatePickupLocation(
+    String name,
+    String address,
+    double latitude,
+    double longitude,
+  ) {
+    // Address 객체 생성
+    var pickupAddress = Address(
+      placeName: name,
+      placeFormattedAddress: address,
+      latitude: latitude,
+      longitude: longitude,
+      placeId: 'psu_${name.hashCode}', // 임의의 플레이스 ID 생성
+    );
+
+    // 임시 픽업 주소로 저장
+    Provider.of<AppData>(
+      context,
+      listen: false,
+    ).updateTempPickupAddress(pickupAddress);
+
+    // 지도 이동 및 마커 생성
+    LatLng pickupLatLng = LatLng(latitude, longitude);
+
+    // 기존 마커 지우기
+    _Markers.clear();
+    _Circles.clear();
+
+    // 마커 생성
+    final pickupMarker = Marker(
+      markerId: const MarkerId('tempPickup'),
+      position: pickupLatLng,
+      icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+      infoWindow: InfoWindow(title: name, snippet: "출발 위치"),
+      visible: true,
+      zIndex: 3,
+    );
+
+    // 원 생성
+    Circle pickupCircle = Circle(
+      circleId: const CircleId('tempPickup'),
+      strokeColor: Colors.white,
+      strokeWidth: 3,
+      radius: 30,
+      center: pickupLatLng,
+      fillColor: Colors.white.withOpacity(0.3),
+    );
+
+    setState(() {
+      _Markers.add(pickupMarker);
+      _Circles.add(pickupCircle);
+    });
+
+    // 지도 이동
+    mapController.animateCamera(CameraUpdate.newLatLngZoom(pickupLatLng, 15));
+
+    // 마커 정보창 표시
+    Future.delayed(Duration(milliseconds: 300), () {
+      mapController.showMarkerInfoWindow(MarkerId('tempPickup'));
+    });
   }
 }

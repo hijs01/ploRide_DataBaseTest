@@ -35,14 +35,14 @@ target 'Runner' do
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
 
   # Firebase 설정 업데이트
-  pod 'Firebase', :modular_headers => true
-  pod 'FirebaseCore', :modular_headers => true
-  pod 'GoogleUtilities', :modular_headers => true
+  pod 'Firebase', '~> 11.10.0', :modular_headers => true
+  pod 'FirebaseCore', '~> 11.10.0', :modular_headers => true
+  pod 'GoogleUtilities', '~> 8.0', :modular_headers => true
   
   # 추가 Firebase 패키지
-  pod 'FirebaseMessaging', :modular_headers => true
-  pod 'FirebaseDatabase', :modular_headers => true
-  pod 'FirebaseAuth', :modular_headers => true
+  pod 'FirebaseMessaging', '~> 11.10.0', :modular_headers => true
+  pod 'FirebaseDatabase', '~> 11.10.0', :modular_headers => true
+  pod 'FirebaseAuth', '~> 11.10.0', :modular_headers => true
 end
 
 post_install do |installer|

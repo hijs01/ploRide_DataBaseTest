@@ -6,6 +6,12 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:cabrider/screens/loginpage.dart';
 import 'package:cabrider/screens/registrationpage.dart';
 import 'package:cabrider/screens/mainpage.dart';
+import 'package:cabrider/screens/searchpage.dart';
+import 'package:cabrider/screens/homepage.dart';
+import 'package:cabrider/screens/settings_page.dart';
+import 'package:cabrider/screens/taxi_info_page.dart';
+import 'package:cabrider/screens/rideconfirmation/rideconfirmation_page.dart';
+import 'package:cabrider/screens/email_verification_page.dart';
 import 'package:cabrider/globalvariable.dart';
 import 'package:provider/provider.dart';
 import 'package:cabrider/dataprovider/appdata.dart';
@@ -47,7 +53,7 @@ Future<void> main() async {
   try {
     WidgetsFlutterBinding.ensureInitialized();
 
-    // Firebase 초기화
+    // Firebase 초기화 - 더 안전한 방식으로 수정
     if (Firebase.apps.isEmpty) {
       await Firebase.initializeApp(
         options:
@@ -72,6 +78,8 @@ Future<void> main() async {
                   storageBucket: 'geetaxi-aa379.firebasestorage.app',
                 ),
       );
+    } else {
+      Firebase.app(); // 이미 초기화된 앱 인스턴스 사용
     }
 
     // currentFirebaseUser 초기화
@@ -154,8 +162,14 @@ class MyApp extends StatelessWidget {
       initialRoute: currentFirebaseUser == null ? Loginpage.id : MainPage.id,
       routes: {
         MainPage.id: (context) => MainPage(),
-        Loginpage.id: (context) => Loginpage(),
         RegistrationPage.id: (context) => RegistrationPage(),
+        Loginpage.id: (context) => Loginpage(),
+        SearchPage.id: (context) => SearchPage(),
+        HomePage.id: (context) => HomePage(),
+        SettingsPage.id: (context) => SettingsPage(),
+        TaxiInfoPage.id: (context) => TaxiInfoPage(),
+        EmailVerificationPage.id: (context) => EmailVerificationPage(email: ''),
+        'rideconfirmation': (context) => RideConfirmationPage(),
       },
     );
   }

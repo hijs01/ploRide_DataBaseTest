@@ -10,7 +10,13 @@ import 'package:cabrider/globalvariable.dart';
 
 class PredictionTile extends StatelessWidget {
   final Prediction prediction;
-  const PredictionTile({super.key, required this.prediction});
+  final bool isPickup;
+
+  const PredictionTile({
+    super.key,
+    required this.prediction,
+    this.isPickup = false,
+  });
 
   void getPlaceDetails(String placeId, context) async {
     showDialog(
@@ -41,13 +47,20 @@ class PredictionTile extends StatelessWidget {
         placeFormattedAddress: response['result']['formatted_address'],
       );
 
-      Provider.of<AppData>(
-        context,
-        listen: false,
-      ).updateDestinationAddress(thisPlace);
+      if (isPickup) {
+        Provider.of<AppData>(
+          context,
+          listen: false,
+        ).updatePickupAddress(thisPlace);
+      } else {
+        Provider.of<AppData>(
+          context,
+          listen: false,
+        ).updateDestinationAddress(thisPlace);
+      }
 
       print(thisPlace.placeName);
-      
+
       Navigator.pop(context, 'getDirection');
     }
   }
