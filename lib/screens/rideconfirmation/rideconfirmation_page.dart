@@ -5,7 +5,8 @@ import 'package:cabrider/datamodels/address.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cabrider/globalvariable.dart';
-import 'package:cabrider/helpers/helpermethods.dart';
+// 알림 관련 임포트 주석 처리
+// import 'package:cabrider/helpers/helpermethods.dart';
 import 'package:cabrider/screens/homepage.dart';
 
 class RideConfirmationPage extends StatefulWidget {
@@ -15,8 +16,11 @@ class RideConfirmationPage extends StatefulWidget {
   _RideConfirmationPageState createState() => _RideConfirmationPageState();
 }
 
-class _RideConfirmationPageState extends State<RideConfirmationPage> {
+class _RideConfirmationPageState extends State<RideConfirmationPage>
+    with WidgetsBindingObserver {
   bool _isLoading = false;
+  bool _isProcessing = false; // 예약 처리 중 상태 추가
+  bool _disposed = false; // 위젯 dispose 상태 체크
 
   // 인디고 색상 정의
   final Color themeColor = Color(0xFF3F51B5); // 인디고 색상
@@ -24,377 +28,152 @@ class _RideConfirmationPageState extends State<RideConfirmationPage> {
 
   // 슬라이더 값 상태 추가
   double _sliderValue = 0.0;
+  // 슬라이더 너비 저장 변수 추가
+  double _maxSliderWidth = 0.0;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    // 초기화 시점에서는 슬라이더 값 리셋
+    _sliderValue = 0.0;
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    // 진행 중인 비동기 작업 취소 로직
+    _isProcessing = false;
+    _isLoading = false;
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached) {
+      // 앱이 백그라운드로 가거나 종료될 때 이미 진행 중인 작업 취소 로직 추가 가능
+      _isProcessing = false;
+    }
+  }
+
+  // setState 함수를 오버라이드하여 안전하게 상태 업데이트
+  @override
+  void setState(VoidCallback fn) {
+    if (!_disposed && mounted) {
+      super.setState(fn);
+    }
+  }
+
+  // 예약 확정 버튼 슬라이드 처리 함수
+  void _handleSliderUpdate(DragUpdateDetails details, BuildContext context) {
+    // 이미 처리 중이면 무시
+    if (_isLoading || _isProcessing) return;
+
+    // 슬라이더 위치 계산 방식 개선
+    try {
+      final RenderBox box = context.findRenderObject() as RenderBox;
+      _maxSliderWidth = box.size.width - 92;
+
+      // 유효하지 않은 너비는 처리하지 않음
+      if (_maxSliderWidth <= 0) return;
+
+      double newPosition = _sliderValue + details.delta.dx / _maxSliderWidth;
+      // 안전하게 값 범위 제한
+      newPosition = newPosition.clamp(0.0, 1.0);
+
+      if (mounted && !_disposed) {
+        setState(() {
+          _sliderValue = newPosition;
+        });
+      }
+
+      // 예약 확정 조건
+      if (_sliderValue >= 0.9 && !_isLoading && !_isProcessing) {
+        if (mounted && !_disposed) {
+          setState(() {
+            _sliderValue = 0.0;
+            _isLoading = true;
+          });
+        }
+
+        // 안전하게 UI 업데이트 후 다이얼로그 표시 (메인 스레드에서)
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && !_disposed) {
+            _showMatchingDialog(context);
+          }
+        });
+      }
+    } catch (e) {
+      print('슬라이더 업데이트 오류: $e');
+      // 오류 발생 시 슬라이더 리셋
+      if (mounted && !_disposed) {
+        setState(() {
+          _sliderValue = 0.0;
+        });
+      }
+    }
+  }
+
+  // 예약 확정 버튼 슬라이드 종료 처리 함수
+  void _handleSliderEnd(DragEndDetails details) {
+    // 이미 처리 중이면 무시
+    if (_isLoading || _isProcessing || !mounted || _disposed) return;
+
+    // 사용자가 끝까지 슬라이드하지 않은 경우 초기 위치로 돌아감
+    if (_sliderValue < 0.9) {
+      setState(() {
+        _sliderValue = 0.0;
+      });
+    }
+  }
 
   // 예약 정보를 Firestore에 저장하고 드라이버에게 전송하는 함수
   Future<void> _confirmRide() async {
     if (_isLoading) return;
 
-    setState(() {
-      _isLoading = true;
-    });
-
     try {
-      final appData = Provider.of<AppData>(context, listen: false);
-      final pickup = appData.pickupAddress;
-      final destination = appData.destinationAddress;
-      final luggageCount = appData.luggageCount;
-      final rideDate = appData.rideDate;
-      final rideTime = appData.rideTime;
+      setState(() {
+        _isLoading = true;
+      });
 
-      // 필수 정보 확인
-      if (pickup == null ||
-          destination == null ||
-          rideDate == null ||
-          rideTime == null) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('탑승 정보가 올바르지 않습니다')));
-        return;
-      }
+      await _processRide();
 
-      // 현재 사용자 확인
-      final user = FirebaseAuth.instance.currentUser;
-      if (user == null) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('로그인이 필요합니다')));
-        return;
-      }
-
-      // 예약 시간을 DateTime으로 변환
-      final rideDateTime = DateTime(
-        rideDate.year,
-        rideDate.month,
-        rideDate.day,
-        rideTime.hour,
-        rideTime.minute,
-      );
-
-      // 픽업과 목적지 위치 정보
-      Map<String, dynamic> pickupMap = {
-        'latitude': pickup.latitude,
-        'longitude': pickup.longitude,
-        'address': pickup.placeName,
-        'formatted_address': pickup.placeFormattedAddress,
-      };
-
-      Map<String, dynamic> destinationMap = {
-        'latitude': destination.latitude,
-        'longitude': destination.longitude,
-        'address': destination.placeName,
-        'formatted_address': destination.placeFormattedAddress,
-      };
-
-      // 라이드 요청 데이터 생성
-      Map<String, dynamic> rideMap = {
-        'created_at': FieldValue.serverTimestamp(),
-        'rider_name': currentUserInfo?.fullName ?? user.displayName ?? '이름 없음',
-        'rider_phone': currentUserInfo?.phone ?? '전화번호 없음',
-        'rider_email': user.email,
-        'pickup': pickupMap,
-        'destination': destinationMap,
-        'luggage_count': luggageCount,
-        'ride_date': rideDateTime,
-        'ride_date_timestamp': Timestamp.fromDate(rideDateTime),
-        'status': 'pending',
-        'user_id': user.uid,
-        'payment_method': 'card',
-        'driver_id': 'waiting',
-      };
-
-      print('라이드 요청 데이터:');
-      print(rideMap);
-
-      // 출발지와 목적지 정보 확인
-      String pickupName = pickup.placeName?.toLowerCase() ?? '';
-      String destinationName = destination.placeName?.toLowerCase() ?? '';
-
-      // 채팅방 컬렉션 이름과 식별자 결정
-      String chatRoomCollection = '';
-      String locationIdentifier = '';
-      int chatRoomNumber = 1; // 기본 채팅방 번호
-
-      // Penn State University에서 출발하는 경우 - 도착 공항 기준으로 그룹화
-      if (pickupName.contains('penn state') ||
-          pickupName.contains('university') ||
-          pickupName.contains('대학')) {
-        chatRoomCollection = 'psuToAirport'; // PSU에서 공항으로 컬렉션
-
-        // 목적지(공항) 이름에서 식별자 추출
-        if (destinationName.contains('airport') ||
-            destinationName.contains('공항')) {
-          // 공항 이름 추출 (예: jfk airport -> jfk)
-          String airportName =
-              destinationName
-                  .replaceAll("airport", "")
-                  .replaceAll("공항", "")
-                  .trim();
-          if (airportName.isEmpty) {
-            airportName = "unknown";
-          }
-          locationIdentifier = airportName.replaceAll(" ", "_");
-        } else {
-          locationIdentifier = destinationName.replaceAll(" ", "_");
-        }
-
-        print('출발지가 Penn State University입니다. psuToAirport 컬렉션을 사용합니다.');
-        print('식별자: $locationIdentifier');
-      }
-      // 공항에서 출발하는 경우 - 출발 공항 기준으로 그룹화
-      else if (pickupName.contains('airport') || pickupName.contains('공항')) {
-        chatRoomCollection = 'airportToPsu'; // 공항에서 PSU로 컬렉션
-
-        // 출발지(공항) 이름에서 식별자 추출
-        String airportName =
-            pickupName.replaceAll("airport", "").replaceAll("공항", "").trim();
-        if (airportName.isEmpty) {
-          airportName = "unknown";
-        }
-        locationIdentifier = airportName.replaceAll(" ", "_");
-
-        print('출발지가 공항입니다. airportToPsu 컬렉션을 사용합니다.');
-        print('식별자: $locationIdentifier');
-      } else {
-        // 둘 다 아닌 경우(일반 케이스) 기본값 설정
-        chatRoomCollection = 'generalRides';
-        locationIdentifier = '${pickupName}_to_${destinationName}'.replaceAll(
-          " ",
-          "_",
+      // 이전 코드에서는 여기서 성공 메시지와 네비게이션을 했지만
+      // 이 함수를 직접 호출하는 곳이 있을 수 있어 남겨둡니다.
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('예약이 완료되었습니다! 채팅방에서 다른 여행자들과 소통하세요.'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 4),
+          ),
         );
-        print('일반 경로입니다. generalRides 컬렉션을 사용합니다.');
+
+        // 홈페이지로 이동
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (context) => HomePage()),
+          (route) => false,
+        );
       }
-
-      // 날짜를 yyyy-mm-dd 형식으로 변환 (채팅방 필터링용)
-      String formattedDate =
-          "${rideDate.year}-${rideDate.month.toString().padLeft(2, '0')}-${rideDate.day.toString().padLeft(2, '0')}";
-
-      // 시간 범위 계산 (예약 시간 ±1시간)
-      DateTime rideDateTimeMinusHour = rideDateTime.subtract(
-        Duration(hours: 1),
-      );
-      DateTime rideDateTimePlusHour = rideDateTime.add(Duration(hours: 1));
-
-      // 시간대 식별자 생성 (채팅방 그룹화용)
-      int timeSlot = (rideTime.hour / 2).floor(); // 2시간 단위로 시간대 그룹화
-
-      print('채팅방 컬렉션: $chatRoomCollection, 위치 식별자: $locationIdentifier');
-
-      // 해당 컬렉션에서 같은 날짜와 비슷한 시간대의 채팅방 찾기
-      QuerySnapshot existingChatRooms =
-          await FirebaseFirestore.instance
-              .collection(chatRoomCollection)
-              .where('location_identifier', isEqualTo: locationIdentifier)
-              .where('date_str', isEqualTo: formattedDate)
-              .get();
-
-      print('같은 날짜/위치의 기존 채팅방 수: ${existingChatRooms.docs.length}');
-
-      // 비슷한 시간대(±1시간)의 채팅방 찾기
-      bool foundMatchingRoom = false;
-      String chatRoomId = '';
-      DocumentReference chatRoomRef =
-          FirebaseFirestore.instance
-              .collection(chatRoomCollection)
-              .doc(); // 초기 빈 참조로 초기화
-
-      // 기존 채팅방 중에서 시간이 맞고 인원 여유가 있는 채팅방 찾기
-      if (existingChatRooms.docs.isNotEmpty) {
-        for (var doc in existingChatRooms.docs) {
-          Map<String, dynamic> roomData = doc.data() as Map<String, dynamic>;
-
-          // 채팅방의 탑승 시간 확인
-          if (roomData.containsKey('ride_date_timestamp')) {
-            Timestamp rideTimestamp =
-                roomData['ride_date_timestamp'] as Timestamp;
-            DateTime roomRideDateTime = rideTimestamp.toDate();
-
-            // 시간 차이 계산 (절대값)
-            Duration timeDifference =
-                roomRideDateTime.difference(rideDateTime).abs();
-
-            // 채팅방 멤버 수 확인
-            List<dynamic> members = roomData['members'] ?? [];
-
-            // 시간 차이가 1시간 이내이고, 멤버 수가 4명 미만이며, 해당 사용자가 멤버가 아닌 경우
-            if (timeDifference.inHours <= 1 &&
-                members.length < 4 &&
-                !members.contains(user.uid)) {
-              chatRoomId = doc.id;
-              chatRoomRef = FirebaseFirestore.instance
-                  .collection(chatRoomCollection)
-                  .doc(chatRoomId);
-
-              print(
-                '비슷한 시간대의 채팅방을 찾았습니다: $chatRoomId (시간 차이: ${timeDifference.inMinutes}분)',
-              );
-              foundMatchingRoom = true;
-              break;
-            }
-          }
-        }
-      }
-
-      // 적합한 채팅방을 찾지 못한 경우 새 채팅방 생성
-      if (!foundMatchingRoom) {
-        // 새 채팅방 번호 결정 (기존 채팅방 중 가장 큰 번호 + 1)
-        int maxRoomNumber = 0;
-
-        for (var doc in existingChatRooms.docs) {
-          String docId = doc.id;
-
-          // 문서 ID에서 번호 부분 추출 (예: jfk_1 -> 1)
-          List<String> parts = docId.split('_');
-          if (parts.length > 1) {
-            try {
-              int roomNumber = int.parse(parts.last);
-              if (roomNumber > maxRoomNumber) {
-                maxRoomNumber = roomNumber;
-              }
-            } catch (e) {
-              print('채팅방 번호 추출 오류: $e');
-            }
-          }
-        }
-
-        chatRoomNumber = maxRoomNumber + 1;
-        // 새 채팅방 ID 생성 (locationIdentifier_번호)
-        chatRoomId = "${locationIdentifier}_$chatRoomNumber";
-
-        print('새 채팅방 생성: $chatRoomId');
-
-        // 채팅방 참조
-        chatRoomRef = FirebaseFirestore.instance
-            .collection(chatRoomCollection)
-            .doc(chatRoomId);
-
-        // 새 채팅방 데이터
-        Map<String, dynamic> chatRoomData = {
-          'created_at': FieldValue.serverTimestamp(),
-          'location_identifier': locationIdentifier,
-          'ride_date': rideDateTime,
-          'ride_date_timestamp': Timestamp.fromDate(rideDateTime),
-          'date_str': formattedDate,
-          'time_slot': timeSlot,
-          'pickup_info': pickupMap,
-          'destination_info': destinationMap,
-          'members': [user.uid],
-          'member_count': 1,
-          'last_message': '새로운 그룹이 생성되었습니다.',
-          'last_message_time': FieldValue.serverTimestamp(),
-          'room_number': chatRoomNumber,
-          'collection_name': chatRoomCollection,
-        };
-
-        // 채팅방 생성
-        await chatRoomRef.set(chatRoomData);
-
-        // 시스템 메시지 추가
-        await FirebaseFirestore.instance
-            .collection(chatRoomCollection)
-            .doc(chatRoomId)
-            .collection('messages')
-            .add({
-              'text':
-                  '${currentUserInfo?.fullName ?? user.displayName ?? '이름 없음'}님이 그룹에 참여했습니다.',
-              'sender_id': 'system',
-              'sender_name': '시스템',
-              'timestamp': FieldValue.serverTimestamp(),
-              'type': 'system',
-            });
-
-        print('새 채팅방 생성 완료: $chatRoomId in $chatRoomCollection');
-      }
-      // 적합한 채팅방을 찾은 경우, 해당 채팅방에 사용자 추가
-      else {
-        print('기존 채팅방에 사용자 추가: $chatRoomId');
-
-        DocumentSnapshot chatRoomDoc = await chatRoomRef.get();
-        Map<String, dynamic> chatRoomData =
-            chatRoomDoc.data() as Map<String, dynamic>;
-        List<dynamic> members = chatRoomData['members'] ?? [];
-
-        if (!members.contains(user.uid)) {
-          // 채팅방 멤버 목록에 사용자 추가
-          members.add(user.uid);
-
-          // 채팅방 업데이트
-          await chatRoomRef.update({
-            'members': members,
-            'member_count': members.length,
-          });
-
-          // 참여 메시지 추가
-          await FirebaseFirestore.instance
-              .collection(chatRoomCollection)
-              .doc(chatRoomId)
-              .collection('messages')
-              .add({
-                'text':
-                    '${currentUserInfo?.fullName ?? user.displayName ?? '이름 없음'}님이 그룹에 참여했습니다.',
-                'sender_id': 'system',
-                'sender_name': '시스템',
-                'timestamp': FieldValue.serverTimestamp(),
-                'type': 'system',
-              });
-
-          print('사용자를 기존 채팅방에 추가했습니다.');
-        } else {
-          print('사용자가 이미 채팅방에 존재합니다.');
-        }
-      }
-
-      // 사용자의 채팅방 목록에 추가
-      String userChatRoomPath = '$chatRoomCollection/$chatRoomId';
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .collection('chatRooms')
-          .doc(userChatRoomPath)
-          .set({
-            'chat_room_collection': chatRoomCollection,
-            'chat_room_id': chatRoomId,
-            'chat_room_path': userChatRoomPath,
-            'joined_at': FieldValue.serverTimestamp(),
-            'ride_date': rideDateTime,
-          });
-
-      print('사용자의 채팅방 목록에 추가 완료');
-
-      // Firestore에 라이드 요청 저장 (채팅방 정보 포함)
-      rideMap['chat_room_collection'] = chatRoomCollection;
-      rideMap['chat_room_id'] = chatRoomId;
-      rideMap['chat_room_path'] = userChatRoomPath;
-
-      DocumentReference rideRef = await FirebaseFirestore.instance
-          .collection('rideRequests')
-          .add(rideMap);
-
-      print('라이드 요청 생성 성공: ${rideRef.id}');
-
-      // 예약 상태 메시지 수정
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('예약이 완료되었습니다! 채팅방에서 다른 여행자들과 소통하세요.'),
-          backgroundColor: Colors.green,
-          duration: Duration(seconds: 4),
-        ),
-      );
-
-      // 홈페이지로 이동
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (context) => HomePage()),
-        (route) => false,
-      );
     } catch (e) {
       print('라이드 요청 생성 오류: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('오류가 발생했습니다: $e'), backgroundColor: Colors.red),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('오류가 발생했습니다: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -467,386 +246,364 @@ class _RideConfirmationPageState extends State<RideConfirmationPage> {
         ],
       ),
       body: SafeArea(
-        child: Padding(
-          padding: EdgeInsets.fromLTRB(16, 8, 16, 16),
-          child: Column(
-            children: [
-              // 출발지-목적지 카드
-              Container(
-                margin: EdgeInsets.only(bottom: 8),
-                decoration: BoxDecoration(
-                  color: cardColor,
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.03),
-                      blurRadius: 8,
-                      offset: Offset(0, 2),
+        child: WillPopScope(
+          // 처리 중일 때 뒤로가기 방지
+          onWillPop: () async {
+            return !_isProcessing;
+          },
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(16, 8, 16, 16),
+            child: Column(
+              children: [
+                // 출발지-목적지 카드
+                Container(
+                  margin: EdgeInsets.only(bottom: 8),
+                  decoration: BoxDecoration(
+                    color: cardColor,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.03),
+                        blurRadius: 8,
+                        offset: Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Padding(
+                    padding: EdgeInsets.all(14),
+                    child: Column(
+                      children: [
+                        // 출발지-목적지 경로 시각화
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // 왼쪽 경로 아이콘
+                            SizedBox(
+                              width: 24,
+                              child: Column(
+                                children: [
+                                  Icon(
+                                    Icons.trip_origin,
+                                    color: primaryColor,
+                                    size: 16,
+                                  ),
+                                  Container(
+                                    width: 1,
+                                    height: 30,
+                                    color: primaryColor.withOpacity(0.3),
+                                  ),
+                                  Icon(
+                                    Icons.location_on,
+                                    color: primaryColor,
+                                    size: 16,
+                                  ),
+                                ],
+                              ),
+                            ),
+                            SizedBox(width: 12),
+                            // 출발지-목적지 텍스트 정보
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  // 출발지
+                                  Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        '출발지',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: subtitleColor,
+                                        ),
+                                      ),
+                                      SizedBox(height: 2),
+                                      Text(
+                                        pickup?.placeName ?? '정보 없음',
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.bold,
+                                          color: textColor,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ],
+                                  ),
+                                  SizedBox(height: 16),
+                                  // 목적지
+                                  Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        '목적지',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: subtitleColor,
+                                        ),
+                                      ),
+                                      SizedBox(height: 2),
+                                      Text(
+                                        destination?.placeName ?? '정보 없음',
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.bold,
+                                          color: textColor,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
-                child: Padding(
-                  padding: EdgeInsets.all(14),
-                  child: Column(
+
+                // 날짜, 시간, 캐리어 개수 그리드
+                Container(
+                  margin: EdgeInsets.only(bottom: 8),
+                  child: Row(
                     children: [
-                      // 출발지-목적지 경로 시각화
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // 왼쪽 경로 아이콘
-                          SizedBox(
-                            width: 24,
-                            child: Column(
-                              children: [
-                                Icon(
-                                  Icons.trip_origin,
-                                  color: primaryColor,
-                                  size: 16,
-                                ),
-                                Container(
-                                  width: 1,
-                                  height: 30,
-                                  color: primaryColor.withOpacity(0.3),
-                                ),
-                                Icon(
-                                  Icons.location_on,
-                                  color: primaryColor,
-                                  size: 16,
-                                ),
-                              ],
-                            ),
-                          ),
-                          SizedBox(width: 12),
-                          // 출발지-목적지 텍스트 정보
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                // 출발지
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      '출발지',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: subtitleColor,
-                                      ),
-                                    ),
-                                    SizedBox(height: 2),
-                                    Text(
-                                      pickup?.placeName ?? '정보 없음',
-                                      style: TextStyle(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.bold,
-                                        color: textColor,
-                                      ),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ],
-                                ),
-                                SizedBox(height: 16),
-                                // 목적지
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      '목적지',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: subtitleColor,
-                                      ),
-                                    ),
-                                    SizedBox(height: 2),
-                                    Text(
-                                      destination?.placeName ?? '정보 없음',
-                                      style: TextStyle(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.bold,
-                                        color: textColor,
-                                      ),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
+                      _buildInfoCard(
+                        context,
+                        Icons.calendar_today_outlined,
+                        '날짜',
+                        formattedDate.isEmpty ? '정보 없음' : formattedDate,
+                        primaryColor,
+                        textColor,
+                        subtitleColor,
+                        cardColor,
+                        flex: 2,
+                      ),
+                      SizedBox(width: 8),
+                      _buildInfoCard(
+                        context,
+                        Icons.access_time,
+                        '시간',
+                        formattedTime.isEmpty ? '정보 없음' : formattedTime,
+                        primaryColor,
+                        textColor,
+                        subtitleColor,
+                        cardColor,
+                      ),
+                      SizedBox(width: 8),
+                      _buildInfoCard(
+                        context,
+                        Icons.luggage,
+                        '캐리어',
+                        '${appData.luggageCount}개',
+                        primaryColor,
+                        textColor,
+                        subtitleColor,
+                        cardColor,
                       ),
                     ],
                   ),
                 ),
-              ),
 
-              // 날짜, 시간, 캐리어 개수 그리드
-              Container(
-                margin: EdgeInsets.only(bottom: 8),
-                child: Row(
-                  children: [
-                    _buildInfoCard(
-                      context,
-                      Icons.calendar_today_outlined,
-                      '날짜',
-                      formattedDate.isEmpty ? '정보 없음' : formattedDate,
-                      primaryColor,
-                      textColor,
-                      subtitleColor,
-                      cardColor,
-                      flex: 2,
+                // 요금 카드 (강조 표시)
+                Container(
+                  height: 80,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [primaryColor, secondaryColor],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
                     ),
-                    SizedBox(width: 8),
-                    _buildInfoCard(
-                      context,
-                      Icons.access_time,
-                      '시간',
-                      formattedTime.isEmpty ? '정보 없음' : formattedTime,
-                      primaryColor,
-                      textColor,
-                      subtitleColor,
-                      cardColor,
-                    ),
-                    SizedBox(width: 8),
-                    _buildInfoCard(
-                      context,
-                      Icons.luggage,
-                      '캐리어',
-                      '${appData.luggageCount}개',
-                      primaryColor,
-                      textColor,
-                      subtitleColor,
-                      cardColor,
-                    ),
-                  ],
-                ),
-              ),
-
-              // 요금 카드 (강조 표시)
-              Container(
-                height: 80,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [primaryColor, secondaryColor],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: primaryColor.withOpacity(0.3),
+                        blurRadius: 8,
+                        offset: Offset(0, 3),
+                      ),
+                    ],
                   ),
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(
-                      color: primaryColor.withOpacity(0.3),
-                      blurRadius: 8,
-                      offset: Offset(0, 3),
-                    ),
-                  ],
-                ),
-                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        Icons.receipt_long_rounded,
-                        color: Colors.white,
-                        size: 20,
-                      ),
-                    ),
-                    SizedBox(width: 14),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          '예상 요금',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: Colors.white.withOpacity(0.9),
-                          ),
+                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.2),
+                          shape: BoxShape.circle,
                         ),
-                        SizedBox(height: 3),
-                        Text(
-                          '15,000원',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
+                        child: Icon(
+                          Icons.receipt_long_rounded,
+                          color: Colors.white,
+                          size: 20,
                         ),
-                      ],
-                    ),
-                    Spacer(),
-                    Container(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
                       ),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.15),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Row(
+                      SizedBox(width: 14),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Text(
-                            '현금결제',
+                            '예상 요금',
                             style: TextStyle(
                               fontSize: 13,
-                              color: Colors.white,
-                              fontWeight: FontWeight.w500,
+                              color: Colors.white.withOpacity(0.9),
                             ),
                           ),
-                          SizedBox(width: 4),
-                          Icon(
-                            Icons.payments_outlined,
-                            color: Colors.white,
-                            size: 14,
+                          SizedBox(height: 3),
+                          Text(
+                            '15,000원',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
                           ),
                         ],
                       ),
-                    ),
-                  ],
-                ),
-              ),
-
-              SizedBox(height: 35),
-
-              // 예약 확정을 위한 슬라이드 버튼 (GestureDetector 사용)
-              Container(
-                margin: EdgeInsets.symmetric(vertical: 10),
-                child: Column(
-                  children: [
-                    Container(
-                      height: 55,
-                      width: double.infinity,
-                      decoration: BoxDecoration(
-                        color: primaryColor.withOpacity(0.15),
-                        borderRadius: BorderRadius.circular(30),
-                      ),
-                      child: Stack(
-                        children: [
-                          // 진행 표시줄
-                          AnimatedContainer(
-                            duration: Duration(milliseconds: 100),
-                            width:
-                                MediaQuery.of(context).size.width *
-                                _sliderValue,
-                            decoration: BoxDecoration(
-                              color: primaryColor.withOpacity(0.5),
-                              borderRadius: BorderRadius.circular(30),
+                      Spacer(),
+                      Container(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Row(
+                          children: [
+                            Text(
+                              '현금결제',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: Colors.white,
+                                fontWeight: FontWeight.w500,
+                              ),
                             ),
-                          ),
+                            SizedBox(width: 4),
+                            Icon(
+                              Icons.payments_outlined,
+                              color: Colors.white,
+                              size: 14,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
 
-                          // 안내 텍스트
-                          Center(
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  Icons.arrow_forward,
-                                  color:
-                                      _sliderValue > 0.6
-                                          ? Colors.white
-                                          : primaryColor,
-                                  size: 16,
-                                ),
-                                SizedBox(width: 8),
-                                Text(
-                                  '스와이프하여 예약 확정',
-                                  style: TextStyle(
+                SizedBox(height: 35),
+
+                // 예약 확정을 위한 슬라이드 버튼 (GestureDetector 사용)
+                Container(
+                  margin: EdgeInsets.symmetric(vertical: 10),
+                  child: Column(
+                    children: [
+                      Container(
+                        height: 55,
+                        width: double.infinity,
+                        decoration: BoxDecoration(
+                          color: primaryColor.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(30),
+                        ),
+                        child: Stack(
+                          children: [
+                            // 진행 표시줄
+                            AnimatedContainer(
+                              duration: Duration(milliseconds: 100),
+                              width:
+                                  MediaQuery.of(context).size.width *
+                                  _sliderValue,
+                              decoration: BoxDecoration(
+                                color: primaryColor.withOpacity(0.5),
+                                borderRadius: BorderRadius.circular(30),
+                              ),
+                            ),
+
+                            // 안내 텍스트
+                            Center(
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.arrow_forward,
                                     color:
                                         _sliderValue > 0.6
                                             ? Colors.white
                                             : primaryColor,
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 15,
+                                    size: 16,
                                   ),
-                                ),
-                              ],
-                            ),
-                          ),
-
-                          // 슬라이더 노브
-                          Positioned(
-                            left:
-                                (_sliderValue *
-                                    (MediaQuery.of(context).size.width - 92)),
-                            top: 3.5,
-                            child: GestureDetector(
-                              onHorizontalDragUpdate: (details) {
-                                // 드래그 위치를 계산하여 슬라이더 값 업데이트
-                                double newPosition =
-                                    _sliderValue +
-                                    details.delta.dx /
-                                        (MediaQuery.of(context).size.width -
-                                            92);
-                                setState(() {
-                                  _sliderValue = newPosition.clamp(0.0, 1.0);
-                                });
-
-                                // 예약 확정 조건
-                                if (_sliderValue >= 0.9) {
-                                  _showMatchingDialog(context);
-                                  Future.delayed(
-                                    Duration(milliseconds: 300),
-                                    () {
-                                      if (mounted) {
-                                        setState(() {
-                                          _sliderValue = 0.0;
-                                        });
-                                      }
-                                    },
-                                  );
-                                }
-                              },
-                              onHorizontalDragEnd: (details) {
-                                // 사용자가 끝까지 슬라이드하지 않은 경우 초기 위치로 돌아감
-                                if (_sliderValue < 0.9) {
-                                  setState(() {
-                                    _sliderValue = 0.0;
-                                  });
-                                }
-                              },
-                              child: Container(
-                                width: 48,
-                                height: 48,
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  shape: BoxShape.circle,
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withOpacity(0.2),
-                                      blurRadius: 5,
-                                      offset: Offset(0, 2),
+                                  SizedBox(width: 8),
+                                  Text(
+                                    '스와이프하여 예약 확정',
+                                    style: TextStyle(
+                                      color:
+                                          _sliderValue > 0.6
+                                              ? Colors.white
+                                              : primaryColor,
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 15,
                                     ),
-                                  ],
-                                ),
-                                child: Icon(
-                                  Icons.arrow_forward,
-                                  color: primaryColor,
-                                  size: 24,
+                                  ),
+                                ],
+                              ),
+                            ),
+
+                            // 슬라이더 노브
+                            Positioned(
+                              left:
+                                  (_sliderValue *
+                                      (MediaQuery.of(context).size.width - 92)),
+                              top: 3.5,
+                              child: GestureDetector(
+                                onHorizontalDragUpdate:
+                                    (details) =>
+                                        _handleSliderUpdate(details, context),
+                                onHorizontalDragEnd: _handleSliderEnd,
+                                child: Container(
+                                  width: 48,
+                                  height: 48,
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    shape: BoxShape.circle,
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withOpacity(0.2),
+                                        blurRadius: 5,
+                                        offset: Offset(0, 2),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Icon(
+                                    Icons.arrow_forward,
+                                    color: primaryColor,
+                                    size: 24,
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
-                    ),
-                    SizedBox(height: 8),
-                    Text(
-                      '오른쪽으로 끝까지 밀어서 예약 확정',
-                      style: TextStyle(color: subtitleColor, fontSize: 12),
-                    ),
-                  ],
+                      SizedBox(height: 8),
+                      Text(
+                        '오른쪽으로 끝까지 밀어서 예약 확정',
+                        style: TextStyle(color: subtitleColor, fontSize: 12),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
 
-              // 남은 공간 채우기
-              Expanded(child: SizedBox()),
-            ],
+                // 남은 공간 채우기
+                Expanded(child: SizedBox()),
+              ],
+            ),
           ),
         ),
       ),
@@ -919,6 +676,14 @@ class _RideConfirmationPageState extends State<RideConfirmationPage> {
 
   // 매칭 중 다이얼로그를 표시하는 함수
   void _showMatchingDialog(BuildContext context) {
+    // 이미 처리 중이거나 위젯이 종료된 경우 실행 방지
+    if (_isProcessing || !mounted || _disposed) return;
+
+    // 상태 설정
+    setState(() {
+      _isProcessing = true;
+    });
+
     // 테마 색상 가져오기 - 인디고 색상 사용
     final Color primaryColor = themeColor;
     final isDarkMode =
@@ -928,74 +693,611 @@ class _RideConfirmationPageState extends State<RideConfirmationPage> {
         isDarkMode ? Colors.grey[400]! : Colors.grey[600]!;
     final Color cardColor = isDarkMode ? Color(0xFF1E1E1E) : Colors.white;
 
-    showDialog(
-      context: context,
-      barrierDismissible: false, // 배경 터치로 닫기 방지
-      barrierColor: Colors.black54, // 배경을 더 어둡게 처리
-      builder: (BuildContext dialogContext) {
-        return Dialog(
-          backgroundColor: cardColor,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20.0),
-          ),
-          child: Container(
-            width: MediaQuery.of(context).size.width * 0.8,
-            padding: EdgeInsets.all(20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                SizedBox(height: 8),
-                // 개선된 로딩 애니메이션
-                Container(
-                  width: 60,
-                  height: 60,
-                  decoration: BoxDecoration(
-                    color: primaryColor.withOpacity(0.1),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Padding(
-                    padding: EdgeInsets.all(12),
-                    child: CircularProgressIndicator(
-                      valueColor: AlwaysStoppedAnimation<Color>(primaryColor),
-                      strokeWidth: 3,
-                    ),
-                  ),
-                ),
-                SizedBox(height: 20),
-                Text(
-                  '비슷한 일정의 예약자와\n매칭중 입니다.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: textColor,
-                  ),
-                ),
-                SizedBox(height: 12),
-                Text(
-                  '예약 정보 처리 및 채팅방 생성 중',
-                  style: TextStyle(fontSize: 14, color: subtitleColor),
-                ),
-                SizedBox(height: 8),
-                Text(
-                  '같은 시간대(±1시간)의 여행자들과\n자동으로 채팅방이 연결됩니다',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 12, color: subtitleColor),
-                ),
-                SizedBox(height: 16),
-              ],
-            ),
-          ),
-        );
-      },
-    );
+    // 다이얼로그 컨트롤러 (닫기 제어용)
+    BuildContext? dialogContext;
 
-    // 3초 후에 다이얼로그 닫고 스낵바 표시
-    Future.delayed(Duration(seconds: 3), () {
-      if (mounted) {
-        Navigator.of(context).pop(); // 다이얼로그 닫기
-        _confirmRide(); // 실제 예약 확정 함수 호출
+    // 안전하게 다이얼로그 표시
+    if (mounted) {
+      try {
+        showDialog(
+          context: context,
+          barrierDismissible: false, // 배경 터치로 닫기 방지
+          barrierColor: Colors.black54, // 배경을 더 어둡게 처리
+          builder: (BuildContext context) {
+            dialogContext = context;
+            return WillPopScope(
+              // 뒤로가기 버튼 비활성화
+              onWillPop: () async => false,
+              child: Dialog(
+                backgroundColor: cardColor,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20.0),
+                ),
+                child: Container(
+                  width: MediaQuery.of(context).size.width * 0.8,
+                  padding: EdgeInsets.all(20),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      SizedBox(height: 8),
+                      // 개선된 로딩 애니메이션
+                      Container(
+                        width: 60,
+                        height: 60,
+                        decoration: BoxDecoration(
+                          color: primaryColor.withOpacity(0.1),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Padding(
+                          padding: EdgeInsets.all(12),
+                          child: CircularProgressIndicator(
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              primaryColor,
+                            ),
+                            strokeWidth: 3,
+                          ),
+                        ),
+                      ),
+                      SizedBox(height: 20),
+                      Text(
+                        '비슷한 일정의 예약자와\n매칭중 입니다.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: textColor,
+                        ),
+                      ),
+                      SizedBox(height: 12),
+                      Text(
+                        '예약 정보 처리 및 채팅방 생성 중',
+                        style: TextStyle(fontSize: 14, color: subtitleColor),
+                      ),
+                      SizedBox(height: 8),
+                      Text(
+                        '같은 시간대(±1시간)의 여행자들과\n자동으로 채팅방이 연결됩니다',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 12, color: subtitleColor),
+                      ),
+                      SizedBox(height: 16),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      } catch (e) {
+        print('다이얼로그 표시 중 오류: $e');
+        // 다이얼로그 오류 시 처리 상태 초기화
+        if (mounted && !_disposed) {
+          setState(() {
+            _isProcessing = false;
+            _isLoading = false;
+          });
+        }
+        return;
       }
-    });
+    }
+
+    // 다이얼로그 표시 후 처리 시작
+    _safeConfirmRide()
+        .then((_) {
+          // 성공 시 다이얼로그 닫기 및 상태 업데이트
+          if (mounted && !_disposed) {
+            _closeDialogAndUpdateUI(
+              dialogContext: dialogContext,
+              isSuccess: true,
+              message: '예약이 완료되었습니다! 채팅방에서 다른 여행자들과 소통하세요.',
+            );
+          }
+        })
+        .catchError((e) {
+          print('예약 처리 오류: $e');
+
+          // 오류 발생 시 다이얼로그 닫기 및 상태 업데이트
+          if (mounted && !_disposed) {
+            _closeDialogAndUpdateUI(
+              dialogContext: dialogContext,
+              isSuccess: false,
+              message: e.toString(),
+            );
+          }
+        })
+        .whenComplete(() {
+          // 무슨 일이 있어도 상태 업데이트
+          if (mounted && !_disposed) {
+            setState(() {
+              _isLoading = false;
+              _isProcessing = false;
+            });
+          }
+        });
+  }
+
+  // 다이얼로그 닫고 UI 업데이트하는 헬퍼 함수
+  void _closeDialogAndUpdateUI({
+    BuildContext? dialogContext,
+    required bool isSuccess,
+    required String message,
+  }) {
+    // 다이얼로그 닫기
+    if (dialogContext != null && mounted) {
+      try {
+        Navigator.of(dialogContext, rootNavigator: true).pop();
+      } catch (e) {
+        print('다이얼로그 닫기 오류: $e');
+      }
+    }
+
+    if (!mounted || _disposed) return;
+
+    // 스낵바 표시
+    try {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: isSuccess ? Colors.green : Colors.red,
+          duration: Duration(seconds: isSuccess ? 4 : 6),
+        ),
+      );
+    } catch (e) {
+      print('스낵바 표시 오류: $e');
+    }
+
+    // 성공 시 홈페이지로 이동
+    if (isSuccess && mounted && !_disposed) {
+      // 알림 전송 부분 주석 처리
+      /*
+      try {
+        // FCM 알림 전송 로직이 있다면 여기에 있을 것
+      } catch (e) {
+        print('알림 전송 오류: $e');
+      }
+      */
+
+      // 약간의 지연 후 네비게이션
+      Future.delayed(Duration(milliseconds: 500), () {
+        if (mounted && !_disposed) {
+          try {
+            Navigator.pushAndRemoveUntil(
+              context,
+              MaterialPageRoute(builder: (context) => HomePage()),
+              (route) => false,
+            );
+          } catch (e) {
+            print('네비게이션 오류: $e');
+          }
+        }
+      });
+    }
+  }
+
+  // 예약 처리 로직을 별도 함수로 분리
+  Future<void> _processRide() async {
+    try {
+      // 이미 처리 중이거나 위젯이 종료된 경우 실행 방지
+      if (_isProcessing || !mounted || _disposed) {
+        return;
+      }
+
+      final appData = Provider.of<AppData>(context, listen: false);
+      final pickup = appData.pickupAddress;
+      final destination = appData.destinationAddress;
+      final luggageCount = appData.luggageCount;
+      final rideDate = appData.rideDate;
+      final rideTime = appData.rideTime;
+
+      // 필수 정보 확인 - 더 엄격한 체크
+      if (pickup == null ||
+          destination == null ||
+          rideDate == null ||
+          rideTime == null) {
+        throw Exception('탑승 정보가 올바르지 않습니다');
+      }
+
+      // 현재 사용자 확인
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        throw Exception('로그인이 필요합니다');
+      }
+
+      // 예약 시간을 DateTime으로 변환
+      final rideDateTime = DateTime(
+        rideDate.year,
+        rideDate.month,
+        rideDate.day,
+        rideTime.hour,
+        rideTime.minute,
+      );
+
+      // 픽업과 목적지 위치 정보
+      Map<String, dynamic> pickupMap = {
+        'latitude': pickup.latitude,
+        'longitude': pickup.longitude,
+        'address': pickup.placeName,
+        'formatted_address': pickup.placeFormattedAddress,
+      };
+
+      Map<String, dynamic> destinationMap = {
+        'latitude': destination.latitude,
+        'longitude': destination.longitude,
+        'address': destination.placeName,
+        'formatted_address': destination.placeFormattedAddress,
+      };
+
+      // 출발지와 목적지 정보 확인
+      String pickupName = pickup.placeName?.toLowerCase() ?? '';
+      String destinationName = destination.placeName?.toLowerCase() ?? '';
+
+      // 채팅방 컬렉션 이름과 식별자 결정
+      String chatRoomCollection = '';
+      String locationIdentifier = '';
+      int chatRoomNumber = 1; // 기본 채팅방 번호
+
+      // Penn State University에서 출발하는 경우 - 도착 공항 기준으로 그룹화
+      if (pickupName.contains('penn state') ||
+          pickupName.contains('university') ||
+          pickupName.contains('대학')) {
+        chatRoomCollection = 'psuToAirport'; // PSU에서 공항으로 컬렉션
+
+        // 목적지(공항) 이름에서 식별자 추출
+        if (destinationName.contains('airport') ||
+            destinationName.contains('공항')) {
+          // 공항 이름 추출 (예: jfk airport -> jfk)
+          String airportName =
+              destinationName
+                  .replaceAll("airport", "")
+                  .replaceAll("공항", "")
+                  .trim();
+          if (airportName.isEmpty) {
+            airportName = "unknown";
+          }
+          locationIdentifier = airportName.replaceAll(" ", "_");
+        } else {
+          locationIdentifier = destinationName.replaceAll(" ", "_");
+        }
+
+        print('출발지가 Penn State University입니다. psuToAirport 컬렉션을 사용합니다.');
+        print('식별자: $locationIdentifier');
+      }
+      // 공항에서 출발하는 경우 - 출발 공항 기준으로 그룹화
+      else if (pickupName.contains('airport') || pickupName.contains('공항')) {
+        chatRoomCollection = 'airportToPsu'; // 공항에서 PSU로 컬렉션
+
+        // 출발지(공항) 이름에서 식별자 추출
+        String airportName =
+            pickupName.replaceAll("airport", "").replaceAll("공항", "").trim();
+        if (airportName.isEmpty) {
+          airportName = "unknown";
+        }
+        locationIdentifier = airportName.replaceAll(" ", "_");
+
+        print('출발지가 공항입니다. airportToPsu 컬렉션을 사용합니다.');
+        print('식별자: $locationIdentifier');
+      } else {
+        // 둘 다 아닌 경우(일반 케이스) 기본값 설정
+        chatRoomCollection = 'generalRides';
+        locationIdentifier = '${pickupName}_to_${destinationName}'.replaceAll(
+          " ",
+          "_",
+        );
+        print('일반 경로입니다. generalRides 컬렉션을 사용합니다.');
+      }
+
+      // 날짜를 yyyy-mm-dd 형식으로 변환 (채팅방 필터링용)
+      String formattedDate =
+          "${rideDate.year}-${rideDate.month.toString().padLeft(2, '0')}-${rideDate.day.toString().padLeft(2, '0')}";
+
+      // 시간대 식별자 생성 (채팅방 그룹화용)
+      int timeSlot = (rideTime.hour / 2).floor(); // 2시간 단위로 시간대 그룹화
+
+      print('채팅방 컬렉션: $chatRoomCollection, 위치 식별자: $locationIdentifier');
+
+      // 라이드 요청 데이터 생성 (채팅방 저장 전에 미리 준비)
+      Map<String, dynamic> rideMap = {
+        'created_at': FieldValue.serverTimestamp(),
+        'rider_name': currentUserInfo?.fullName ?? user.displayName ?? '이름 없음',
+        'rider_phone': currentUserInfo?.phone ?? '전화번호 없음',
+        'rider_email': user.email,
+        'pickup': pickupMap,
+        'destination': destinationMap,
+        'luggage_count': luggageCount,
+        'ride_date': rideDateTime,
+        'ride_date_timestamp': Timestamp.fromDate(rideDateTime),
+        'status': 'pending',
+        'user_id': user.uid,
+        'payment_method': 'card',
+        'driver_id': 'waiting',
+      };
+
+      print('라이드 요청 데이터 준비 완료');
+
+      // 트랜잭션과 함께 타임아웃 설정
+      String chatRoomId = '';
+      DocumentReference chatRoomRef;
+
+      try {
+        // 안전한 비동기 작업을 위한 Future 처리
+        final timeout = Duration(seconds: 25); // 더 긴 타임아웃 설정
+
+        // 1. 기존 채팅방 검색 작업
+        // 해당 컬렉션에서 같은 날짜와 비슷한 시간대의 채팅방 찾기
+        QuerySnapshot existingChatRooms = await FirebaseFirestore.instance
+            .collection(chatRoomCollection)
+            .where('location_identifier', isEqualTo: locationIdentifier)
+            .where('date_str', isEqualTo: formattedDate)
+            .get()
+            .timeout(timeout);
+
+        if (!mounted || _disposed) {
+          throw Exception('화면이 종료되었습니다');
+        }
+
+        print('같은 날짜/위치의 기존 채팅방 수: ${existingChatRooms.docs.length}');
+
+        // 비슷한 시간대(±1시간)의 채팅방 찾기
+        bool foundMatchingRoom = false;
+        chatRoomRef =
+            FirebaseFirestore.instance
+                .collection(chatRoomCollection)
+                .doc(); // 초기 빈 참조로 초기화
+
+        // 기존 채팅방 중에서 시간이 맞고 인원 여유가 있는 채팅방 찾기
+        if (existingChatRooms.docs.isNotEmpty) {
+          for (var doc in existingChatRooms.docs) {
+            Map<String, dynamic> roomData = doc.data() as Map<String, dynamic>;
+
+            // 채팅방의 탑승 시간 확인
+            if (roomData.containsKey('ride_date_timestamp')) {
+              Timestamp rideTimestamp =
+                  roomData['ride_date_timestamp'] as Timestamp;
+              DateTime roomRideDateTime = rideTimestamp.toDate();
+
+              // 시간 차이 계산 (절대값)
+              Duration timeDifference =
+                  roomRideDateTime.difference(rideDateTime).abs();
+
+              // 채팅방 멤버 수 확인
+              List<dynamic> members = roomData['members'] ?? [];
+
+              // 시간 차이가 1시간 이내이고, 멤버 수가 4명 미만이며, 해당 사용자가 멤버가 아닌 경우
+              if (timeDifference.inHours <= 1 &&
+                  members.length < 4 &&
+                  !members.contains(user.uid)) {
+                chatRoomId = doc.id;
+                chatRoomRef = FirebaseFirestore.instance
+                    .collection(chatRoomCollection)
+                    .doc(chatRoomId);
+
+                print(
+                  '비슷한 시간대의 채팅방을 찾았습니다: $chatRoomId (시간 차이: ${timeDifference.inMinutes}분)',
+                );
+                foundMatchingRoom = true;
+                break;
+              }
+            }
+          }
+        }
+
+        if (!mounted || _disposed) {
+          throw Exception('화면이 종료되었습니다');
+        }
+
+        // 적합한 채팅방을 찾지 못한 경우 새 채팅방 생성
+        if (!foundMatchingRoom) {
+          // 새 채팅방 번호 결정 (기존 채팅방 중 가장 큰 번호 + 1)
+          int maxRoomNumber = 0;
+
+          for (var doc in existingChatRooms.docs) {
+            String docId = doc.id;
+
+            // 문서 ID에서 번호 부분 추출 (예: jfk_1 -> 1)
+            List<String> parts = docId.split('_');
+            if (parts.length > 1) {
+              try {
+                int roomNumber = int.parse(parts.last);
+                if (roomNumber > maxRoomNumber) {
+                  maxRoomNumber = roomNumber;
+                }
+              } catch (e) {
+                print('채팅방 번호 추출 오류: $e');
+              }
+            }
+          }
+
+          chatRoomNumber = maxRoomNumber + 1;
+          // 새 채팅방 ID 생성 (locationIdentifier_번호)
+          chatRoomId = "${locationIdentifier}_$chatRoomNumber";
+
+          print('새 채팅방 생성: $chatRoomId');
+
+          // 채팅방 참조
+          chatRoomRef = FirebaseFirestore.instance
+              .collection(chatRoomCollection)
+              .doc(chatRoomId);
+
+          // 새 채팅방 데이터
+          Map<String, dynamic> chatRoomData = {
+            'created_at': FieldValue.serverTimestamp(),
+            'location_identifier': locationIdentifier,
+            'ride_date': rideDateTime,
+            'ride_date_timestamp': Timestamp.fromDate(rideDateTime),
+            'date_str': formattedDate,
+            'time_slot': timeSlot,
+            'pickup_info': pickupMap,
+            'destination_info': destinationMap,
+            'members': [user.uid],
+            'member_count': 1,
+            'last_message': '새로운 그룹이 생성되었습니다.',
+            'last_message_time': FieldValue.serverTimestamp(),
+            'room_number': chatRoomNumber,
+            'collection_name': chatRoomCollection,
+          };
+
+          // 채팅방 생성
+          await chatRoomRef.set(chatRoomData).timeout(timeout);
+
+          // 시스템 메시지 추가
+          await FirebaseFirestore.instance
+              .collection(chatRoomCollection)
+              .doc(chatRoomId)
+              .collection('messages')
+              .add({
+                'text':
+                    '${currentUserInfo?.fullName ?? user.displayName ?? '이름 없음'}님이 그룹에 참여했습니다.',
+                'sender_id': 'system',
+                'sender_name': '시스템',
+                'timestamp': FieldValue.serverTimestamp(),
+                'type': 'system',
+              })
+              .timeout(timeout);
+
+          print('새 채팅방 생성 완료: $chatRoomId in $chatRoomCollection');
+        }
+        // 적합한 채팅방을 찾은 경우, 해당 채팅방에 사용자 추가
+        else {
+          print('기존 채팅방에 사용자 추가: $chatRoomId');
+
+          if (!mounted || _disposed) {
+            throw Exception('화면이 종료되었습니다');
+          }
+
+          DocumentSnapshot chatRoomDoc = await chatRoomRef.get().timeout(
+            timeout,
+          );
+
+          if (!chatRoomDoc.exists) {
+            throw Exception('채팅방을 찾을 수 없습니다');
+          }
+
+          Map<String, dynamic> chatRoomData =
+              chatRoomDoc.data() as Map<String, dynamic>;
+          List<dynamic> members = chatRoomData['members'] ?? [];
+
+          if (!members.contains(user.uid)) {
+            // 채팅방 멤버 목록에 사용자 추가
+            members.add(user.uid);
+
+            // 채팅방 업데이트
+            await chatRoomRef
+                .update({'members': members, 'member_count': members.length})
+                .timeout(timeout);
+
+            // 참여 메시지 추가
+            await FirebaseFirestore.instance
+                .collection(chatRoomCollection)
+                .doc(chatRoomId)
+                .collection('messages')
+                .add({
+                  'text':
+                      '${currentUserInfo?.fullName ?? user.displayName ?? '이름 없음'}님이 그룹에 참여했습니다.',
+                  'sender_id': 'system',
+                  'sender_name': '시스템',
+                  'timestamp': FieldValue.serverTimestamp(),
+                  'type': 'system',
+                })
+                .timeout(timeout);
+
+            print('사용자를 기존 채팅방에 추가했습니다.');
+          } else {
+            print('사용자가 이미 채팅방에 존재합니다.');
+          }
+        }
+      } catch (e) {
+        print('채팅방 생성/검색 중 오류: $e');
+        throw Exception('채팅방 처리 중 오류가 발생했습니다. 다시 시도해주세요.');
+      }
+
+      if (!mounted || _disposed) {
+        throw Exception('화면이 종료되었습니다');
+      }
+
+      // --------- 사용자 정보 및 라이드 요청 저장 로직 ---------
+
+      try {
+        final timeout = Duration(seconds: 15);
+
+        // 사용자의 채팅방 목록에 추가
+        String userChatRoomPath = '$chatRoomCollection/$chatRoomId';
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .collection('chatRooms')
+            .doc(userChatRoomPath)
+            .set({
+              'chat_room_collection': chatRoomCollection,
+              'chat_room_id': chatRoomId,
+              'chat_room_path': userChatRoomPath,
+              'joined_at': FieldValue.serverTimestamp(),
+              'ride_date': rideDateTime,
+            })
+            .timeout(timeout);
+
+        print('사용자의 채팅방 목록에 추가 완료');
+
+        if (!mounted || _disposed) {
+          throw Exception('화면이 종료되었습니다');
+        }
+
+        // Firestore에 라이드 요청 저장 (채팅방 정보 포함)
+        rideMap['chat_room_collection'] = chatRoomCollection;
+        rideMap['chat_room_id'] = chatRoomId;
+        rideMap['chat_room_path'] = userChatRoomPath;
+
+        DocumentReference rideRef = await FirebaseFirestore.instance
+            .collection('rideRequests')
+            .add(rideMap)
+            .timeout(timeout);
+
+        print('라이드 요청 생성 성공: ${rideRef.id}');
+      } catch (e) {
+        print('사용자 정보 또는 라이드 요청 저장 중 오류: $e');
+        throw Exception('예약 정보 저장 중 오류가 발생했습니다. 네트워크 연결을 확인해주세요.');
+      }
+
+      return; // 모든 작업 완료
+    } catch (e) {
+      print('_processRide 오류: $e');
+      String errorMessage = '예약 처리 중 오류가 발생했습니다';
+
+      if (e.toString().contains('network') ||
+          e.toString().contains('timeout')) {
+        errorMessage = '네트워크 연결 상태를 확인해주세요';
+      } else if (e.toString().contains('permission-denied')) {
+        errorMessage = '권한이 없습니다. 다시 로그인해주세요';
+      } else if (e.toString().contains('not-found')) {
+        errorMessage = '요청한 정보를 찾을 수 없습니다';
+      }
+
+      throw Exception(errorMessage);
+    }
+  }
+
+  // 예약 확정을 안전하게 시도하는 함수 (재시도 로직 포함)
+  Future<void> _safeConfirmRide() async {
+    int retryCount = 0;
+    const int maxRetries = 2;
+
+    while (retryCount <= maxRetries) {
+      if (!mounted || _disposed) {
+        throw Exception('화면이 종료되었습니다');
+      }
+
+      try {
+        await _processRide();
+        return; // 성공하면 즉시 반환
+      } catch (e) {
+        retryCount++;
+        print('예약 시도 $retryCount 실패: $e');
+
+        if (retryCount > maxRetries) {
+          rethrow; // 최대 재시도 횟수 초과 시 예외를 다시 던짐
+        }
+
+        // 잠시 대기 후 재시도 (재시도 간격 늘림)
+        await Future.delayed(Duration(seconds: retryCount));
+      }
+    }
   }
 }
