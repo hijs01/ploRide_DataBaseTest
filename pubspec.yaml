@@ -50,6 +50,7 @@ dependencies:
   animated_text_kit: ^4.2.3
   flutter_geofire: ^2.0.4
   animate_do: ^4.2.0
+  intl: ^0.20.2
 
 
 dependency_overrides:
