@@ -68,6 +68,9 @@ class _SearchPageState extends State<SearchPage> {
   DateTime? selectedDate; // 선택된 날짜
   TimeOfDay? selectedTime; // 선택된 시간
 
+  // 출발 위치 타입을 저장하는 변수 추가
+  String pickupLocationType = ''; // 'psu' 또는 'airport'
+
   @override
   void initState() {
     super.initState();
@@ -1064,6 +1067,16 @@ class _SearchPageState extends State<SearchPage> {
                     ),
                   ),
                   onTap: () {
+                    // 출발 위치 타입을 'psu'로 설정
+                    setState(() {
+                      pickupLocationType = 'psu';
+                      // 도착지 초기화
+                      destinationController.text = '';
+                      Provider.of<AppData>(
+                        context,
+                        listen: false,
+                      ).updateDestinationAddress(Address());
+                    });
                     Navigator.pop(context);
                     _showPsuLocationsBottomSheet(context);
                   },
@@ -1092,6 +1105,16 @@ class _SearchPageState extends State<SearchPage> {
                     ),
                   ),
                   onTap: () {
+                    // 출발 위치 타입을 'airport'로 설정
+                    setState(() {
+                      pickupLocationType = 'airport';
+                      // 도착지 초기화
+                      destinationController.text = '';
+                      Provider.of<AppData>(
+                        context,
+                        listen: false,
+                      ).updateDestinationAddress(Address());
+                    });
                     Navigator.pop(context);
                     _showAirportPickupLocationsBottomSheet(context);
                   },
@@ -1267,6 +1290,18 @@ class _SearchPageState extends State<SearchPage> {
     final sheetColor = isDarkMode ? Color(0xFF121212) : Colors.white;
     final textColor = isDarkMode ? Colors.white : Colors.black87;
 
+    // 출발 위치 타입에 따라 자동으로 도착 위치 선택
+    if (pickupLocationType == 'psu') {
+      // PSU에서 출발한 경우 바로 공항 목적지 선택 화면으로 이동
+      _showAirportDestinationLocationsBottomSheet(context);
+      return;
+    } else if (pickupLocationType == 'airport') {
+      // 공항에서 출발한 경우 바로 PSU 목적지 선택 화면으로 이동
+      _showPsuDestinationLocationsBottomSheet(context);
+      return;
+    }
+
+    // 출발 위치를 선택하지 않은 경우 기존 바텀 시트 표시
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
