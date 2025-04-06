@@ -13,33 +13,17 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage>
-    with SingleTickerProviderStateMixin {
+class _HomePageState extends State<HomePage> {
   GlobalKey<ScaffoldState> scaffoldKey = GlobalKey<ScaffoldState>();
   int _selectedIndex = 0;
-  late TabController _tabController;
-
-  @override
-  void initState() {
-    super.initState();
-    _tabController = TabController(length: 2, vsync: this);
-  }
-
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
-  }
 
   void _onItemTapped(int index) {
     setState(() {
       _selectedIndex = index;
       if (index == 0) {
-        // 홈 탭으로 변경
-        _tabController.animateTo(0); // 첫 번째 탭(Available)으로 이동
+        // 홈 탭 유지
       } else if (index == 1) {
         // History 탭으로 변경
-        _tabController.animateTo(1); // 두 번째 탭(History)으로 이동
       } else if (index == 2) {
         // Chat 페이지로 이동 (애니메이션 없음)
         Navigator.push(
@@ -99,22 +83,53 @@ class _HomePageState extends State<HomePage>
     } else if (_selectedIndex <= 1) {
       // Home, In Progress 탭일 때
       appBar = PreferredSize(
-        preferredSize: Size.fromHeight(kToolbarHeight),
+        preferredSize: Size.fromHeight(160),
         child: Container(
           color: isDarkMode ? Colors.black : Colors.white,
           child: SafeArea(
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                TabBar(
-                  controller: _tabController,
-                  labelColor: isDarkMode ? Colors.white : Colors.blue,
-                  unselectedLabelColor:
-                      isDarkMode ? Colors.grey[400] : Colors.grey,
-                  indicatorColor: isDarkMode ? Colors.white : Colors.blue,
-                  tabs: const [
-                    Tab(text: 'Available'),
-                    Tab(text: 'To be updated'),
-                  ],
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'PLORIDE',
+                        style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF3F51B5), // 인디고 색상
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                SizedBox(height: 16),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '안녕하세요,',
+                        style: TextStyle(
+                          fontSize: 26,
+                          fontWeight: FontWeight.bold,
+                          color: isDarkMode ? Colors.white : Colors.black,
+                        ),
+                      ),
+                      Text(
+                        '어디로 가시나요?',
+                        style: TextStyle(
+                          fontSize: 26,
+                          fontWeight: FontWeight.bold,
+                          color: isDarkMode ? Colors.white : Colors.black,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -124,82 +139,145 @@ class _HomePageState extends State<HomePage>
       body = Column(
         children: [
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
             color: isDarkMode ? Colors.black : Colors.white,
-            child: GestureDetector(
-              onTap: () {
-                //수정2
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => SearchPage()),
-                );
-              },
-              child: AbsorbPointer(
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: isDarkMode ? Colors.grey[900] : Colors.grey[200],
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: TextField(
-                    style: TextStyle(
-                      color: isDarkMode ? Colors.white : Colors.black,
-                    ),
-                    decoration: InputDecoration(
-                      hintText: 'Where to go?',
-                      hintStyle: TextStyle(
-                        color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                GestureDetector(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => SearchPage()),
+                    );
+                  },
+                  child: AbsorbPointer(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: isDarkMode ? Color(0xFF212121) : Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color:
+                                isDarkMode
+                                    ? Colors.black.withOpacity(0.3)
+                                    : Colors.grey.withOpacity(0.3),
+                            spreadRadius: 1,
+                            blurRadius: 6,
+                            offset: Offset(0, 2),
+                          ),
+                        ],
+                        border: Border.all(
+                          color:
+                              isDarkMode
+                                  ? Colors.grey[800]!
+                                  : Colors.grey[300]!,
+                          width: 1,
+                        ),
                       ),
-                      border: InputBorder.none,
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 18,
-                      ),
-                      prefixIcon: Icon(
-                        Icons.search,
-                        color: isDarkMode ? Colors.white : Colors.black,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 12.0,
+                          horizontal: 4.0,
+                        ),
+                        child: Row(
+                          children: [
+                            SizedBox(width: 16),
+                            Container(
+                              padding: EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: Color(0xFF3F51B5).withOpacity(0.1),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                Icons.search,
+                                color: Color(0xFF3F51B5),
+                                size: 26,
+                              ),
+                            ),
+                            SizedBox(width: 16),
+                            Text(
+                              '탑승 정보 입력하기',
+                              style: TextStyle(
+                                fontSize: 18,
+                                color:
+                                    isDarkMode
+                                        ? Colors.grey[400]
+                                        : Colors.grey[600],
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
+              ],
             ),
           ),
           Expanded(
-            child: TabBarView(
-              controller: _tabController,
-              physics: NeverScrollableScrollPhysics(),
-              children: [pages[0], pages[1]],
-            ),
+            child: pages[0], // 항상 첫 번째 페이지만 표시
           ),
         ],
       );
     } else {
       // TaxiInfo 탭일 때 (Index 2)
       appBar = PreferredSize(
-        preferredSize: Size.fromHeight(kToolbarHeight),
+        preferredSize: Size.fromHeight(160),
         child: Container(
           color: isDarkMode ? Colors.black : Colors.white,
           child: SafeArea(
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                TabBar(
-                  controller: _tabController,
-                  labelColor: isDarkMode ? Colors.white : Colors.blue,
-                  unselectedLabelColor:
-                      isDarkMode ? Colors.grey[400] : Colors.grey,
-                  indicatorColor: isDarkMode ? Colors.white : Colors.blue,
-                  tabs: const [
-                    Tab(text: 'Available'),
-                    Tab(text: 'To be updated'),
-                  ],
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'PLORIDE',
+                        style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF3F51B5), // 인디고 색상
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                SizedBox(height: 16),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '안녕하세요,',
+                        style: TextStyle(
+                          fontSize: 26,
+                          fontWeight: FontWeight.bold,
+                          color: isDarkMode ? Colors.white : Colors.black,
+                        ),
+                      ),
+                      Text(
+                        '어디로 가시나요?',
+                        style: TextStyle(
+                          fontSize: 26,
+                          fontWeight: FontWeight.bold,
+                          color: isDarkMode ? Colors.white : Colors.black,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
           ),
         ),
       );
-      body =
-          pages[0]; // TaxiInfo 탭일 때는 HomeContent 표시 (이 부분은 TaxiInfo 화면으로 이동 전)
+      body = pages[0]; // TaxiInfo 탭일 때는 HomeContent 표시
     }
 
     // WillPopScope 추가하여 뒤로가기 동작 제어
@@ -213,7 +291,6 @@ class _HomePageState extends State<HomePage>
         // 다른 탭에 있으면 홈 탭으로 이동
         setState(() {
           _selectedIndex = 0;
-          _tabController.animateTo(0);
         });
 
         // 뒤로가기 이벤트 소비 (앱 종료 방지)
@@ -358,19 +435,17 @@ class _HomePageState extends State<HomePage>
         body: body, // IndexedStack를 제거하고 직접 body 변수 사용
         bottomNavigationBar: BottomNavigationBar(
           items: const <BottomNavigationBarItem>[
-            BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.history),
-              label: 'History',
-            ),
-            BottomNavigationBarItem(icon: Icon(Icons.chat), label: 'Chat'),
-            BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
+            BottomNavigationBarItem(icon: Icon(Icons.home), label: ''),
+            BottomNavigationBarItem(icon: Icon(Icons.history), label: ''),
+            BottomNavigationBarItem(icon: Icon(Icons.chat), label: ''),
+            BottomNavigationBarItem(icon: Icon(Icons.person), label: ''),
           ],
           currentIndex: _selectedIndex,
           selectedItemColor: isDarkMode ? Colors.white : Colors.blue,
           unselectedItemColor: isDarkMode ? Colors.grey[600] : Colors.grey,
           backgroundColor: isDarkMode ? Colors.black : Colors.white,
-          showUnselectedLabels: true,
+          showSelectedLabels: false,
+          showUnselectedLabels: false,
           type: BottomNavigationBarType.fixed,
           onTap: _onItemTapped,
         ),

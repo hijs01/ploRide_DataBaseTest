@@ -175,6 +175,10 @@ class _SearchPageState extends State<SearchPage> {
   // 날짜 선택 다이얼로그
   Future<void> _selectDate(BuildContext context) async {
     final DateTime now = DateTime.now();
+    final isDarkMode =
+        MediaQuery.of(context).platformBrightness == Brightness.dark;
+    final primaryColor = Color(0xFF3F51B5);
+
     final DateTime? picked = await showDatePicker(
       context: context,
       initialDate: selectedDate ?? now,
@@ -183,6 +187,30 @@ class _SearchPageState extends State<SearchPage> {
       helpText: '탑승 날짜를 선택하세요',
       cancelText: '취소',
       confirmText: '확인',
+      builder: (BuildContext context, Widget? child) {
+        return Theme(
+          data:
+              isDarkMode
+                  ? ThemeData.dark().copyWith(
+                    colorScheme: ColorScheme.dark(
+                      primary: primaryColor,
+                      onPrimary: Colors.white,
+                      surface: Color(0xFF121212),
+                      onSurface: Colors.white,
+                    ),
+                    dialogBackgroundColor: Color(0xFF121212),
+                  )
+                  : ThemeData.light().copyWith(
+                    colorScheme: ColorScheme.light(
+                      primary: primaryColor,
+                      onPrimary: Colors.white,
+                      onSurface: Colors.black,
+                    ),
+                    dialogBackgroundColor: Colors.white,
+                  ),
+          child: child ?? Container(),
+        );
+      },
     );
 
     if (picked != null && picked != selectedDate) {
@@ -196,12 +224,57 @@ class _SearchPageState extends State<SearchPage> {
   // 시간 선택 다이얼로그
   Future<void> _selectTime(BuildContext context) async {
     final TimeOfDay now = TimeOfDay.now();
+    final isDarkMode =
+        MediaQuery.of(context).platformBrightness == Brightness.dark;
+    final primaryColor = Color(0xFF3F51B5);
+
     final TimeOfDay? picked = await showTimePicker(
       context: context,
       initialTime: selectedTime ?? now,
       helpText: '탑승 시간을 선택하세요',
       cancelText: '취소',
       confirmText: '확인',
+      builder: (BuildContext context, Widget? child) {
+        return Theme(
+          data:
+              isDarkMode
+                  ? ThemeData.dark().copyWith(
+                    colorScheme: ColorScheme.dark(
+                      primary: primaryColor,
+                      onPrimary: Colors.white,
+                      surface: Color(0xFF121212),
+                      onSurface: Colors.white,
+                    ),
+                    dialogBackgroundColor: Color(0xFF121212),
+                    timePickerTheme: TimePickerThemeData(
+                      backgroundColor: Color(0xFF121212),
+                      hourMinuteColor: primaryColor.withOpacity(0.1),
+                      hourMinuteTextColor: Colors.white,
+                      dayPeriodTextColor: Colors.white70,
+                      dialBackgroundColor: Color(0xFF212121),
+                      dialHandColor: primaryColor,
+                      dialTextColor: Colors.white,
+                    ),
+                  )
+                  : ThemeData.light().copyWith(
+                    colorScheme: ColorScheme.light(
+                      primary: primaryColor,
+                      onPrimary: Colors.white,
+                      onSurface: Colors.black,
+                    ),
+                    timePickerTheme: TimePickerThemeData(
+                      backgroundColor: Colors.white,
+                      hourMinuteColor: primaryColor.withOpacity(0.1),
+                      hourMinuteTextColor: Colors.black,
+                      dayPeriodTextColor: Colors.black87,
+                      dialBackgroundColor: Colors.grey.shade200,
+                      dialHandColor: primaryColor,
+                      dialTextColor: Colors.black87,
+                    ),
+                  ),
+          child: child ?? Container(),
+        );
+      },
     );
 
     if (picked != null && picked != selectedTime) {
@@ -228,9 +301,9 @@ class _SearchPageState extends State<SearchPage> {
     final cardColor = isDarkMode ? Color(0xFF1A1A1A) : Colors.white;
     final borderColor = isDarkMode ? Colors.grey[800] : Colors.grey[300];
 
+    // 전체 주소 대신 빌딩 이름(placeName)만 표시
     String address =
-        Provider.of<AppData>(context).pickupAddress?.placeFormattedAddress ??
-        '';
+        Provider.of<AppData>(context).pickupAddress?.placeName ?? '';
     pickupController.text = address;
 
     return WillPopScope(
@@ -602,7 +675,7 @@ class _SearchPageState extends State<SearchPage> {
 
                       // 캐리어 개수 선택
                       Container(
-                        margin: EdgeInsets.only(bottom: 24),
+                        margin: EdgeInsets.only(bottom: 10),
                         decoration: BoxDecoration(
                           color:
                               isDarkMode ? Color(0xFF202020) : Colors.grey[100],
@@ -723,24 +796,49 @@ class _SearchPageState extends State<SearchPage> {
               ),
 
               // 확인 버튼
-              SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: ElevatedButton(
-                  onPressed: navigateToMainPage,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: primaryColor,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: 60, vertical: 5),
+                child: AnimatedContainer(
+                  duration: Duration(milliseconds: 200),
+                  width: double.infinity,
+                  height: 56,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      // 버튼에 물결 효과 추가
+                      ScaffoldMessenger.of(context).clearSnackBars();
+                      navigateToMainPage();
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: primaryColor,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      elevation: 4,
+                      shadowColor: primaryColor.withOpacity(0.4),
                     ),
-                    elevation: 0,
-                  ),
-                  child: Text(
-                    '탑승 정보 확인',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                    child: Text(
+                      '탑승 정보 확인',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
                   ),
                 ),
               ),
+
+              // 버튼과 콘텐츠 사이에 공간 및 구분선 추가
+              SizedBox(height: 12),
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: 20),
+                child: Divider(
+                  color: isDarkMode ? Colors.grey[800] : Colors.grey[300],
+                  thickness: 1,
+                ),
+              ),
+              SizedBox(height: 12),
 
               // 추천 경로, 프로모션, 이용 팁 등 콘텐츠
               if (destinationPredictionList.isEmpty) ...[
@@ -954,6 +1052,11 @@ class _SearchPageState extends State<SearchPage> {
                     onLocationSelected: (Address address) {
                       Navigator.pop(context); // 바텀 시트 닫기
 
+                      // 빌딩 이름을 TextController에 설정
+                      setState(() {
+                        pickupController.text = address.placeName ?? '';
+                      });
+
                       // 모든 위치에 대해 지도 페이지로 이동
                       _navigateToLocationMapPage(context, address);
                     },
@@ -1031,6 +1134,7 @@ class _SearchPageState extends State<SearchPage> {
                       _navigateToDestinationMapPage(context, address);
                     },
                     updateTextField: (String name) {
+                      // 빌딩 이름만 표시
                       destinationController.text = name;
                     },
                   ),
@@ -1057,6 +1161,11 @@ class _SearchPageState extends State<SearchPage> {
                   listen: false,
                 ).updatePickupAddress(address);
 
+                // 빌딩 이름만 표시하도록 설정
+                setState(() {
+                  pickupController.text = address.placeName ?? '';
+                });
+
                 Navigator.pop(context); // 지도 페이지 닫기
               },
             ),
@@ -1079,6 +1188,11 @@ class _SearchPageState extends State<SearchPage> {
                   context,
                   listen: false,
                 ).updateDestinationAddress(address);
+
+                // 빌딩 이름만 표시하도록 설정
+                setState(() {
+                  destinationController.text = address.placeName ?? '';
+                });
 
                 Navigator.pop(context); // 지도 페이지 닫기
               },
