@@ -104,6 +104,8 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
   // 현재 위치 변수 추가
   Position? currentPosition;
 
+  int luggageCount = 0; // 캐리어 개수 변수 추가
+
   void showDetailSheet() async {
     await getDirection();
 
@@ -732,7 +734,9 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                               // pushNamed 대신 push를 사용
                               context,
                               MaterialPageRoute(
-                                builder: (context) => SearchPage(),
+                                builder: (context) => SearchPage(
+                                  onLuggageCountChanged: updateLuggageCount,
+                                ),
                               ),
                             );
                             if (response == 'getDirection') {
@@ -1587,6 +1591,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
         'status': 'pending',
         'user_id': currentFirebaseUser!.uid,
         'fare': HelperMethods.estimateFares(tripDirectionDetails!),
+        'luggage_count': luggageCount, // 캐리어 개수 추가
       };
 
       print('Firestore에 전송할 데이터:');
@@ -2183,6 +2188,12 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
     // 마커 정보창 표시
     Future.delayed(Duration(milliseconds: 300), () {
       mapController.showMarkerInfoWindow(MarkerId('tempPickup'));
+    });
+  }
+
+  void updateLuggageCount(int count) {
+    setState(() {
+      luggageCount = count;
     });
   }
 }

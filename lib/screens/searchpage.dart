@@ -43,7 +43,12 @@ class LeftToRightPageRoute<T> extends PageRouteBuilder<T> {
 
 class SearchPage extends StatefulWidget {
   static const String id = 'search';
-  const SearchPage({super.key});
+  final Function(int)? onLuggageCountChanged;
+  
+  const SearchPage({
+    Key? key,
+    this.onLuggageCountChanged,
+  }) : super(key: key);
 
   @override
   _SearchPageState createState() => _SearchPageState();
@@ -292,6 +297,13 @@ class _SearchPageState extends State<SearchPage> {
             "$hourDisplayed:${picked.minute.toString().padLeft(2, '0')} $period";
       });
     }
+  }
+
+  void _updateLuggageCount(int count) {
+    setState(() {
+      luggageCount = count;
+    });
+    widget.onLuggageCountChanged?.call(count);
   }
 
   @override
@@ -719,9 +731,9 @@ class _SearchPageState extends State<SearchPage> {
                                   color: Colors.transparent,
                                   child: InkWell(
                                     onTap: () {
-                                      setState(() {
-                                        if (luggageCount > 1) luggageCount--;
-                                      });
+                                      if (luggageCount > 0) {
+                                        _updateLuggageCount(luggageCount - 1);
+                                      }
                                     },
                                     borderRadius: BorderRadius.circular(20),
                                     child: Container(
@@ -761,9 +773,9 @@ class _SearchPageState extends State<SearchPage> {
                                   color: Colors.transparent,
                                   child: InkWell(
                                     onTap: () {
-                                      setState(() {
-                                        if (luggageCount < 5) luggageCount++;
-                                      });
+                                      if (luggageCount < 5) {
+                                        _updateLuggageCount(luggageCount + 1);
+                                      }
                                     },
                                     borderRadius: BorderRadius.circular(20),
                                     child: Container(

@@ -1068,6 +1068,7 @@ class _RideConfirmationPageState extends State<RideConfirmationPage>
                 'last_message_time': FieldValue.serverTimestamp(),
                 'room_number': chatRoomNumber,
                 'collection_name': chatRoomCollection,
+                'luggage_count_total': luggageCount,
               };
 
               // 채팅방 생성
@@ -1106,12 +1107,13 @@ class _RideConfirmationPageState extends State<RideConfirmationPage>
                 members.add(user.uid);
 
                 // 채팅방 업데이트
-                await chatRoomRef
-                    .update({
-                      'members': members,
-                      'member_count': members.length,
-                    })
-                    .timeout(Duration(seconds: 5));
+                await chatRoomRef.update({
+                  'members': FieldValue.arrayUnion([user.uid]),
+                  'member_count': FieldValue.increment(1),
+                  'last_message': '${currentUserInfo?.fullName ?? user.displayName ?? '이름 없음'}님이 그룹에 참여했습니다.',
+                  'last_message_time': FieldValue.serverTimestamp(),
+                  'luggage_count_total': FieldValue.increment(luggageCount),
+                });
 
                 // 참여 메시지 추가
                 await FirebaseFirestore.instance
