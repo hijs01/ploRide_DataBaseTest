@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cabrider/screens/mainpage.dart';
 import 'package:cabrider/screens/searchpage.dart';
 import 'package:cabrider/screens/settings_page.dart';
-import 'package:cabrider/screens/taxi_info_page.dart';
+import 'package:cabrider/screens/chat_page.dart';
 
 class HomePage extends StatefulWidget {
   static const String id = 'home';
@@ -30,7 +30,7 @@ class _HomePageState extends State<HomePage> {
           context,
           PageRouteBuilder(
             pageBuilder:
-                (context, animation, secondaryAnimation) => TaxiInfoPage(),
+                (context, animation, secondaryAnimation) => ChatPage(),
             transitionDuration: Duration.zero,
             reverseTransitionDuration: Duration.zero,
           ),
@@ -67,7 +67,7 @@ class _HomePageState extends State<HomePage> {
           ),
         ),
       ),
-      TaxiInfoPage(),
+      ChatPage(),
       SettingsPage(useScaffold: false), // Scaffold 없이 내용만 표시
     ];
 
