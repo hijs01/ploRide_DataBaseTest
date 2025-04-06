@@ -455,7 +455,7 @@ class _SearchPageState extends State<SearchPage> {
                                 readOnly: true,
                                 onTap: () {
                                   // 출발지 선택을 위한 바텀 시트 표시
-                                  _showPsuLocationsBottomSheet(context);
+                                  _showPickupOptionsBottomSheet(context);
                                 },
                                 style: TextStyle(
                                   color: textColor,
@@ -518,7 +518,7 @@ class _SearchPageState extends State<SearchPage> {
                                 readOnly: true,
                                 onTap: () {
                                   // 도착지 선택을 위한 바텀 시트 표시
-                                  _showAirportLocationsBottomSheet(context);
+                                  _showDestinationOptionsBottomSheet(context);
                                 },
                                 style: TextStyle(
                                   color: textColor,
@@ -989,6 +989,197 @@ class _SearchPageState extends State<SearchPage> {
     super.dispose();
   }
 
+  // 출발 위치 옵션을 선택하기 위한 바텀 시트
+  void _showPickupOptionsBottomSheet(BuildContext context) {
+    final isDarkMode =
+        MediaQuery.of(context).platformBrightness == Brightness.dark;
+    final backgroundColor = isDarkMode ? Colors.black : Colors.white;
+    final sheetColor = isDarkMode ? Color(0xFF121212) : Colors.white;
+    final textColor = isDarkMode ? Colors.white : Colors.black87;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder:
+          (context) => Container(
+            padding: EdgeInsets.symmetric(vertical: 20),
+            decoration: BoxDecoration(
+              color: sheetColor,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 10,
+                  spreadRadius: 0,
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // 핸들 바
+                Container(
+                  margin: EdgeInsets.only(bottom: 16),
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: isDarkMode ? Colors.grey[700] : Colors.grey[300],
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                // 헤더
+                Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: Text(
+                    '출발 위치 선택',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: textColor,
+                    ),
+                  ),
+                ),
+                SizedBox(height: 8),
+                // Penn State University 옵션
+                ListTile(
+                  leading: Container(
+                    padding: EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Color(0xFF3F51B5).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(Icons.school, color: Color(0xFF3F51B5)),
+                  ),
+                  title: Text(
+                    'Penn State University',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w500,
+                      color: textColor,
+                    ),
+                  ),
+                  subtitle: Text(
+                    '대학 캠퍼스에서 출발',
+                    style: TextStyle(
+                      color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                    ),
+                  ),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _showPsuLocationsBottomSheet(context);
+                  },
+                ),
+                // Airport 옵션
+                ListTile(
+                  leading: Container(
+                    padding: EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Color(0xFF3F51B5).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(Icons.flight, color: Color(0xFF3F51B5)),
+                  ),
+                  title: Text(
+                    'Airport',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w500,
+                      color: textColor,
+                    ),
+                  ),
+                  subtitle: Text(
+                    '공항에서 출발',
+                    style: TextStyle(
+                      color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                    ),
+                  ),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _showAirportPickupLocationsBottomSheet(context);
+                  },
+                ),
+                SizedBox(height: 16),
+              ],
+            ),
+          ),
+    );
+  }
+
+  // 공항 출발 위치 선택을 위한 바텀 시트
+  void _showAirportPickupLocationsBottomSheet(BuildContext context) {
+    final isDarkMode =
+        MediaQuery.of(context).platformBrightness == Brightness.dark;
+    final backgroundColor = isDarkMode ? Colors.black : Colors.white;
+    final sheetColor = isDarkMode ? Color(0xFF121212) : Colors.white;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder:
+          (context) => Container(
+            height: MediaQuery.of(context).size.height * 0.7,
+            decoration: BoxDecoration(
+              color: sheetColor,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 10,
+                  spreadRadius: 0,
+                ),
+              ],
+            ),
+            child: Column(
+              children: [
+                // 핸들 바
+                Container(
+                  margin: EdgeInsets.only(top: 12),
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: isDarkMode ? Colors.grey[700] : Colors.grey[300],
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                // 헤더
+                Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Row(
+                    children: [
+                      Icon(Icons.flight, color: Color(0xFF3F51B5)),
+                      SizedBox(width: 12),
+                      Text(
+                        '공항 출발 위치',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: isDarkMode ? Colors.white : Colors.black,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Divider(height: 1),
+                // 리스트
+                Expanded(
+                  child: AirportLocationsList(
+                    isDarkMode: isDarkMode,
+                    onLocationSelected: (Address address) {
+                      Navigator.pop(context); // 바텀 시트 닫기
+                      // 지도 페이지로 이동
+                      _navigateToLocationMapPage(context, address);
+                    },
+                    updateTextField: (String name) {
+                      // 빌딩 이름만 표시
+                      pickupController.text = name;
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+    );
+  }
+
   // PSU 위치 선택을 위한 바텀 시트
   void _showPsuLocationsBottomSheet(BuildContext context) {
     final isDarkMode =
@@ -1068,8 +1259,257 @@ class _SearchPageState extends State<SearchPage> {
     );
   }
 
-  // 공항 위치 선택을 위한 바텀 시트
-  void _showAirportLocationsBottomSheet(BuildContext context) {
+  // 도착 위치 옵션을 선택하기 위한 바텀 시트
+  void _showDestinationOptionsBottomSheet(BuildContext context) {
+    final isDarkMode =
+        MediaQuery.of(context).platformBrightness == Brightness.dark;
+    final backgroundColor = isDarkMode ? Colors.black : Colors.white;
+    final sheetColor = isDarkMode ? Color(0xFF121212) : Colors.white;
+    final textColor = isDarkMode ? Colors.white : Colors.black87;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder:
+          (context) => Container(
+            padding: EdgeInsets.symmetric(vertical: 20),
+            decoration: BoxDecoration(
+              color: sheetColor,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 10,
+                  spreadRadius: 0,
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // 핸들 바
+                Container(
+                  margin: EdgeInsets.only(bottom: 16),
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: isDarkMode ? Colors.grey[700] : Colors.grey[300],
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                // 헤더
+                Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: Text(
+                    '도착 위치 선택',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: textColor,
+                    ),
+                  ),
+                ),
+                SizedBox(height: 8),
+                // Penn State University 옵션
+                ListTile(
+                  leading: Container(
+                    padding: EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Color(0xFF3F51B5).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(Icons.school, color: Color(0xFF3F51B5)),
+                  ),
+                  title: Text(
+                    'Penn State University',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w500,
+                      color: textColor,
+                    ),
+                  ),
+                  subtitle: Text(
+                    '대학 캠퍼스로 도착',
+                    style: TextStyle(
+                      color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                    ),
+                  ),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _showPsuDestinationLocationsBottomSheet(context);
+                  },
+                ),
+                // Airport 옵션
+                ListTile(
+                  leading: Container(
+                    padding: EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Color(0xFF3F51B5).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(Icons.flight, color: Color(0xFF3F51B5)),
+                  ),
+                  title: Text(
+                    'Airport',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w500,
+                      color: textColor,
+                    ),
+                  ),
+                  subtitle: Text(
+                    '공항으로 도착',
+                    style: TextStyle(
+                      color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                    ),
+                  ),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _showAirportDestinationLocationsBottomSheet(context);
+                  },
+                ),
+                SizedBox(height: 16),
+              ],
+            ),
+          ),
+    );
+  }
+
+  // PSU 도착 위치 선택을 위한 바텀 시트
+  void _showPsuDestinationLocationsBottomSheet(BuildContext context) {
+    final isDarkMode =
+        MediaQuery.of(context).platformBrightness == Brightness.dark;
+    final backgroundColor = isDarkMode ? Colors.black : Colors.white;
+    final sheetColor = isDarkMode ? Color(0xFF121212) : Colors.white;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true, // 전체 높이를 사용할 수 있도록 설정
+      backgroundColor: Colors.transparent,
+      builder:
+          (context) => Container(
+            height: MediaQuery.of(context).size.height * 0.7,
+            decoration: BoxDecoration(
+              color: sheetColor,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 10,
+                  spreadRadius: 0,
+                ),
+              ],
+            ),
+            child: Column(
+              children: [
+                // 핸들 바
+                Container(
+                  margin: EdgeInsets.only(top: 12),
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: isDarkMode ? Colors.grey[700] : Colors.grey[300],
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                // 헤더
+                Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Row(
+                    children: [
+                      Icon(Icons.location_on, color: Color(0xFF3F51B5)),
+                      SizedBox(width: 12),
+                      Text(
+                        'Penn State University 도착 위치',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: isDarkMode ? Colors.white : Colors.black,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Divider(height: 1),
+                // 리스트
+                Expanded(
+                  child: PsuLocationsList(
+                    isDarkMode: isDarkMode,
+                    onLocationSelected: (Address address) {
+                      Navigator.pop(context); // 바텀 시트 닫기
+
+                      // 빌딩 이름을 TextController에 설정
+                      setState(() {
+                        destinationController.text = address.placeName ?? '';
+                      });
+
+                      // 지도 페이지로 이동
+                      _navigateToDestinationMapPage(context, address);
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+    );
+  }
+
+  // 지도 위치 확인 페이지로 이동하는 함수
+  void _navigateToLocationMapPage(BuildContext context, Address address) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder:
+            (context) => LocationMapPage(
+              address: address,
+              isPickup: true,
+              onConfirm: () {
+                // 확인 버튼을 누르면 위치 정보를 AppData에 저장하고 SearchPage로 돌아옴
+                Provider.of<AppData>(
+                  context,
+                  listen: false,
+                ).updatePickupAddress(address);
+
+                // 빌딩 이름만 표시하도록 설정
+                setState(() {
+                  pickupController.text = address.placeName ?? '';
+                });
+
+                Navigator.pop(context); // 지도 페이지 닫기
+              },
+            ),
+      ),
+    );
+  }
+
+  // 목적지 지도 위치 확인 페이지로 이동하는 함수
+  void _navigateToDestinationMapPage(BuildContext context, Address address) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder:
+            (context) => LocationMapPage(
+              address: address,
+              isPickup: false,
+              onConfirm: () {
+                // 확인 버튼을 누르면 위치 정보를 AppData에 저장하고 SearchPage로 돌아옴
+                Provider.of<AppData>(
+                  context,
+                  listen: false,
+                ).updateDestinationAddress(address);
+
+                // 빌딩 이름만 표시하도록 설정
+                setState(() {
+                  destinationController.text = address.placeName ?? '';
+                });
+
+                Navigator.pop(context); // 지도 페이지 닫기
+              },
+            ),
+      ),
+    );
+  }
+
+  // 공항 도착 위치 선택을 위한 바텀 시트
+  void _showAirportDestinationLocationsBottomSheet(BuildContext context) {
     final isDarkMode =
         MediaQuery.of(context).platformBrightness == Brightness.dark;
     final backgroundColor = isDarkMode ? Colors.black : Colors.white;
@@ -1142,62 +1582,6 @@ class _SearchPageState extends State<SearchPage> {
               ],
             ),
           ),
-    );
-  }
-
-  // 지도 위치 확인 페이지로 이동하는 함수
-  void _navigateToLocationMapPage(BuildContext context, Address address) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder:
-            (context) => LocationMapPage(
-              address: address,
-              isPickup: true,
-              onConfirm: () {
-                // 확인 버튼을 누르면 위치 정보를 AppData에 저장하고 SearchPage로 돌아옴
-                Provider.of<AppData>(
-                  context,
-                  listen: false,
-                ).updatePickupAddress(address);
-
-                // 빌딩 이름만 표시하도록 설정
-                setState(() {
-                  pickupController.text = address.placeName ?? '';
-                });
-
-                Navigator.pop(context); // 지도 페이지 닫기
-              },
-            ),
-      ),
-    );
-  }
-
-  // 목적지 지도 위치 확인 페이지로 이동하는 함수
-  void _navigateToDestinationMapPage(BuildContext context, Address address) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder:
-            (context) => LocationMapPage(
-              address: address,
-              isPickup: false,
-              onConfirm: () {
-                // 확인 버튼을 누르면 위치 정보를 AppData에 저장하고 SearchPage로 돌아옴
-                Provider.of<AppData>(
-                  context,
-                  listen: false,
-                ).updateDestinationAddress(address);
-
-                // 빌딩 이름만 표시하도록 설정
-                setState(() {
-                  destinationController.text = address.placeName ?? '';
-                });
-
-                Navigator.pop(context); // 지도 페이지 닫기
-              },
-            ),
-      ),
     );
   }
 

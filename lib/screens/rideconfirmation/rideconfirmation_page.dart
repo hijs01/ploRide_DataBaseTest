@@ -105,128 +105,278 @@ class _RideConfirmationPageState extends State<RideConfirmationPage> {
       print('라이드 요청 데이터:');
       print(rideMap);
 
-      // Firestore에 라이드 요청 저장
+      // 출발지와 목적지 정보 확인
+      String pickupName = pickup.placeName?.toLowerCase() ?? '';
+      String destinationName = destination.placeName?.toLowerCase() ?? '';
+
+      // 채팅방 컬렉션 이름과 식별자 결정
+      String chatRoomCollection = '';
+      String locationIdentifier = '';
+      int chatRoomNumber = 1; // 기본 채팅방 번호
+
+      // Penn State University에서 출발하는 경우 - 도착 공항 기준으로 그룹화
+      if (pickupName.contains('penn state') ||
+          pickupName.contains('university') ||
+          pickupName.contains('대학')) {
+        chatRoomCollection = 'psuToAirport'; // PSU에서 공항으로 컬렉션
+
+        // 목적지(공항) 이름에서 식별자 추출
+        if (destinationName.contains('airport') ||
+            destinationName.contains('공항')) {
+          // 공항 이름 추출 (예: jfk airport -> jfk)
+          String airportName =
+              destinationName
+                  .replaceAll("airport", "")
+                  .replaceAll("공항", "")
+                  .trim();
+          if (airportName.isEmpty) {
+            airportName = "unknown";
+          }
+          locationIdentifier = airportName.replaceAll(" ", "_");
+        } else {
+          locationIdentifier = destinationName.replaceAll(" ", "_");
+        }
+
+        print('출발지가 Penn State University입니다. psuToAirport 컬렉션을 사용합니다.');
+        print('식별자: $locationIdentifier');
+      }
+      // 공항에서 출발하는 경우 - 출발 공항 기준으로 그룹화
+      else if (pickupName.contains('airport') || pickupName.contains('공항')) {
+        chatRoomCollection = 'airportToPsu'; // 공항에서 PSU로 컬렉션
+
+        // 출발지(공항) 이름에서 식별자 추출
+        String airportName =
+            pickupName.replaceAll("airport", "").replaceAll("공항", "").trim();
+        if (airportName.isEmpty) {
+          airportName = "unknown";
+        }
+        locationIdentifier = airportName.replaceAll(" ", "_");
+
+        print('출발지가 공항입니다. airportToPsu 컬렉션을 사용합니다.');
+        print('식별자: $locationIdentifier');
+      } else {
+        // 둘 다 아닌 경우(일반 케이스) 기본값 설정
+        chatRoomCollection = 'generalRides';
+        locationIdentifier = '${pickupName}_to_${destinationName}'.replaceAll(
+          " ",
+          "_",
+        );
+        print('일반 경로입니다. generalRides 컬렉션을 사용합니다.');
+      }
+
+      // 날짜를 yyyy-mm-dd 형식으로 변환 (채팅방 필터링용)
+      String formattedDate =
+          "${rideDate.year}-${rideDate.month.toString().padLeft(2, '0')}-${rideDate.day.toString().padLeft(2, '0')}";
+
+      // 시간 범위 계산 (예약 시간 ±1시간)
+      DateTime rideDateTimeMinusHour = rideDateTime.subtract(
+        Duration(hours: 1),
+      );
+      DateTime rideDateTimePlusHour = rideDateTime.add(Duration(hours: 1));
+
+      // 시간대 식별자 생성 (채팅방 그룹화용)
+      int timeSlot = (rideTime.hour / 2).floor(); // 2시간 단위로 시간대 그룹화
+
+      print('채팅방 컬렉션: $chatRoomCollection, 위치 식별자: $locationIdentifier');
+
+      // 해당 컬렉션에서 같은 날짜와 비슷한 시간대의 채팅방 찾기
+      QuerySnapshot existingChatRooms =
+          await FirebaseFirestore.instance
+              .collection(chatRoomCollection)
+              .where('location_identifier', isEqualTo: locationIdentifier)
+              .where('date_str', isEqualTo: formattedDate)
+              .get();
+
+      print('같은 날짜/위치의 기존 채팅방 수: ${existingChatRooms.docs.length}');
+
+      // 비슷한 시간대(±1시간)의 채팅방 찾기
+      bool foundMatchingRoom = false;
+      String chatRoomId = '';
+      DocumentReference chatRoomRef =
+          FirebaseFirestore.instance
+              .collection(chatRoomCollection)
+              .doc(); // 초기 빈 참조로 초기화
+
+      // 기존 채팅방 중에서 시간이 맞고 인원 여유가 있는 채팅방 찾기
+      if (existingChatRooms.docs.isNotEmpty) {
+        for (var doc in existingChatRooms.docs) {
+          Map<String, dynamic> roomData = doc.data() as Map<String, dynamic>;
+
+          // 채팅방의 탑승 시간 확인
+          if (roomData.containsKey('ride_date_timestamp')) {
+            Timestamp rideTimestamp =
+                roomData['ride_date_timestamp'] as Timestamp;
+            DateTime roomRideDateTime = rideTimestamp.toDate();
+
+            // 시간 차이 계산 (절대값)
+            Duration timeDifference =
+                roomRideDateTime.difference(rideDateTime).abs();
+
+            // 채팅방 멤버 수 확인
+            List<dynamic> members = roomData['members'] ?? [];
+
+            // 시간 차이가 1시간 이내이고, 멤버 수가 4명 미만이며, 해당 사용자가 멤버가 아닌 경우
+            if (timeDifference.inHours <= 1 &&
+                members.length < 4 &&
+                !members.contains(user.uid)) {
+              chatRoomId = doc.id;
+              chatRoomRef = FirebaseFirestore.instance
+                  .collection(chatRoomCollection)
+                  .doc(chatRoomId);
+
+              print(
+                '비슷한 시간대의 채팅방을 찾았습니다: $chatRoomId (시간 차이: ${timeDifference.inMinutes}분)',
+              );
+              foundMatchingRoom = true;
+              break;
+            }
+          }
+        }
+      }
+
+      // 적합한 채팅방을 찾지 못한 경우 새 채팅방 생성
+      if (!foundMatchingRoom) {
+        // 새 채팅방 번호 결정 (기존 채팅방 중 가장 큰 번호 + 1)
+        int maxRoomNumber = 0;
+
+        for (var doc in existingChatRooms.docs) {
+          String docId = doc.id;
+
+          // 문서 ID에서 번호 부분 추출 (예: jfk_1 -> 1)
+          List<String> parts = docId.split('_');
+          if (parts.length > 1) {
+            try {
+              int roomNumber = int.parse(parts.last);
+              if (roomNumber > maxRoomNumber) {
+                maxRoomNumber = roomNumber;
+              }
+            } catch (e) {
+              print('채팅방 번호 추출 오류: $e');
+            }
+          }
+        }
+
+        chatRoomNumber = maxRoomNumber + 1;
+        // 새 채팅방 ID 생성 (locationIdentifier_번호)
+        chatRoomId = "${locationIdentifier}_$chatRoomNumber";
+
+        print('새 채팅방 생성: $chatRoomId');
+
+        // 채팅방 참조
+        chatRoomRef = FirebaseFirestore.instance
+            .collection(chatRoomCollection)
+            .doc(chatRoomId);
+
+        // 새 채팅방 데이터
+        Map<String, dynamic> chatRoomData = {
+          'created_at': FieldValue.serverTimestamp(),
+          'location_identifier': locationIdentifier,
+          'ride_date': rideDateTime,
+          'ride_date_timestamp': Timestamp.fromDate(rideDateTime),
+          'date_str': formattedDate,
+          'time_slot': timeSlot,
+          'pickup_info': pickupMap,
+          'destination_info': destinationMap,
+          'members': [user.uid],
+          'member_count': 1,
+          'last_message': '새로운 그룹이 생성되었습니다.',
+          'last_message_time': FieldValue.serverTimestamp(),
+          'room_number': chatRoomNumber,
+          'collection_name': chatRoomCollection,
+        };
+
+        // 채팅방 생성
+        await chatRoomRef.set(chatRoomData);
+
+        // 시스템 메시지 추가
+        await FirebaseFirestore.instance
+            .collection(chatRoomCollection)
+            .doc(chatRoomId)
+            .collection('messages')
+            .add({
+              'text':
+                  '${currentUserInfo?.fullName ?? user.displayName ?? '이름 없음'}님이 그룹에 참여했습니다.',
+              'sender_id': 'system',
+              'sender_name': '시스템',
+              'timestamp': FieldValue.serverTimestamp(),
+              'type': 'system',
+            });
+
+        print('새 채팅방 생성 완료: $chatRoomId in $chatRoomCollection');
+      }
+      // 적합한 채팅방을 찾은 경우, 해당 채팅방에 사용자 추가
+      else {
+        print('기존 채팅방에 사용자 추가: $chatRoomId');
+
+        DocumentSnapshot chatRoomDoc = await chatRoomRef.get();
+        Map<String, dynamic> chatRoomData =
+            chatRoomDoc.data() as Map<String, dynamic>;
+        List<dynamic> members = chatRoomData['members'] ?? [];
+
+        if (!members.contains(user.uid)) {
+          // 채팅방 멤버 목록에 사용자 추가
+          members.add(user.uid);
+
+          // 채팅방 업데이트
+          await chatRoomRef.update({
+            'members': members,
+            'member_count': members.length,
+          });
+
+          // 참여 메시지 추가
+          await FirebaseFirestore.instance
+              .collection(chatRoomCollection)
+              .doc(chatRoomId)
+              .collection('messages')
+              .add({
+                'text':
+                    '${currentUserInfo?.fullName ?? user.displayName ?? '이름 없음'}님이 그룹에 참여했습니다.',
+                'sender_id': 'system',
+                'sender_name': '시스템',
+                'timestamp': FieldValue.serverTimestamp(),
+                'type': 'system',
+              });
+
+          print('사용자를 기존 채팅방에 추가했습니다.');
+        } else {
+          print('사용자가 이미 채팅방에 존재합니다.');
+        }
+      }
+
+      // 사용자의 채팅방 목록에 추가
+      String userChatRoomPath = '$chatRoomCollection/$chatRoomId';
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .collection('chatRooms')
+          .doc(userChatRoomPath)
+          .set({
+            'chat_room_collection': chatRoomCollection,
+            'chat_room_id': chatRoomId,
+            'chat_room_path': userChatRoomPath,
+            'joined_at': FieldValue.serverTimestamp(),
+            'ride_date': rideDateTime,
+          });
+
+      print('사용자의 채팅방 목록에 추가 완료');
+
+      // Firestore에 라이드 요청 저장 (채팅방 정보 포함)
+      rideMap['chat_room_collection'] = chatRoomCollection;
+      rideMap['chat_room_id'] = chatRoomId;
+      rideMap['chat_room_path'] = userChatRoomPath;
+
       DocumentReference rideRef = await FirebaseFirestore.instance
           .collection('rideRequests')
           .add(rideMap);
 
       print('라이드 요청 생성 성공: ${rideRef.id}');
 
-      // 가용 드라이버들에게 알림 전송 (선택적)
-      try {
-        // MainPage의 FireHelper.nearbyDriverList를 사용하거나 드라이버 목록을 직접 가져옴
-        // 1. driversAvailable 컬렉션에서 온라인 드라이버 가져오기
-        QuerySnapshot driversAvailable =
-            await FirebaseFirestore.instance
-                .collection('driversAvailable')
-                .get();
-
-        print(
-          'driversAvailable 컬렉션 조회 결과: ${driversAvailable.docs.length}개 문서 발견',
-        );
-
-        // 온라인 드라이버가 없다면 drivers 컬렉션 확인
-        if (driversAvailable.docs.isEmpty) {
-          print('온라인 드라이버가 없어 drivers 컬렉션 확인');
-          QuerySnapshot allDrivers =
-              await FirebaseFirestore.instance
-                  .collection('drivers')
-                  .limit(5)
-                  .get();
-
-          for (var doc in allDrivers.docs) {
-            print('드라이버 문서 확인: ${doc.id}, 데이터: ${doc.data()}');
-          }
-
-          print('drivers 컬렉션에서 online 필드가 true인 드라이버 확인');
-          // 여러 가능한 필드명 시도
-          List<String> possibleFields = [
-            'available',
-            'online',
-            'isOnline',
-            'status',
-          ];
-
-          for (var field in possibleFields) {
-            try {
-              QuerySnapshot onlineDrivers =
-                  await FirebaseFirestore.instance
-                      .collection('drivers')
-                      .where(field, isEqualTo: true)
-                      .get();
-
-              print('필드 $field로 검색한 결과: ${onlineDrivers.docs.length}개 문서');
-
-              if (onlineDrivers.docs.isNotEmpty) {
-                driversAvailable = onlineDrivers;
-                print('사용된 필드: $field');
-                break;
-              }
-            } catch (e) {
-              print('$field 필드로 쿼리 중 오류: $e');
-            }
-          }
-        }
-
-        // 드라이버가 발견되지 않았다면 테스트 드라이버 사용
-        if (driversAvailable.docs.isEmpty) {
-          print('가용 드라이버를 찾을 수 없어 임시 방편으로 첫 번째 드라이버 사용');
-
-          QuerySnapshot firstDriver =
-              await FirebaseFirestore.instance
-                  .collection('drivers')
-                  .limit(1)
-                  .get();
-
-          if (firstDriver.docs.isNotEmpty) {
-            driversAvailable = firstDriver;
-            print('첫 번째 드라이버를 사용합니다: ${firstDriver.docs.first.id}');
-          }
-        }
-
-        if (driversAvailable.docs.isNotEmpty) {
-          // 첫 번째 가용 드라이버에게 알림 전송
-          String driverId = driversAvailable.docs.first.id;
-
-          // driver_id 필드가 있다면 그 값을 사용
-          var driverData =
-              driversAvailable.docs.first.data() as Map<String, dynamic>;
-          if (driverData.containsKey('driver_id')) {
-            driverId = driverData['driver_id'].toString();
-            print('driver_id 필드 발견: $driverId');
-          }
-
-          print('알림을 보낼 드라이버: $driverId');
-
-          // 드라이버의 newtrip 필드 업데이트 (드라이버 앱이 이를 확인)
-          await FirebaseFirestore.instance
-              .collection('drivers')
-              .doc(driverId)
-              .update({
-                'newtrip': rideRef.id,
-                'notification_time': FieldValue.serverTimestamp(),
-              });
-
-          print('드라이버($driverId)에게 라이드 요청 전송 완료');
-
-          // HelperMethods를 통해 FCM 푸시 알림 전송
-          await HelperMethods.sendNotification(
-            driverId: driverId,
-            context: context,
-            ride_id: rideRef.id,
-          );
-        } else {
-          print('가용 드라이버가 없습니다');
-        }
-      } catch (e) {
-        print('드라이버 알림 전송 중 오류: $e');
-      }
-
-      // 예약 완료 알림
+      // 예약 상태 메시지 수정
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('예약이 완료되었습니다!'),
+          content: Text('예약이 완료되었습니다! 채팅방에서 다른 여행자들과 소통하세요.'),
           backgroundColor: Colors.green,
+          duration: Duration(seconds: 4),
         ),
       );
 
@@ -823,8 +973,14 @@ class _RideConfirmationPageState extends State<RideConfirmationPage> {
                 ),
                 SizedBox(height: 12),
                 Text(
-                  '잠시만 기다려 주세요',
+                  '예약 정보 처리 및 채팅방 생성 중',
                   style: TextStyle(fontSize: 14, color: subtitleColor),
+                ),
+                SizedBox(height: 8),
+                Text(
+                  '같은 시간대(±1시간)의 여행자들과\n자동으로 채팅방이 연결됩니다',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 12, color: subtitleColor),
                 ),
                 SizedBox(height: 16),
               ],
