@@ -3,13 +3,13 @@
 <plist version="1.0">
 <dict>
 	<key>API_KEY</key>
-	<string>AIzaSyBFtw9Wu3003CyA4auGTToQw_JjB2xaGN8</string>
+	<string>AIzaSyAFaRQz-HFBkFwwM9tPPRmT4jeJi_yOEhM</string>
 	<key>GCM_SENDER_ID</key>
 	<string>425631894947</string>
 	<key>PLIST_VERSION</key>
 	<string>1</string>
 	<key>BUNDLE_ID</key>
-	<string>com.example.cabrider</string>
+	<string>com.plo.cabrider</string>
 	<key>PROJECT_ID</key>
 	<string>geetaxi-aa379</string>
 	<key>STORAGE_BUCKET</key>
@@ -25,7 +25,7 @@
 	<key>IS_SIGNIN_ENABLED</key>
 	<true></true>
 	<key>GOOGLE_APP_ID</key>
-	<string>1:425631894947:ios:3dd5d94321ccd60195de16</string>
+	<string>1:425631894947:ios:098d68944ab071a995de16</string>
 	<key>DATABASE_URL</key>
 	<string>https://geetaxi-aa379-default-rtdb.firebaseio.com</string>
 </dict>

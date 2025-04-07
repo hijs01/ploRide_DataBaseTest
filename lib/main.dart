@@ -12,6 +12,7 @@ import 'package:cabrider/screens/settings_page.dart';
 import 'package:cabrider/screens/taxi_info_page.dart';
 import 'package:cabrider/screens/rideconfirmation/rideconfirmation_page.dart';
 import 'package:cabrider/screens/email_verification_page.dart';
+import 'package:cabrider/screens/chat_room_page.dart';
 import 'package:cabrider/globalvariable.dart';
 import 'package:provider/provider.dart';
 import 'package:cabrider/dataprovider/appdata.dart';
@@ -130,7 +131,33 @@ Future<void> main() async {
     // 알림 클릭 이벤트 처리
     FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
       print('알림 클릭: ${message.data}');
-      // TODO: 알림 클릭 시 특정 화면으로 이동하는 로직 추가
+
+      // 채팅 메시지 알림인 경우 해당 채팅방으로 이동
+      if (message.data['type'] == 'chat_message') {
+        final chatRoomId = message.data['chatRoomId'];
+        final chatRoomName = message.data['chatRoomName'] ?? '채팅방';
+
+        if (chatRoomId != null) {
+          // 메인 네비게이터를 사용하여 채팅방 화면으로 이동
+          // 앱이 실행 중일 때만 작동
+          print('채팅방으로 이동: $chatRoomId, $chatRoomName');
+
+          // 지연 추가 (UI가 준비된 후 실행되도록)
+          Future.delayed(Duration(milliseconds: 500), () {
+            if (navigatorKey.currentState != null) {
+              navigatorKey.currentState!.push(
+                MaterialPageRoute(
+                  builder:
+                      (context) => ChatRoomPage(
+                        chatRoomId: chatRoomId,
+                        chatRoomName: chatRoomName,
+                      ),
+                ),
+              );
+            }
+          });
+        }
+      }
     });
   } catch (e) {
     print('Firebase 초기화 에러: $e');
@@ -147,12 +174,16 @@ Future<void> main() async {
   );
 }
 
+// 전역 NavigatorKey 선언
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: navigatorKey, // 전역 NavigatorKey 설정
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         primarySwatch: Colors.blue,

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
 class ChatRoomPage extends StatefulWidget {
   final String chatRoomId;
@@ -24,12 +26,14 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
   String? _currentUserId;
   List<Map<String, dynamic>> _messages = [];
   Map<String, String> _userNames = {};
+  List<String> _roomMembers = [];
 
   @override
   void initState() {
     super.initState();
     _getCurrentUser();
     _loadMessages();
+    _loadRoomMembers();
   }
 
   void _getCurrentUser() {
@@ -38,6 +42,28 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
       setState(() {
         _currentUserId = user.uid;
       });
+    }
+  }
+
+  // 채팅방 멤버 목록 로드
+  Future<void> _loadRoomMembers() async {
+    try {
+      final roomDoc =
+          await _firestore
+              .collection('psuToAirport')
+              .doc(widget.chatRoomId)
+              .get();
+
+      if (roomDoc.exists) {
+        final data = roomDoc.data();
+        if (data != null && data.containsKey('members')) {
+          setState(() {
+            _roomMembers = List<String>.from(data['members']);
+          });
+        }
+      }
+    } catch (e) {
+      print('Error loading room members: $e');
     }
   }
 
@@ -103,14 +129,68 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
     return DateFormat('HH:mm').format(dateTime);
   }
 
+  // 다른 채팅방 멤버들에게 알림 보내기
+  Future<void> _sendNotificationToOtherMembers(String messageText) async {
+    try {
+      // 현재 사용자는 제외하고 알림 보내기
+      final otherMembers =
+          _roomMembers.where((uid) => uid != _currentUserId).toList();
+
+      if (otherMembers.isEmpty) return;
+
+      final user = _auth.currentUser;
+      String senderName = user?.displayName ?? '알 수 없는 사용자';
+
+      // 사용자 프로필에서 이름 가져오기
+      try {
+        final userDoc =
+            await _firestore.collection('users').doc(_currentUserId).get();
+        if (userDoc.exists) {
+          final userData = userDoc.data();
+          senderName = userData?['fullname'] ?? senderName;
+        }
+      } catch (e) {
+        print('사용자 이름 조회 오류: $e');
+      }
+
+      // Cloud Function을 호출하여 알림 전송
+      final url =
+          'https://us-central1-geetaxi-aa379.cloudfunctions.net/sendChatNotification';
+
+      final requestData = {
+        'chatRoomId': widget.chatRoomId,
+        'chatRoomName': widget.chatRoomName,
+        'messageText': messageText,
+        'senderName': senderName,
+        'senderId': _currentUserId,
+        'receiverIds': otherMembers,
+      };
+
+      final response = await http.post(
+        Uri.parse(url),
+        body: jsonEncode(requestData),
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      if (response.statusCode == 200) {
+        print('채팅 알림 전송 성공');
+      } else {
+        print('채팅 알림 전송 실패: ${response.statusCode}, ${response.body}');
+      }
+    } catch (e) {
+      print('채팅 알림 전송 중 오류 발생: $e');
+    }
+  }
+
   Future<void> _sendMessage() async {
     if (_messageController.text.trim().isEmpty) return;
 
+    final messageText = _messageController.text.trim();
     final user = _auth.currentUser;
     final displayName = user?.displayName ?? '알 수 없는 사용자';
 
     final message = {
-      'text': _messageController.text.trim(),
+      'text': messageText,
       'senderId': _currentUserId,
       'sender_name': displayName,
       'timestamp': FieldValue.serverTimestamp(),
@@ -125,13 +205,12 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
           .add(message);
 
       // 마지막 메시지 업데이트
-      await _firestore
-          .collection('psuToAirport')
-          .doc(widget.chatRoomId)
-          .update({
-            'lastMessage': _messageController.text.trim(),
-            'timestamp': FieldValue.serverTimestamp(),
-          });
+      await _firestore.collection('psuToAirport').doc(widget.chatRoomId).update(
+        {'lastMessage': messageText, 'timestamp': FieldValue.serverTimestamp()},
+      );
+
+      // 다른 멤버들에게 알림 전송
+      await _sendNotificationToOtherMembers(messageText);
 
       _messageController.clear();
     } catch (e) {

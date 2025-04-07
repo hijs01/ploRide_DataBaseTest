@@ -248,3 +248,146 @@ exports.sendPushToDriver = functions.https.onRequest(async (req, res) => {
     res.status(500).send({ error: error.message });
   }
 });
+
+// HTTP 엔드포인트: 채팅 메시지 알림 보내기
+exports.sendChatNotification = functions.https.onRequest(async (req, res) => {
+  // CORS 헤더 설정
+  res.set('Access-Control-Allow-Origin', '*');
+  
+  if (req.method === 'OPTIONS') {
+    res.set('Access-Control-Allow-Methods', 'POST');
+    res.set('Access-Control-Allow-Headers', 'Content-Type');
+    res.status(204).send('');
+    return;
+  }
+  
+  if (req.method !== 'POST') {
+    res.status(405).send('Method Not Allowed');
+    return;
+  }
+
+  try {
+    const { 
+      chatRoomId, 
+      chatRoomName, 
+      messageText, 
+      senderName, 
+      senderId, 
+      receiverIds 
+    } = req.body;
+    
+    if (!chatRoomId || !messageText || !senderName || !senderId || !receiverIds || !Array.isArray(receiverIds)) {
+      res.status(400).send({ error: '필수 정보가 누락되었습니다' });
+      return;
+    }
+
+    console.log('채팅 알림 요청 정보:', {
+      chatRoomId,
+      chatRoomName,
+      messageText: messageText.substring(0, 50) + (messageText.length > 50 ? '...' : ''),
+      senderName,
+      senderId,
+      receiverCount: receiverIds.length
+    });
+
+    // 모든 수신자의 FCM 토큰 가져오기
+    const userTokens = [];
+    for (const userId of receiverIds) {
+      try {
+        const userDoc = await admin.firestore()
+          .collection('users')
+          .doc(userId)
+          .get();
+        
+        if (userDoc.exists) {
+          const userData = userDoc.data();
+          // token 또는 fcm_token 필드 확인
+          const token = userData.token || userData.fcm_token;
+          
+          if (token) {
+            userTokens.push(token);
+          } else {
+            console.log(`사용자 ${userId}의 FCM 토큰이 없습니다`);
+          }
+        } else {
+          console.log(`사용자 ${userId}를 찾을 수 없습니다`);
+        }
+      } catch (error) {
+        console.error(`사용자 ${userId}의 토큰 조회 중 오류:`, error);
+      }
+    }
+
+    if (userTokens.length === 0) {
+      console.log('FCM 토큰을 가진 사용자가 없습니다');
+      res.status(404).send({ error: '알림을 보낼 사용자가 없습니다' });
+      return;
+    }
+
+    // 메시지를 한 번에 최대 500개까지만 전송
+    const MAX_MULTICAST_SIZE = 500;
+    const tokenBatches = [];
+    
+    for (let i = 0; i < userTokens.length; i += MAX_MULTICAST_SIZE) {
+      tokenBatches.push(userTokens.slice(i, i + MAX_MULTICAST_SIZE));
+    }
+
+    const results = [];
+    
+    // 각 배치에 대해 멀티캐스트 메시지 전송
+    for (const tokenBatch of tokenBatches) {
+      // 알림 메시지 구성
+      const message = {
+        notification: {
+          title: chatRoomName || '새 채팅 메시지',
+          body: `${senderName}: ${messageText.length > 100 ? messageText.substring(0, 97) + '...' : messageText}`,
+          sound: 'default',
+        },
+        data: {
+          chatRoomId: chatRoomId,
+          senderId: senderId,
+          senderName: senderName,
+          chatRoomName: chatRoomName || '',
+          type: 'chat_message',
+          click_action: 'FLUTTER_NOTIFICATION_CLICK',
+        },
+        apns: {
+          payload: {
+            aps: {
+              badge: 1,
+              sound: 'default',
+            },
+          },
+        },
+        tokens: tokenBatch,
+      };
+
+      try {
+        // FCM 멀티캐스트 메시지 전송
+        const response = await admin.messaging().sendMulticast(message);
+        console.log(`멀티캐스트 알림 전송 성공 (${tokenBatch.length}명): 성공 ${response.successCount}, 실패 ${response.failureCount}`);
+        results.push({
+          total: tokenBatch.length,
+          success: response.successCount,
+          failure: response.failureCount
+        });
+      } catch (error) {
+        console.error('멀티캐스트 알림 전송 실패:', error);
+        results.push({
+          total: tokenBatch.length,
+          success: 0,
+          failure: tokenBatch.length,
+          error: error.message
+        });
+      }
+    }
+
+    res.status(200).send({ 
+      success: true, 
+      message: '채팅 알림 처리가 완료되었습니다', 
+      results 
+    });
+  } catch (error) {
+    console.error('채팅 알림 처리 중 오류 발생:', error);
+    res.status(500).send({ error: error.message });
+  }
+});
