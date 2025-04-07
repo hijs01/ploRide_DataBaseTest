@@ -13,6 +13,8 @@ import 'package:cabrider/screens/homepage.dart';
 class RideConfirmationPage extends StatefulWidget {
   static const String id = 'rideconfirmation';
 
+  const RideConfirmationPage({super.key});
+
   @override
   _RideConfirmationPageState createState() => _RideConfirmationPageState();
 }
@@ -671,15 +673,14 @@ class _RideConfirmationPageState extends State<RideConfirmationPage>
     BuildContext? dialogContext;
 
     // 안전하게 다이얼로그 표시
-    if (mounted) {
+    if (mounted && !_disposed) {
       showDialog(
         context: context,
-        barrierDismissible: false, // 배경 터치로 닫기 방지
-        barrierColor: Colors.black54, // 배경을 더 어둡게 처리
+        barrierDismissible: false,
+        barrierColor: Colors.black54,
         builder: (BuildContext context) {
           dialogContext = context;
           return WillPopScope(
-            // 뒤로가기 버튼 비활성화
             onWillPop: () async => false,
             child: Dialog(
               backgroundColor: cardColor,
@@ -745,26 +746,26 @@ class _RideConfirmationPageState extends State<RideConfirmationPage>
     // 다이얼로그 표시 후 처리 시작
     _safeConfirmRide()
         .then((_) {
-          // 성공 시 다이얼로그 닫기 및 상태 업데이트
-          _closeDialogAndUpdateUI(
-            dialogContext: dialogContext,
-            isSuccess: true,
-            message: '예약이 완료되었습니다! 채팅방에서 다른 여행자들과 소통하세요.',
-          );
+          if (mounted && !_disposed) {
+            _closeDialogAndUpdateUI(
+              dialogContext: dialogContext,
+              isSuccess: true,
+              message: '예약이 완료되었습니다! 채팅방에서 다른 여행자들과 소통하세요.',
+            );
+          }
         })
         .catchError((e) {
           print('예약 처리 오류: $e');
-
-          // 오류 발생 시 다이얼로그 닫기 및 상태 업데이트
-          _closeDialogAndUpdateUI(
-            dialogContext: dialogContext,
-            isSuccess: false,
-            message: e.toString(),
-          );
+          if (mounted && !_disposed) {
+            _closeDialogAndUpdateUI(
+              dialogContext: dialogContext,
+              isSuccess: false,
+              message: e.toString(),
+            );
+          }
         })
         .whenComplete(() {
-          // 무슨 일이 있어도 상태 업데이트
-          if (mounted) {
+          if (mounted && !_disposed) {
             setState(() {
               _isLoading = false;
               _isProcessing = false;
@@ -920,7 +921,7 @@ class _RideConfirmationPageState extends State<RideConfirmationPage>
       } else {
         // 둘 다 아닌 경우(일반 케이스) 기본값 설정
         chatRoomCollection = 'generalRides';
-        locationIdentifier = '${pickupName}_to_${destinationName}'.replaceAll(
+        locationIdentifier = '${pickupName}_to_$destinationName'.replaceAll(
           " ",
           "_",
         );
@@ -1110,7 +1111,8 @@ class _RideConfirmationPageState extends State<RideConfirmationPage>
                 await chatRoomRef.update({
                   'members': FieldValue.arrayUnion([user.uid]),
                   'member_count': FieldValue.increment(1),
-                  'last_message': '${currentUserInfo?.fullName ?? user.displayName ?? '이름 없음'}님이 그룹에 참여했습니다.',
+                  'last_message':
+                      '${currentUserInfo?.fullName ?? user.displayName ?? '이름 없음'}님이 그룹에 참여했습니다.',
                   'last_message_time': FieldValue.serverTimestamp(),
                   'luggage_count_total': FieldValue.increment(luggageCount),
                 });
@@ -1149,7 +1151,7 @@ class _RideConfirmationPageState extends State<RideConfirmationPage>
         String userChatRoomPath = '$chatRoomCollection/$chatRoomId';
 
         // 고유한 문서 ID 생성 (안전한 방법)
-        String safeDocId = "${chatRoomCollection}_${chatRoomId}".replaceAll(
+        String safeDocId = "${chatRoomCollection}_$chatRoomId".replaceAll(
           '/',
           '_',
         );
