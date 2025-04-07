@@ -19,10 +19,12 @@ class ChatRoomPage extends StatefulWidget {
   _ChatRoomPageState createState() => _ChatRoomPageState();
 }
 
-class _ChatRoomPageState extends State<ChatRoomPage> {
+class _ChatRoomPageState extends State<ChatRoomPage> with WidgetsBindingObserver {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final TextEditingController _messageController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
+  final FocusNode _focusNode = FocusNode();
   String? _currentUserId;
   List<Map<String, dynamic>> _messages = [];
   Map<String, String> _userNames = {};
@@ -34,6 +36,27 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
     _getCurrentUser();
     _loadMessages();
     _loadRoomMembers();
+    
+    // 키보드 상태 변경 감지를 위해 observer 등록
+    WidgetsBinding.instance.addObserver(this);
+    
+    // 포커스 변경 감지
+    _focusNode.addListener(() {
+      if (_focusNode.hasFocus) {
+        // 포커스를 받으면 즉시 스크롤을 아래로 이동
+        _scrollToBottom();
+      }
+    });
+  }
+
+  @override
+  void didChangeMetrics() {
+    super.didChangeMetrics();
+    // 키보드가 나타날 때 스크롤을 아래로 이동
+    if (MediaQuery.of(context).viewInsets.bottom > 0) {
+      // 키보드가 나타났을 때
+      _scrollToBottom();
+    }
   }
 
   void _getCurrentUser() {
@@ -87,6 +110,12 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
     return '알 수 없는 사용자';
   }
 
+  void _scrollToBottom() {
+    if (_scrollController.hasClients) {
+      _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+    }
+  }
+
   void _loadMessages() {
     _firestore
         .collection('psuToAirport')
@@ -100,25 +129,68 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
           for (var doc in snapshot.docs) {
             final data = doc.data();
             final senderId = data['senderId'] ?? data['sender_id'] ?? '';
-            String senderName = data['sender_name'] ?? '';
+            String senderName = '';
 
-            // 시스템 메시지가 아니고 사용자 이름이 없는 경우 이름 가져오기
-            if (senderId != 'system' && senderName.isEmpty) {
-              senderName = await _getUserName(senderId);
+            // 시스템 메시지가 아닌 경우 사용자 이름 가져오기
+            if (senderId != 'system') {
+              try {
+                final userDoc = await _firestore.collection('users').doc(senderId).get();
+                if (userDoc.exists) {
+                  final userData = userDoc.data();
+                  senderName = userData?['fullname'] ?? '알 수 없는 사용자';
+                }
+              } catch (e) {
+                print('사용자 이름 조회 오류: $e');
+                senderName = '알 수 없는 사용자';
+              }
+            }
+
+            // 시스템 메시지인 경우 텍스트에서 사용자 이름을 실제 이름으로 대체
+            String messageText = data['text'] ?? '';
+            if (senderId == 'system' && messageText.contains('님이 그룹에 참여했습니다')) {
+              // 메시지에서 사용자 ID 추출
+              final userId = data['userId'] ?? '';
+              if (userId.isNotEmpty) {
+                try {
+                  final userDoc = await _firestore.collection('users').doc(userId).get();
+                  if (userDoc.exists) {
+                    final userData = userDoc.data();
+                    final fullname = userData?['fullname'] ?? '알 수 없는 사용자';
+                    // "이름 없음" 부분을 실제 이름으로 대체
+                    messageText = messageText.replaceAll('이름 없음', fullname);
+                  } else {
+                    print('사용자 문서가 존재하지 않음: $userId');
+                  }
+                } catch (e) {
+                  print('시스템 메시지 사용자 이름 조회 오류: $e');
+                }
+              } else {
+                print('시스템 메시지에 userId가 없음');
+              }
+              
+              // 디버깅을 위한 로그 추가
+              print('시스템 메시지 데이터: ${data.toString()}');
+              print('처리된 메시지 텍스트: $messageText');
             }
 
             messageList.add({
               'id': doc.id,
-              'text': data['text'] ?? '',
+              'text': messageText,
               'senderId': senderId,
               'senderName': senderName,
               'timestamp': data['timestamp'],
               'type': data['type'] ?? 'user',
+              'userId': data['userId'], // 시스템 메시지에서 사용자 ID 저장
             });
           }
 
           setState(() {
             _messages = messageList;
+          });
+          
+          // 새 메시지가 추가될 때마다 스크롤을 아래로 이동
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            _scrollToBottom();
           });
         });
   }
@@ -189,6 +261,9 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
     final user = _auth.currentUser;
     final displayName = user?.displayName ?? '알 수 없는 사용자';
 
+    // 메시지 전송 전에 텍스트 필드 초기화
+    _messageController.clear();
+
     final message = {
       'text': messageText,
       'senderId': _currentUserId,
@@ -211,8 +286,11 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
 
       // 다른 멤버들에게 알림 전송
       await _sendNotificationToOtherMembers(messageText);
-
-      _messageController.clear();
+      
+      // 메시지 전송 후 스크롤을 아래로 이동
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _scrollToBottom();
+      });
     } catch (e) {
       print('Error sending message: $e');
     }
@@ -230,179 +308,226 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
 
     return Scaffold(
       backgroundColor: backgroundColor,
+      resizeToAvoidBottomInset: true,
       appBar: AppBar(
         backgroundColor: accentColor,
         title: Text(widget.chatRoomName, style: TextStyle(color: Colors.white)),
         automaticallyImplyLeading: true,
       ),
-      body: Column(
-        children: [
-          Expanded(
-            child: ListView.builder(
-              padding: EdgeInsets.all(16),
-              itemCount: _messages.length,
-              itemBuilder: (context, index) {
-                final message = _messages[index];
-                final isMe = message['senderId'] == _currentUserId;
-                final isSystem =
-                    message['senderId'] == 'system' ||
-                    message['type'] == 'system';
-                final timestamp = message['timestamp'] as Timestamp?;
-                final formattedTime = _formatTimestamp(timestamp);
+      body: SafeArea(
+        child: Column(
+          children: [
+            Expanded(
+              child: GestureDetector(
+                onTap: () {
+                  // 키보드를 닫기 위해 포커스를 해제
+                  FocusScope.of(context).unfocus();
+                },
+                child: ListView.builder(
+                  controller: _scrollController,
+                  padding: EdgeInsets.only(left: 16, right: 16, top: 16, bottom: 8),
+                  itemCount: _messages.length,
+                  itemBuilder: (context, index) {
+                    final message = _messages[index];
+                    final isMe = message['senderId'] == _currentUserId;
+                    final isSystem =
+                        message['senderId'] == 'system' ||
+                        message['type'] == 'system';
+                    final timestamp = message['timestamp'] as Timestamp?;
+                    final formattedTime = _formatTimestamp(timestamp);
 
-                if (isSystem) {
-                  // 시스템 메시지 UI
-                  return Center(
-                    child: Container(
-                      margin: EdgeInsets.symmetric(vertical: 10),
-                      padding: EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        color: systemMessageColor,
-                        borderRadius: BorderRadius.circular(15),
-                      ),
-                      child: Text(
-                        message['text'],
-                        style: TextStyle(
-                          color: isDarkMode ? Colors.white70 : Colors.black87,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ),
-                  );
-                }
-
-                return Column(
-                  crossAxisAlignment:
-                      isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-                  children: [
-                    if (!isMe)
-                      Padding(
-                        padding: const EdgeInsets.only(left: 8.0, bottom: 2.0),
-                        child: Text(
-                          message['senderName'] ?? '알 수 없는 사용자',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: isDarkMode ? Colors.white70 : Colors.black54,
+                    if (isSystem) {
+                      // 시스템 메시지 UI
+                      return Center(
+                        child: Container(
+                          margin: EdgeInsets.symmetric(vertical: 10),
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: systemMessageColor,
+                            borderRadius: BorderRadius.circular(15),
+                          ),
+                          child: Text(
+                            message['text'],
+                            style: TextStyle(
+                              color: isDarkMode ? Colors.white70 : Colors.black87,
+                              fontSize: 12,
+                            ),
                           ),
                         ),
-                      ),
-                    Row(
-                      mainAxisAlignment:
-                          isMe
-                              ? MainAxisAlignment.end
-                              : MainAxisAlignment.start,
-                      crossAxisAlignment: CrossAxisAlignment.end,
+                      );
+                    }
+
+                    return Column(
+                      crossAxisAlignment:
+                          isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
                       children: [
                         if (!isMe)
-                          Container(
-                            margin: EdgeInsets.only(right: 4),
-                            child: CircleAvatar(
-                              radius: 16,
-                              backgroundColor: Colors.grey[400],
-                              child: Text(
-                                (message['senderName'] ?? '?')
-                                    .substring(0, 1)
-                                    .toUpperCase(),
-                                style: TextStyle(color: Colors.white),
+                          Padding(
+                            padding: const EdgeInsets.only(left: 8.0, bottom: 2.0),
+                            child: Text(
+                              message['senderName'] ?? '알 수 없는 사용자',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: isDarkMode ? Colors.white70 : Colors.black54,
                               ),
                             ),
                           ),
-                        Flexible(
-                          child: Container(
-                            margin: EdgeInsets.only(top: 2, bottom: 2),
-                            padding: EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 10,
-                            ),
-                            decoration: BoxDecoration(
-                              color: isMe ? accentColor : messageColor,
-                              borderRadius: BorderRadius.circular(20),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.1),
-                                  blurRadius: 4,
-                                  offset: Offset(0, 2),
+                        Container(
+                          margin: EdgeInsets.only(
+                            bottom: isMe ? 4 : 8,
+                            right: isMe ? 0 : 0,
+                            left: isMe ? 0 : 0,
+                          ),
+                          child: Row(
+                            mainAxisAlignment:
+                                isMe
+                                    ? MainAxisAlignment.end
+                                    : MainAxisAlignment.start,
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              if (!isMe)
+                                Container(
+                                  margin: EdgeInsets.only(right: 4),
+                                  child: CircleAvatar(
+                                    radius: 16,
+                                    backgroundColor: Colors.grey[400],
+                                    child: Text(
+                                      (message['senderName'] ?? '?')
+                                          .substring(0, 1)
+                                          .toUpperCase(),
+                                      style: TextStyle(color: Colors.white),
+                                    ),
+                                  ),
                                 ),
-                              ],
-                            ),
-                            child: Text(
-                              message['text'],
-                              style: TextStyle(
-                                color: isMe ? Colors.white : textColor,
+                              if (isMe && formattedTime.isNotEmpty)
+                                Padding(
+                                  padding: EdgeInsets.only(right: 2, bottom: 2),
+                                  child: Text(
+                                    formattedTime,
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      color:
+                                          isDarkMode
+                                              ? Colors.white54
+                                              : Colors.black54,
+                                    ),
+                                  ),
+                                ),
+                              if (isMe)
+                                SizedBox(width: 40), // 자신의 메시지를 오른쪽으로 더 밀기 위한 공간
+                              Flexible(
+                                child: Container(
+                                  margin: EdgeInsets.only(
+                                    top: 2, 
+                                    bottom: 2,
+                                    left: isMe ? 0 : 4,
+                                    right: isMe ? 0 : 0,
+                                  ),
+                                  padding: EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 10,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: isMe ? accentColor : messageColor,
+                                    borderRadius: BorderRadius.circular(20),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withOpacity(0.1),
+                                        blurRadius: 4,
+                                        offset: Offset(0, 2),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Text(
+                                    message['text'],
+                                    style: TextStyle(
+                                      color: isMe ? Colors.white : textColor,
+                                    ),
+                                  ),
+                                ),
                               ),
-                            ),
+                              if (!isMe && formattedTime.isNotEmpty)
+                                Padding(
+                                  padding: EdgeInsets.only(left: 2, bottom: 2),
+                                  child: Text(
+                                    formattedTime,
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      color:
+                                          isDarkMode
+                                              ? Colors.white54
+                                              : Colors.black54,
+                                    ),
+                                  ),
+                                ),
+                            ],
                           ),
                         ),
-                        if (formattedTime.isNotEmpty)
-                          Padding(
-                            padding: EdgeInsets.only(left: 4, bottom: 4),
-                            child: Text(
-                              formattedTime,
-                              style: TextStyle(
-                                fontSize: 10,
-                                color:
-                                    isDarkMode
-                                        ? Colors.white54
-                                        : Colors.black54,
-                              ),
-                            ),
-                          ),
                       ],
-                    ),
-                  ],
-                );
-              },
-            ),
-          ),
-          Container(
-            padding: EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: isDarkMode ? Color(0xFF1E1E1E) : Colors.white,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
-                  blurRadius: 4,
-                  offset: Offset(0, -2),
+                    );
+                  },
                 ),
-              ],
+              ),
             ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _messageController,
-                    decoration: InputDecoration(
-                      hintText: '메시지를 입력하세요...',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(25),
-                        borderSide: BorderSide.none,
-                      ),
-                      filled: true,
-                      fillColor:
-                          isDarkMode ? Colors.grey[800] : Colors.grey[200],
-                      contentPadding: EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 8,
-                      ),
-                    ),
-                    style: TextStyle(color: textColor),
+            Container(
+              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: isDarkMode ? Color(0xFF1E1E1E) : Colors.white,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 4,
+                    offset: Offset(0, -2),
                   ),
-                ),
-                SizedBox(width: 8),
-                CircleAvatar(
-                  backgroundColor: accentColor,
-                  child: IconButton(
-                    icon: Icon(Icons.send, color: Colors.white),
-                    onPressed: _sendMessage,
+                ],
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _messageController,
+                      focusNode: _focusNode,
+                      decoration: InputDecoration(
+                        hintText: '메시지를 입력하세요...',
+                        hintStyle: TextStyle(
+                          color: isDarkMode ? Colors.white70 : Colors.grey[600],
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(25),
+                          borderSide: BorderSide.none,
+                        ),
+                        filled: true,
+                        fillColor:
+                            isDarkMode ? Colors.grey[800] : Colors.grey[200],
+                        contentPadding: EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 4,
+                        ),
+                        isDense: true,
+                      ),
+                      style: TextStyle(color: textColor),
+                      onTap: () {
+                        // 텍스트 필드 터치 시 즉시 스크롤을 아래로 이동
+                        _scrollToBottom();
+                      },
+                    ),
                   ),
-                ),
-              ],
+                  SizedBox(width: 8),
+                  CircleAvatar(
+                    backgroundColor: accentColor,
+                    child: IconButton(
+                      icon: Icon(Icons.send, color: Colors.white),
+                      onPressed: _sendMessage,
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -410,6 +535,9 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
   @override
   void dispose() {
     _messageController.dispose();
+    _scrollController.dispose();
+    _focusNode.dispose();
+    WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 }
