@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'dart:async'; // StreamSubscription을 위해 추가
 
 class ChatRoomPage extends StatefulWidget {
   final String chatRoomId;
@@ -11,11 +12,12 @@ class ChatRoomPage extends StatefulWidget {
   final String chatRoomCollection;
 
   const ChatRoomPage({
-    Key? key,
+    super.key,
     required this.chatRoomId,
     required this.chatRoomName,
-    this.chatRoomCollection = 'psuToAirport',
-  }) : super(key: key);
+
+  });
+
 
   @override
   _ChatRoomPageState createState() => _ChatRoomPageState();
@@ -30,8 +32,10 @@ class _ChatRoomPageState extends State<ChatRoomPage>
   final FocusNode _focusNode = FocusNode();
   String? _currentUserId;
   List<Map<String, dynamic>> _messages = [];
-  Map<String, String> _userNames = {};
+  final Map<String, String> _userNames = {};
   List<String> _roomMembers = [];
+  bool _disposed = false; // 위젯 dispose 상태 체크
+  StreamSubscription? _messageSubscription; // 메시지 스트림 구독 관리
 
   @override
   void initState() {
@@ -50,6 +54,13 @@ class _ChatRoomPageState extends State<ChatRoomPage>
         _scrollToBottom();
       }
     });
+  }
+
+  @override
+  void setState(VoidCallback fn) {
+    if (!_disposed && mounted) {
+      super.setState(fn);
+    }
   }
 
   @override
@@ -120,13 +131,18 @@ class _ChatRoomPageState extends State<ChatRoomPage>
   }
 
   void _loadMessages() {
-    _firestore
-        .collection(widget.chatRoomCollection)
+
+    _messageSubscription?.cancel(); // 기존 구독 취소
+
+    _messageSubscription = _firestore
+        .collection('psuToAirport')
         .doc(widget.chatRoomId)
         .collection('messages')
         .orderBy('timestamp', descending: false)
         .snapshots()
         .listen((snapshot) async {
+          if (!mounted || _disposed) return; // 위젯이 dispose된 경우 리턴
+
           final List<Map<String, dynamic>> messageList = [];
 
           for (var doc in snapshot.docs) {
@@ -152,7 +168,6 @@ class _ChatRoomPageState extends State<ChatRoomPage>
             // 시스템 메시지인 경우 텍스트에서 사용자 이름을 실제 이름으로 대체
             String messageText = data['text'] ?? '';
             if (senderId == 'system' && messageText.contains('님이 그룹에 참여했습니다')) {
-              // 메시지에서 사용자 ID 추출
               final userId = data['userId'] ?? '';
               if (userId.isNotEmpty) {
                 try {
@@ -161,21 +176,17 @@ class _ChatRoomPageState extends State<ChatRoomPage>
                   if (userDoc.exists) {
                     final userData = userDoc.data();
                     final fullname = userData?['fullname'] ?? '알 수 없는 사용자';
-                    // "이름 없음" 부분을 실제 이름으로 대체
                     messageText = messageText.replaceAll('이름 없음', fullname);
-                  } else {
-                    print('사용자 문서가 존재하지 않음: $userId');
                   }
                 } catch (e) {
                   print('시스템 메시지 사용자 이름 조회 오류: $e');
                 }
-              } else {
-                print('시스템 메시지에 userId가 없음');
               }
 
               // 디버깅을 위한 로그 추가
               print('시스템 메시지 데이터: ${data.toString()}');
               print('처리된 메시지 텍스트: $messageText');
+
             }
 
             messageList.add({
@@ -185,20 +196,24 @@ class _ChatRoomPageState extends State<ChatRoomPage>
               'senderName': senderName,
               'timestamp': data['timestamp'],
               'type': data['type'] ?? 'user',
-              'userId': data['userId'], // 시스템 메시지에서 사용자 ID 저장
+              'userId': data['userId'],
             });
           }
 
-          setState(() {
-            _messages = messageList;
-          });
 
-          // 새 메시지가 추가될 때마다 스크롤을 아래로 이동
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            _scrollToBottom();
-          });
-        });
-  }
+          if (mounted && !_disposed) {
+            setState(() {
+              _messages = messageList;
+            });
+
+            // 새 메시지가 추가될 때마다 스크롤을 아래로 이동
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted && !_disposed) {
+                _scrollToBottom();
+              }
+            });
+          }
+
 
   String _formatTimestamp(Timestamp? timestamp) {
     if (timestamp == null) return '';
@@ -418,9 +433,9 @@ class _ChatRoomPageState extends State<ChatRoomPage>
                                     radius: 16,
                                     backgroundColor: Colors.grey[400],
                                     child: Text(
-                                      (message['senderName'] ?? '?')
-                                          .substring(0, 1)
-                                          .toUpperCase(),
+                                      _getInitials(
+                                        message['senderName'] ?? '?',
+                                      ),
                                       style: TextStyle(color: Colors.white),
                                     ),
                                   ),
@@ -559,10 +574,18 @@ class _ChatRoomPageState extends State<ChatRoomPage>
 
   @override
   void dispose() {
+    _disposed = true;
+    _messageSubscription?.cancel(); // 메시지 스트림 구독 취소
     _messageController.dispose();
     _scrollController.dispose();
     _focusNode.dispose();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
+  }
+
+  // 사용자 이름의 이니셜을 반환하는 헬퍼 함수
+  String _getInitials(String name) {
+    if (name.isEmpty || name == '?') return '?';
+    return name.substring(0, 1).toUpperCase();
   }
 }
