@@ -9,7 +9,6 @@ import 'package:cabrider/screens/mainpage.dart';
 import 'package:cabrider/screens/searchpage.dart';
 import 'package:cabrider/screens/homepage.dart';
 import 'package:cabrider/screens/settings_page.dart';
-import 'package:cabrider/screens/taxi_info_page.dart';
 import 'package:cabrider/screens/rideconfirmation/rideconfirmation_page.dart';
 import 'package:cabrider/screens/email_verification_page.dart';
 import 'package:cabrider/screens/chat_room_page.dart';
@@ -199,7 +198,6 @@ class MyApp extends StatelessWidget {
         SearchPage.id: (context) => SearchPage(),
         HomePage.id: (context) => HomePage(),
         SettingsPage.id: (context) => SettingsPage(),
-        TaxiInfoPage.id: (context) => TaxiInfoPage(),
         EmailVerificationPage.id: (context) => EmailVerificationPage(email: ''),
         'rideconfirmation': (context) => RideConfirmationPage(),
       },

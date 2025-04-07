@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cabrider/screens/mainpage.dart';
 import 'package:cabrider/screens/homepage.dart';
-import 'package:cabrider/screens/taxi_info_page.dart';
+import 'package:cabrider/screens/chat_page.dart';
 import 'package:flutter/cupertino.dart';
 
 class SettingsPage extends StatefulWidget {
@@ -45,7 +45,7 @@ class _SettingsPageState extends State<SettingsPage> {
             context,
             PageRouteBuilder(
               pageBuilder:
-                  (context, animation, secondaryAnimation) => TaxiInfoPage(),
+                  (context, animation, secondaryAnimation) => ChatPage(),
               transitionDuration: Duration.zero,
               reverseTransitionDuration: Duration.zero,
             ),
