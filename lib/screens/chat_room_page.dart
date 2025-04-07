@@ -9,12 +9,15 @@ import 'dart:async'; // StreamSubscription을 위해 추가
 class ChatRoomPage extends StatefulWidget {
   final String chatRoomId;
   final String chatRoomName;
+  final String chatRoomCollection;
 
   const ChatRoomPage({
     super.key,
     required this.chatRoomId,
     required this.chatRoomName,
+
   });
+
 
   @override
   _ChatRoomPageState createState() => _ChatRoomPageState();
@@ -84,7 +87,7 @@ class _ChatRoomPageState extends State<ChatRoomPage>
     try {
       final roomDoc =
           await _firestore
-              .collection('psuToAirport')
+              .collection(widget.chatRoomCollection)
               .doc(widget.chatRoomId)
               .get();
 
@@ -128,6 +131,7 @@ class _ChatRoomPageState extends State<ChatRoomPage>
   }
 
   void _loadMessages() {
+
     _messageSubscription?.cancel(); // 기존 구독 취소
 
     _messageSubscription = _firestore
@@ -178,6 +182,11 @@ class _ChatRoomPageState extends State<ChatRoomPage>
                   print('시스템 메시지 사용자 이름 조회 오류: $e');
                 }
               }
+
+              // 디버깅을 위한 로그 추가
+              print('시스템 메시지 데이터: ${data.toString()}');
+              print('처리된 메시지 텍스트: $messageText');
+
             }
 
             messageList.add({
@@ -191,6 +200,7 @@ class _ChatRoomPageState extends State<ChatRoomPage>
             });
           }
 
+
           if (mounted && !_disposed) {
             setState(() {
               _messages = messageList;
@@ -203,8 +213,7 @@ class _ChatRoomPageState extends State<ChatRoomPage>
               }
             });
           }
-        });
-  }
+
 
   String _formatTimestamp(Timestamp? timestamp) {
     if (timestamp == null) return '';
@@ -285,15 +294,19 @@ class _ChatRoomPageState extends State<ChatRoomPage>
 
     try {
       await _firestore
-          .collection('psuToAirport')
+          .collection(widget.chatRoomCollection)
           .doc(widget.chatRoomId)
           .collection('messages')
           .add(message);
 
       // 마지막 메시지 업데이트
-      await _firestore.collection('psuToAirport').doc(widget.chatRoomId).update(
-        {'lastMessage': messageText, 'timestamp': FieldValue.serverTimestamp()},
-      );
+      await _firestore
+          .collection(widget.chatRoomCollection)
+          .doc(widget.chatRoomId)
+          .update({
+            'lastMessage': messageText,
+            'timestamp': FieldValue.serverTimestamp(),
+          });
 
       // 다른 멤버들에게 알림 전송
       await _sendNotificationToOtherMembers(messageText);

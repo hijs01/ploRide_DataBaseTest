@@ -5,6 +5,7 @@ import 'package:cabrider/screens/homepage.dart';
 import 'package:cabrider/screens/settings_page.dart';
 import 'package:cabrider/screens/chat_room_page.dart';
 import 'package:intl/intl.dart';
+import 'dart:async'; // StreamSubscription을 위한 임포트 추가
 
 class ChatPage extends StatefulWidget {
   static const String id = 'chat';
@@ -20,12 +21,22 @@ class _ChatPageState extends State<ChatPage> {
   String? _currentUserId;
   List<Map<String, dynamic>> _chatRooms = [];
   bool _isLoading = true;
+  List<StreamSubscription> _chatRoomSubscriptions = [];
 
   @override
   void initState() {
     super.initState();
     _getCurrentUser();
     _loadChatRooms();
+  }
+
+  @override
+  void dispose() {
+    // 모든 구독 취소
+    for (var subscription in _chatRoomSubscriptions) {
+      subscription.cancel();
+    }
+    super.dispose();
   }
 
   void _getCurrentUser() {
@@ -43,36 +54,248 @@ class _ChatPageState extends State<ChatPage> {
     });
 
     try {
-      final snapshot = await _firestore.collection('psuToAirport').get();
-      final chatRooms =
-          snapshot.docs.map((doc) {
-            final data = doc.data();
-            return {
-              'id': doc.id,
-              'name': doc.id.toUpperCase(),
-              'origin': data['origin'] ?? 'PSU',
-              'destination': data['destination'] ?? '공항',
-              'memberCount': data['memberCount'] ?? 1,
-              'maxMembers': data['maxMembers'] ?? 4,
-              'isConfirmed': data['isConfirmed'] ?? false,
-              'departureTime': data['departureTime'] ?? Timestamp.now(),
-              'lastMessage': data['lastMessage'] ?? '',
-              'timestamp': data['timestamp'] ?? Timestamp.now(),
-              'hasNewMessages': data['hasNewMessages'] ?? false,
-              'lastReadMessageId': data['lastReadMessageId'] ?? '',
-            };
-          }).toList();
+      if (_currentUserId == null) {
+        // 사용자 ID가 없으면 로드하지 않음
+        setState(() {
+          _isLoading = false;
+          _chatRooms = [];
+        });
+        return;
+      }
 
-      setState(() {
-        _chatRooms = chatRooms;
-        _isLoading = false;
-      });
+      // 기존 구독 취소
+      for (var subscription in _chatRoomSubscriptions) {
+        subscription.cancel();
+      }
+      _chatRoomSubscriptions.clear();
+
+      // driver_accepted가 true이거나 chat_visible이 true인 항목을 가져옴
+      final querySnapshot =
+          await _firestore
+              .collection('users')
+              .doc(_currentUserId)
+              .collection('chatRooms')
+              .get();
+
+      List<Map<String, dynamic>> userChatRooms = [];
+      List<Future<void>> processingFutures = [];
+
+      // 각 채팅방에 대한 세부 정보 로드
+      for (var doc in querySnapshot.docs) {
+        final data = doc.data();
+
+        String chatRoomCollection = data['chat_room_collection'] ?? '';
+        String chatRoomId = data['chat_room_id'] ?? '';
+
+        if (chatRoomCollection.isEmpty || chatRoomId.isEmpty) {
+          continue; // 필수 정보가 없으면 스킵
+        }
+
+        // 실시간 업데이트를 위한 스트림 설정
+        var chatRoomStream =
+            _firestore
+                .collection(chatRoomCollection)
+                .doc(chatRoomId)
+                .snapshots();
+
+        var subscription = chatRoomStream.listen((docSnapshot) {
+          if (docSnapshot.exists) {
+            _processRoomUpdate(docSnapshot, data);
+          }
+        });
+
+        _chatRoomSubscriptions.add(subscription);
+
+        // 초기 데이터도 처리
+        processingFutures.add(_processRoom(data));
+      }
+
+      // 모든 채팅방 처리 완료 대기
+      await Future.wait(processingFutures);
+
+      // 업데이트하지 않으면 로딩 상태만 변경
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     } catch (e) {
-      print('Error loading chat rooms: $e');
-      setState(() {
-        _isLoading = false;
-      });
+      print('채팅방 로드 오류: $e');
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
+  }
+
+  // 채팅방 문서 스냅샷 업데이트 처리
+  void _processRoomUpdate(
+    DocumentSnapshot docSnapshot,
+    Map<String, dynamic> userRoomData,
+  ) {
+    if (!mounted) return;
+
+    try {
+      if (!docSnapshot.exists) return;
+
+      final chatRoomData = docSnapshot.data() as Map<String, dynamic>;
+      final String chatRoomId = docSnapshot.id;
+      final String chatRoomCollection =
+          userRoomData['chat_room_collection'] ?? '';
+
+      // driver_accepted 또는 chat_visible이 true인지 확인
+      bool isVisible =
+          chatRoomData['driver_accepted'] == true ||
+          chatRoomData['chat_visible'] == true;
+
+      if (isVisible) {
+        // 채팅방 데이터 구성 및 업데이트
+        Map<String, dynamic> chatRoomInfo = _buildChatRoomInfo(
+          chatRoomId,
+          chatRoomCollection,
+          chatRoomData,
+          userRoomData,
+        );
+
+        // 기존 채팅방 목록에서 동일한 ID를 가진 채팅방이 있는지 확인
+        int existingIndex = _chatRooms.indexWhere(
+          (room) =>
+              room['id'] == chatRoomId &&
+              room['collection'] == chatRoomCollection,
+        );
+
+        setState(() {
+          if (existingIndex >= 0) {
+            // 기존 채팅방 업데이트
+            _chatRooms[existingIndex] = chatRoomInfo;
+          } else {
+            // 새 채팅방 추가
+            _chatRooms.add(chatRoomInfo);
+          }
+
+          // 출발 시간 기준으로 정렬
+          _chatRooms.sort((a, b) {
+            final aTime = (a['departureTime'] as Timestamp).toDate();
+            final bTime = (b['departureTime'] as Timestamp).toDate();
+            return aTime.compareTo(bTime);
+          });
+        });
+      } else {
+        // 표시되지 않아야 하는 채팅방은 목록에서 제거
+        setState(() {
+          _chatRooms.removeWhere(
+            (room) =>
+                room['id'] == chatRoomId &&
+                room['collection'] == chatRoomCollection,
+          );
+        });
+      }
+    } catch (e) {
+      print('채팅방 업데이트 처리 오류: $e');
+    }
+  }
+
+  // 초기 채팅방 목록 처리
+  Future<void> _processRoom(Map<String, dynamic> userRoomData) async {
+    try {
+      String chatRoomCollection = userRoomData['chat_room_collection'] ?? '';
+      String chatRoomId = userRoomData['chat_room_id'] ?? '';
+
+      // 원본 채팅방 정보 가져오기
+      final chatRoomDoc =
+          await _firestore.collection(chatRoomCollection).doc(chatRoomId).get();
+
+      if (chatRoomDoc.exists) {
+        final chatRoomData = chatRoomDoc.data() as Map<String, dynamic>;
+
+        // driver_accepted 또는 chat_visible이 true인지 확인
+        bool isVisible =
+            chatRoomData['driver_accepted'] == true ||
+            chatRoomData['chat_visible'] == true;
+
+        if (isVisible) {
+          // 채팅방 데이터 구성
+          Map<String, dynamic> chatRoomInfo = _buildChatRoomInfo(
+            chatRoomId,
+            chatRoomCollection,
+            chatRoomData,
+            userRoomData,
+          );
+
+          if (mounted) {
+            setState(() {
+              // 기존에 같은 ID를 가진 채팅방이 있는지 확인하고 업데이트 또는 추가
+              int existingIndex = _chatRooms.indexWhere(
+                (room) =>
+                    room['id'] == chatRoomId &&
+                    room['collection'] == chatRoomCollection,
+              );
+
+              if (existingIndex >= 0) {
+                _chatRooms[existingIndex] = chatRoomInfo;
+              } else {
+                _chatRooms.add(chatRoomInfo);
+              }
+
+              // 출발 시간 기준으로 정렬
+              _chatRooms.sort((a, b) {
+                final aTime = (a['departureTime'] as Timestamp).toDate();
+                final bTime = (b['departureTime'] as Timestamp).toDate();
+                return aTime.compareTo(bTime);
+              });
+            });
+          }
+        }
+      }
+    } catch (e) {
+      print('채팅방 세부 정보 로드 오류: $e');
+    }
+  }
+
+  // 채팅방 정보 구성 헬퍼 함수
+  Map<String, dynamic> _buildChatRoomInfo(
+    String chatRoomId,
+    String chatRoomCollection,
+    Map<String, dynamic> chatRoomData,
+    Map<String, dynamic> userRoomData,
+  ) {
+    // 기본 채팅방 데이터 구성
+    Map<String, dynamic> chatRoomInfo = {
+      'id': chatRoomId,
+      'collection': chatRoomCollection,
+      'name': chatRoomId.split('_').first.toUpperCase(), // ID의 첫 부분을 대문자로
+      'origin': chatRoomCollection == 'psuToAirport' ? 'PSU' : '공항',
+      'destination': chatRoomCollection == 'psuToAirport' ? '공항' : 'PSU',
+      'memberCount': chatRoomData['member_count'] ?? 0,
+      'maxMembers': 4,
+      'isConfirmed': chatRoomData['driver_accepted'] ?? false,
+      'departureTime': chatRoomData['ride_date_timestamp'] ?? Timestamp.now(),
+      'lastMessage': chatRoomData['last_message'] ?? '',
+      'timestamp': chatRoomData['last_message_time'] ?? Timestamp.now(),
+      'hasNewMessages': false, // 기본값
+      'chat_visible':
+          chatRoomData['chat_visible'] ?? userRoomData['chat_visible'] ?? false,
+      'driver_accepted':
+          chatRoomData['driver_accepted'] ??
+          userRoomData['driver_accepted'] ??
+          false,
+    };
+
+    // 출발지와 목적지 정보 설정
+    if (chatRoomData.containsKey('pickup_info') &&
+        chatRoomData.containsKey('destination_info')) {
+      final pickupInfo = chatRoomData['pickup_info'] as Map<String, dynamic>;
+      final destInfo = chatRoomData['destination_info'] as Map<String, dynamic>;
+
+      String pickupAddress = pickupInfo['address'] as String? ?? '출발지';
+      String destAddress = destInfo['address'] as String? ?? '목적지';
+
+      chatRoomInfo['origin'] = pickupAddress;
+      chatRoomInfo['destination'] = destAddress;
+    }
+
+    return chatRoomInfo;
   }
 
   void _onItemTapped(int index) {
@@ -214,6 +437,11 @@ class _ChatPageState extends State<ChatPage> {
     final formattedDate = DateFormat('M월 d일').format(departureTime);
     final formattedTime = DateFormat('HH:mm').format(departureTime);
 
+    // 채팅방이 보이지 않아야 하는 경우 빈 컨테이너 반환 (쿼리에서 이미 필터링됨)
+    // if (!(chatRoom['driver_accepted'] == true || chatRoom['chat_visible'] == true)) {
+    //   return Container();
+    // }
+
     return Card(
       margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       elevation: 2,
@@ -229,6 +457,7 @@ class _ChatPageState extends State<ChatPage> {
                   (context) => ChatRoomPage(
                     chatRoomId: chatRoom['id'],
                     chatRoomName: chatRoom['name'],
+                    chatRoomCollection: chatRoom['collection'],
                   ),
             ),
           );
@@ -303,17 +532,45 @@ class _ChatPageState extends State<ChatPage> {
               SizedBox(height: 12),
 
               // 경로 정보
-              Row(
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(Icons.location_on, color: accentColor, size: 20),
-                  SizedBox(width: 8),
-                  Text(
-                    '${chatRoom['origin']} → ${chatRoom['destination']}',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: textColor,
-                    ),
+                  Row(
+                    children: [
+                      Icon(Icons.trip_origin, color: accentColor, size: 18),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          '출발: ${chatRoom['origin']}',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: textColor,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Icon(Icons.location_on, color: accentColor, size: 18),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          '도착: ${chatRoom['destination']}',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: textColor,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
