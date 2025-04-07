@@ -8,18 +8,21 @@ import 'dart:convert';
 class ChatRoomPage extends StatefulWidget {
   final String chatRoomId;
   final String chatRoomName;
+  final String chatRoomCollection;
 
   const ChatRoomPage({
     Key? key,
     required this.chatRoomId,
     required this.chatRoomName,
+    this.chatRoomCollection = 'psuToAirport',
   }) : super(key: key);
 
   @override
   _ChatRoomPageState createState() => _ChatRoomPageState();
 }
 
-class _ChatRoomPageState extends State<ChatRoomPage> with WidgetsBindingObserver {
+class _ChatRoomPageState extends State<ChatRoomPage>
+    with WidgetsBindingObserver {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final TextEditingController _messageController = TextEditingController();
@@ -36,10 +39,10 @@ class _ChatRoomPageState extends State<ChatRoomPage> with WidgetsBindingObserver
     _getCurrentUser();
     _loadMessages();
     _loadRoomMembers();
-    
+
     // 키보드 상태 변경 감지를 위해 observer 등록
     WidgetsBinding.instance.addObserver(this);
-    
+
     // 포커스 변경 감지
     _focusNode.addListener(() {
       if (_focusNode.hasFocus) {
@@ -73,7 +76,7 @@ class _ChatRoomPageState extends State<ChatRoomPage> with WidgetsBindingObserver
     try {
       final roomDoc =
           await _firestore
-              .collection('psuToAirport')
+              .collection(widget.chatRoomCollection)
               .doc(widget.chatRoomId)
               .get();
 
@@ -118,7 +121,7 @@ class _ChatRoomPageState extends State<ChatRoomPage> with WidgetsBindingObserver
 
   void _loadMessages() {
     _firestore
-        .collection('psuToAirport')
+        .collection(widget.chatRoomCollection)
         .doc(widget.chatRoomId)
         .collection('messages')
         .orderBy('timestamp', descending: false)
@@ -134,7 +137,8 @@ class _ChatRoomPageState extends State<ChatRoomPage> with WidgetsBindingObserver
             // 시스템 메시지가 아닌 경우 사용자 이름 가져오기
             if (senderId != 'system') {
               try {
-                final userDoc = await _firestore.collection('users').doc(senderId).get();
+                final userDoc =
+                    await _firestore.collection('users').doc(senderId).get();
                 if (userDoc.exists) {
                   final userData = userDoc.data();
                   senderName = userData?['fullname'] ?? '알 수 없는 사용자';
@@ -152,7 +156,8 @@ class _ChatRoomPageState extends State<ChatRoomPage> with WidgetsBindingObserver
               final userId = data['userId'] ?? '';
               if (userId.isNotEmpty) {
                 try {
-                  final userDoc = await _firestore.collection('users').doc(userId).get();
+                  final userDoc =
+                      await _firestore.collection('users').doc(userId).get();
                   if (userDoc.exists) {
                     final userData = userDoc.data();
                     final fullname = userData?['fullname'] ?? '알 수 없는 사용자';
@@ -167,7 +172,7 @@ class _ChatRoomPageState extends State<ChatRoomPage> with WidgetsBindingObserver
               } else {
                 print('시스템 메시지에 userId가 없음');
               }
-              
+
               // 디버깅을 위한 로그 추가
               print('시스템 메시지 데이터: ${data.toString()}');
               print('처리된 메시지 텍스트: $messageText');
@@ -187,7 +192,7 @@ class _ChatRoomPageState extends State<ChatRoomPage> with WidgetsBindingObserver
           setState(() {
             _messages = messageList;
           });
-          
+
           // 새 메시지가 추가될 때마다 스크롤을 아래로 이동
           WidgetsBinding.instance.addPostFrameCallback((_) {
             _scrollToBottom();
@@ -274,19 +279,23 @@ class _ChatRoomPageState extends State<ChatRoomPage> with WidgetsBindingObserver
 
     try {
       await _firestore
-          .collection('psuToAirport')
+          .collection(widget.chatRoomCollection)
           .doc(widget.chatRoomId)
           .collection('messages')
           .add(message);
 
       // 마지막 메시지 업데이트
-      await _firestore.collection('psuToAirport').doc(widget.chatRoomId).update(
-        {'lastMessage': messageText, 'timestamp': FieldValue.serverTimestamp()},
-      );
+      await _firestore
+          .collection(widget.chatRoomCollection)
+          .doc(widget.chatRoomId)
+          .update({
+            'lastMessage': messageText,
+            'timestamp': FieldValue.serverTimestamp(),
+          });
 
       // 다른 멤버들에게 알림 전송
       await _sendNotificationToOtherMembers(messageText);
-      
+
       // 메시지 전송 후 스크롤을 아래로 이동
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _scrollToBottom();
@@ -325,7 +334,12 @@ class _ChatRoomPageState extends State<ChatRoomPage> with WidgetsBindingObserver
                 },
                 child: ListView.builder(
                   controller: _scrollController,
-                  padding: EdgeInsets.only(left: 16, right: 16, top: 16, bottom: 8),
+                  padding: EdgeInsets.only(
+                    left: 16,
+                    right: 16,
+                    top: 16,
+                    bottom: 8,
+                  ),
                   itemCount: _messages.length,
                   itemBuilder: (context, index) {
                     final message = _messages[index];
@@ -352,7 +366,8 @@ class _ChatRoomPageState extends State<ChatRoomPage> with WidgetsBindingObserver
                           child: Text(
                             message['text'],
                             style: TextStyle(
-                              color: isDarkMode ? Colors.white70 : Colors.black87,
+                              color:
+                                  isDarkMode ? Colors.white70 : Colors.black87,
                               fontSize: 12,
                             ),
                           ),
@@ -362,16 +377,24 @@ class _ChatRoomPageState extends State<ChatRoomPage> with WidgetsBindingObserver
 
                     return Column(
                       crossAxisAlignment:
-                          isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                          isMe
+                              ? CrossAxisAlignment.end
+                              : CrossAxisAlignment.start,
                       children: [
                         if (!isMe)
                           Padding(
-                            padding: const EdgeInsets.only(left: 8.0, bottom: 2.0),
+                            padding: const EdgeInsets.only(
+                              left: 8.0,
+                              bottom: 2.0,
+                            ),
                             child: Text(
                               message['senderName'] ?? '알 수 없는 사용자',
                               style: TextStyle(
                                 fontSize: 12,
-                                color: isDarkMode ? Colors.white70 : Colors.black54,
+                                color:
+                                    isDarkMode
+                                        ? Colors.white70
+                                        : Colors.black54,
                               ),
                             ),
                           ),
@@ -417,11 +440,13 @@ class _ChatRoomPageState extends State<ChatRoomPage> with WidgetsBindingObserver
                                   ),
                                 ),
                               if (isMe)
-                                SizedBox(width: 40), // 자신의 메시지를 오른쪽으로 더 밀기 위한 공간
+                                SizedBox(
+                                  width: 40,
+                                ), // 자신의 메시지를 오른쪽으로 더 밀기 위한 공간
                               Flexible(
                                 child: Container(
                                   margin: EdgeInsets.only(
-                                    top: 2, 
+                                    top: 2,
                                     bottom: 2,
                                     left: isMe ? 0 : 4,
                                     right: isMe ? 0 : 0,
