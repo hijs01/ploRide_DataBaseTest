@@ -1135,13 +1135,13 @@ class _RideConfirmationPageState extends State<RideConfirmationPage>
                   'luggage_count_total': FieldValue.increment(luggageCount),
                 };
 
-                // 4명이 모이면 드라이버 앱에 표시 가능하도록 설정
-                if (members.length + 1 >= 4) {
+                // 1명이 모이면 드라이버 앱에 표시 가능하도록 설정
+                if (members.length + 1 >= 1) {
                   // 기존 멤버 + 현재 추가된 사용자
                   updateData['available_for_driver'] = true;
 
                   // 로그 추가
-                  print('4명이 모였습니다. 드라이버 앱에 표시됩니다.');
+                  print('1명이 모였습니다. 드라이버 앱에 표시됩니다.');
                 }
 
                 // 채팅방 업데이트
@@ -1239,25 +1239,13 @@ class _RideConfirmationPageState extends State<RideConfirmationPage>
           print('드라이버 수락을 기다리는 중입니다.');
         }
 
-        // Firestore에 라이드 요청 저장 (채팅방 정보 포함)
-        rideMap['chat_room_collection'] = chatRoomCollection;
-        rideMap['chat_room_id'] = chatRoomId;
-        rideMap['chat_room_path'] = userChatRoomPath;
-        rideMap['driver_accepted'] = chatRoomData['driver_accepted'] ?? false;
-        rideMap['driver_id'] = chatRoomData['driver_id'] ?? '';
+        return; // 모든 작업 완료
 
-        DocumentReference rideRef = await FirebaseFirestore.instance
-            .collection('rideRequests')
-            .add(rideMap)
-            .timeout(Duration(seconds: 5));
-
-        print('라이드 요청 생성 성공: ${rideRef.id}');
       } catch (e) {
-        print('사용자 정보 또는 라이드 요청 저장 중 오류: $e');
+        print('사용자 정보 저장 중 오류: $e');
         throw Exception('예약 정보 저장 중 오류가 발생했습니다. 네트워크 연결을 확인해주세요.');
       }
 
-      return; // 모든 작업 완료
     } catch (e) {
       print('_processRide 오류: $e');
       String errorMessage = '예약 처리 중 오류가 발생했습니다';
