@@ -38,6 +38,8 @@ class _ChatRoomPageState extends State<ChatRoomPage>
   List<QueryDocumentSnapshot> _messages = [];
   Map<String, String> _userNames = {};
   List<String> _roomMembers = [];
+  String? _pickupAddress;
+  String? _destinationAddress;
 
   @override
   void initState() {
@@ -45,6 +47,7 @@ class _ChatRoomPageState extends State<ChatRoomPage>
     _getCurrentUser();
     _loadMessages();
     _loadRoomMembers();
+    _loadChatRoomData();
 
     // 키보드 상태 변경 감지를 위해 observer 등록
     WidgetsBinding.instance.addObserver(this);
@@ -100,6 +103,10 @@ class _ChatRoomPageState extends State<ChatRoomPage>
   }
 
   Future<String> _getUserName(String userId) async {
+    if (userId.isEmpty) {
+      return '알 수 없는 사용자';
+    }
+    
     if (_userNames.containsKey(userId)) {
       return _userNames[userId]!;
     }
@@ -141,11 +148,11 @@ class _ChatRoomPageState extends State<ChatRoomPage>
 
           for (var doc in snapshot.docs) {
             final data = doc.data() as Map<String, dynamic>;
-            final senderId = data['sender_id'] ?? data['sender_id'] ?? '';
+            final senderId = data['sender_id'] ?? '';
             String senderName = '';
 
             // 시스템 메시지가 아닌 경우에만 사용자 이름 가져오기
-            if (senderId != 'system') {
+            if (senderId != 'system' && senderId.isNotEmpty) {
               try {
                 final userDoc =
                     await _firestore.collection('users').doc(senderId).get();
@@ -307,7 +314,7 @@ class _ChatRoomPageState extends State<ChatRoomPage>
       resizeToAvoidBottomInset: true,
       appBar: AppBar(
         backgroundColor: accentColor,
-        title: Text(widget.chatRoomName, style: TextStyle(color: Colors.white)),
+        title: _buildAppBarTitle(),
         automaticallyImplyLeading: true,
       ),
       body: SafeArea(
@@ -372,18 +379,17 @@ class _ChatRoomPageState extends State<ChatRoomPage>
                         if (!isMe)
                           Padding(
                             padding: const EdgeInsets.only(
-                              left: 8.0,
-                              bottom: 2.0,
+                              left: 5.0,
+                              bottom: 1.0,
+                              top: 4.0,
                             ),
                             child: Text(
                               messageData['sender_name'] ?? '알 수 없는 사용자',
                               style: TextStyle(
                                 fontSize: 12,
-                                color:
-                                    isDarkMode
-                                        ? Colors.white70
-                                        : Colors.black54,
+                                color: isDarkMode ? Colors.white70 : Colors.black54,
                               ),
+                              textAlign: TextAlign.left,
                             ),
                           ),
                         Container(
@@ -405,15 +411,29 @@ class _ChatRoomPageState extends State<ChatRoomPage>
                                   child: CircleAvatar(
                                     radius: 16,
                                     backgroundColor: Colors.grey[400],
-                                    child: Text(
-                                      (messageData['sender_name'] ?? '?')
-                                          .substring(0, 1)
-                                          .toUpperCase(),
-                                      style: TextStyle(color: Colors.white),
+                                    child: FittedBox(
+                                      fit: BoxFit.scaleDown,
+                                      child: Center(
+                                        child: Padding(
+                                          padding: EdgeInsets.all(4),
+                                          child: Text(
+                                            (messageData['sender_name'] ?? '?')
+                                                .substring(0, 1)
+                                                .toUpperCase(),
+                                            style: TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w600,
+                                              height: 1,
+                                            ),
+                                            textAlign: TextAlign.center,
+                                          ),
+                                        ),
+                                      ),
                                     ),
                                   ),
                                 ),
-                              if (isMe && formattedTime.isNotEmpty)
+                              if (isMe)
                                 Padding(
                                   padding: EdgeInsets.only(right: 2, bottom: 2),
                                   child: Text(
@@ -427,17 +447,13 @@ class _ChatRoomPageState extends State<ChatRoomPage>
                                     ),
                                   ),
                                 ),
-                              if (isMe)
-                                SizedBox(
-                                  width: 40,
-                                ), // 자신의 메시지를 오른쪽으로 더 밀기 위한 공간
                               Flexible(
                                 child: Container(
                                   margin: EdgeInsets.only(
                                     top: 2,
                                     bottom: 2,
                                     left: isMe ? 0 : 4,
-                                    right: isMe ? 0 : 0,
+                                    right: isMe ? 0 : 4,
                                   ),
                                   padding: EdgeInsets.symmetric(
                                     horizontal: 16,
@@ -462,7 +478,7 @@ class _ChatRoomPageState extends State<ChatRoomPage>
                                   ),
                                 ),
                               ),
-                              if (!isMe && formattedTime.isNotEmpty)
+                              if (!isMe)
                                 Padding(
                                   padding: EdgeInsets.only(left: 2, bottom: 2),
                                   child: Text(
@@ -589,5 +605,92 @@ class _ChatRoomPageState extends State<ChatRoomPage>
       _messages = messages;
       _isLoading = false;
     });
+  }
+
+  // 채팅방 데이터 로드
+  Future<void> _loadChatRoomData() async {
+    try {
+      final roomDoc = await _firestore
+          .collection(widget.chatRoomCollection)
+          .doc(widget.chatRoomId)
+          .get();
+
+      if (roomDoc.exists) {
+        final data = roomDoc.data();
+        if (data != null) {
+          setState(() {
+            _chatRoomData = data;
+            
+            // 픽업 정보와 목적지 정보 가져오기
+            if (data.containsKey('pickup_info')) {
+              final pickupInfo = data['pickup_info'] as Map<String, dynamic>;
+              _pickupAddress = pickupInfo['address'] as String?;
+            }
+            
+            if (data.containsKey('destination_info')) {
+              final destInfo = data['destination_info'] as Map<String, dynamic>;
+              _destinationAddress = destInfo['address'] as String?;
+            }
+          });
+        }
+      }
+    } catch (e) {
+      print('Error loading chat room data: $e');
+    }
+  }
+
+  Widget _buildAppBarTitle() {
+    // 채팅방 이름에서 출발지와 목적지를 추출
+    String departure = '';
+    String destination = '';
+    
+    // '_'로 분리 시도
+    List<String> parts = widget.chatRoomName.split('_');
+    
+    if (parts.length >= 2) {
+      // '_'로 분리된 경우
+      departure = parts[0];
+      destination = parts[1];
+    } else {
+      // '_'로 분리되지 않은 경우
+      // 채팅방 컬렉션에 따라 기본값 설정
+      if (widget.chatRoomCollection == 'psuToAirport') {
+        departure = _pickupAddress ?? 'PSU';
+        destination = _destinationAddress ?? '공항';
+      } else if (widget.chatRoomCollection == 'airportToPsu') {
+        departure = _pickupAddress ?? '공항';
+        destination = _destinationAddress ?? 'PSU';
+      } else {
+        // 기본값
+        departure = _pickupAddress ?? '출발지';
+        destination = _destinationAddress ?? '목적지';
+      }
+    }
+    
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Flexible(
+          child: Text(
+            departure,
+            style: TextStyle(color: Colors.white, fontSize: 14),
+            overflow: TextOverflow.ellipsis,
+            maxLines: 1,
+          ),
+        ),
+        Padding(
+          padding: EdgeInsets.symmetric(horizontal: 4),
+          child: Icon(Icons.arrow_forward, color: Colors.white, size: 16),
+        ),
+        Flexible(
+          child: Text(
+            destination,
+            style: TextStyle(color: Colors.white, fontSize: 14),
+            overflow: TextOverflow.ellipsis,
+            maxLines: 1,
+          ),
+        ),
+      ],
+    );
   }
 }

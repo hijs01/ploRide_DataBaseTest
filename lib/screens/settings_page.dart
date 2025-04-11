@@ -3,6 +3,8 @@ import 'package:cabrider/screens/mainpage.dart';
 import 'package:cabrider/screens/homepage.dart';
 import 'package:cabrider/screens/chat_page.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cabrider/screens/loginpage.dart';
 
 class SettingsPage extends StatefulWidget {
   static const String id = 'settings';
@@ -103,6 +105,26 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
           ),
     );
+  }
+
+  // 로그아웃 처리
+  Future<void> _signOut() async {
+    try {
+      await FirebaseAuth.instance.signOut();
+      Navigator.pushNamedAndRemoveUntil(
+        context, 
+        Loginpage.id, 
+        (route) => false
+      );
+    } catch (e) {
+      print('로그아웃 중 오류 발생: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('로그아웃 중 오류가 발생했습니다. 다시 시도해주세요.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   @override
@@ -402,9 +424,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 subtitle: '계정에서 로그아웃합니다',
                 isDarkMode: isDarkMode,
                 isDestructive: true,
-                onTap: () {
-                  // 로그아웃 처리
-                },
+                onTap: _signOut,
                 trailing: Icon(
                   Icons.arrow_forward_ios,
                   size: 16,
@@ -465,17 +485,17 @@ class _SettingsPageState extends State<SettingsPage> {
       ),
       bottomNavigationBar: BottomNavigationBar(
         items: const <BottomNavigationBarItem>[
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: ''),
-          BottomNavigationBarItem(icon: Icon(Icons.history), label: ''),
-          BottomNavigationBarItem(icon: Icon(Icons.chat), label: ''),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: ''),
+          BottomNavigationBarItem(icon: Icon(Icons.home), label: '홈'),
+          BottomNavigationBarItem(icon: Icon(Icons.history), label: '히스토리'),
+          BottomNavigationBarItem(icon: Icon(Icons.chat), label: '채팅'),
+          BottomNavigationBarItem(icon: Icon(Icons.person), label: '프로필'),
         ],
         currentIndex: _selectedIndex,
         selectedItemColor: isDarkMode ? Colors.white : Colors.blue,
         unselectedItemColor: isDarkMode ? Colors.grey[600] : Colors.grey,
         backgroundColor: isDarkMode ? Colors.black : Colors.white,
-        showSelectedLabels: false,
-        showUnselectedLabels: false,
+        showSelectedLabels: true,
+        showUnselectedLabels: true,
         type: BottomNavigationBarType.fixed,
         onTap: _onItemTapped,
       ),

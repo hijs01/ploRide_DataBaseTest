@@ -174,11 +174,11 @@ class _ChatPageState extends State<ChatPage> {
             _chatRooms.add(chatRoomInfo);
           }
 
-          // 출발 시간 기준으로 정렬
+          // 마지막 메시지 시간 기준으로 정렬 (최신순)
           _chatRooms.sort((a, b) {
-            final aTime = (a['departureTime'] as Timestamp).toDate();
-            final bTime = (b['departureTime'] as Timestamp).toDate();
-            return aTime.compareTo(bTime);
+            final aTime = (a['timestamp'] as Timestamp).toDate();
+            final bTime = (b['timestamp'] as Timestamp).toDate();
+            return bTime.compareTo(aTime); // 내림차순 정렬 (최신이 위로)
           });
         });
       } else {
@@ -238,11 +238,11 @@ class _ChatPageState extends State<ChatPage> {
                 _chatRooms.add(chatRoomInfo);
               }
 
-              // 출발 시간 기준으로 정렬
+              // 마지막 메시지 시간 기준으로 정렬 (최신순)
               _chatRooms.sort((a, b) {
-                final aTime = (a['departureTime'] as Timestamp).toDate();
-                final bTime = (b['departureTime'] as Timestamp).toDate();
-                return aTime.compareTo(bTime);
+                final aTime = (a['timestamp'] as Timestamp).toDate();
+                final bTime = (b['timestamp'] as Timestamp).toDate();
+                return bTime.compareTo(aTime); // 내림차순 정렬 (최신이 위로)
               });
             });
           }

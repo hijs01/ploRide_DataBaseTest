@@ -435,17 +435,17 @@ class _HomePageState extends State<HomePage> {
         body: body, // IndexedStack를 제거하고 직접 body 변수 사용
         bottomNavigationBar: BottomNavigationBar(
           items: const <BottomNavigationBarItem>[
-            BottomNavigationBarItem(icon: Icon(Icons.home), label: ''),
-            BottomNavigationBarItem(icon: Icon(Icons.history), label: ''),
-            BottomNavigationBarItem(icon: Icon(Icons.chat), label: ''),
-            BottomNavigationBarItem(icon: Icon(Icons.person), label: ''),
+            BottomNavigationBarItem(icon: Icon(Icons.home), label: '홈'),
+            BottomNavigationBarItem(icon: Icon(Icons.history), label: '히스토리'),
+            BottomNavigationBarItem(icon: Icon(Icons.chat), label: '채팅'),
+            BottomNavigationBarItem(icon: Icon(Icons.person), label: '프로필'),
           ],
           currentIndex: _selectedIndex,
           selectedItemColor: isDarkMode ? Colors.white : Colors.blue,
           unselectedItemColor: isDarkMode ? Colors.grey[600] : Colors.grey,
           backgroundColor: isDarkMode ? Colors.black : Colors.white,
-          showSelectedLabels: false,
-          showUnselectedLabels: false,
+          showSelectedLabels: true,
+          showUnselectedLabels: true,
           type: BottomNavigationBarType.fixed,
           onTap: _onItemTapped,
         ),
