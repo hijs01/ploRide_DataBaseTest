@@ -1086,27 +1086,43 @@ class _RideConfirmationPageState extends State<RideConfirmationPage>
               await chatRoomRef.set(chatRoomData).timeout(Duration(seconds: 5));
 
               // 시스템 메시지 추가
-              await FirebaseFirestore.instance
-                  .collection(chatRoomCollection)
-                  .doc(chatRoomId)
-                  .collection('messages')
-                  .where('text', isEqualTo: '${currentUserInfo?.fullName ?? user.displayName ?? '이름 없음'}님이 그룹에 참여했습니다.')
-                  .get()
-                  .then((snapshot) async {
-                    if (snapshot.docs.isEmpty) {
-                      await FirebaseFirestore.instance
-                          .collection(chatRoomCollection)
-                          .doc(chatRoomId)
-                          .collection('messages')
-                          .add({
-                            'text': '${currentUserInfo?.fullName ?? user.displayName ?? '이름 없음'}님이 그룹에 참여했습니다.',
-                            'sender_id': 'system',
-                            'sender_name': '시스템',
-                            'timestamp': FieldValue.serverTimestamp(),
-                            'type': 'system',
-                          });
-                    }
-                  });
+              try {
+                // 사용자 정보 가져오기
+                DocumentSnapshot userDoc = await FirebaseFirestore.instance
+                    .collection('users')
+                    .doc(user.uid)
+                    .get();
+
+                String userName = '알 수 없음';
+                if (userDoc.exists) {
+                  Map<String, dynamic> userData = userDoc.data() as Map<String, dynamic>;
+                  userName = userData['fullname'] ?? '알 수 없음';
+                }
+
+                await FirebaseFirestore.instance
+                    .collection(chatRoomCollection)
+                    .doc(chatRoomId)
+                    .collection('messages')
+                    .where('text', isEqualTo: '${userName}님이 그룹에 참여했습니다.')
+                    .get()
+                    .then((snapshot) async {
+                      if (snapshot.docs.isEmpty) {
+                        await FirebaseFirestore.instance
+                            .collection(chatRoomCollection)
+                            .doc(chatRoomId)
+                            .collection('messages')
+                            .add({
+                              'text': '${userName}님이 그룹에 참여했습니다.',
+                              'sender_id': 'system',
+                              'sender_name': '시스템',
+                              'timestamp': FieldValue.serverTimestamp(),
+                              'type': 'system',
+                            });
+                      }
+                    });
+              } catch (e) {
+                print('시스템 메시지 추가 중 오류: $e');
+              }
 
               print('새 채팅방 생성 완료: $chatRoomId in $chatRoomCollection');
             }
@@ -1122,6 +1138,18 @@ class _RideConfirmationPageState extends State<RideConfirmationPage>
               List<dynamic> members = chatRoomData['members'] ?? [];
 
               if (!members.contains(user.uid)) {
+                // 사용자 정보 가져오기
+                DocumentSnapshot userDoc = await FirebaseFirestore.instance
+                    .collection('users')
+                    .doc(user.uid)
+                    .get();
+
+                String userName = '알 수 없음';
+                if (userDoc.exists) {
+                  Map<String, dynamic> userData = userDoc.data() as Map<String, dynamic>;
+                  userName = userData['fullname'] ?? '알 수 없음';
+                }
+
                 // 채팅방 멤버 목록에 사용자 추가
                 members.add(user.uid);
 
@@ -1129,8 +1157,7 @@ class _RideConfirmationPageState extends State<RideConfirmationPage>
                 Map<String, dynamic> updateData = {
                   'members': FieldValue.arrayUnion([user.uid]),
                   'member_count': FieldValue.increment(1),
-                  'last_message':
-                      '${currentUserInfo?.fullName ?? user.displayName ?? '이름 없음'}님이 그룹에 참여했습니다.',
+                  'last_message': '${userName}님이 그룹에 참여했습니다.',
                   'last_message_time': FieldValue.serverTimestamp(),
                   'luggage_count_total': FieldValue.increment(luggageCount),
                 };
@@ -1152,7 +1179,7 @@ class _RideConfirmationPageState extends State<RideConfirmationPage>
                     .collection(chatRoomCollection)
                     .doc(chatRoomId)
                     .collection('messages')
-                    .where('text', isEqualTo: '${currentUserInfo?.fullName ?? user.displayName ?? '이름 없음'}님이 그룹에 참여했습니다.')
+                    .where('text', isEqualTo: '${userName}님이 그룹에 참여했습니다.')
                     .get()
                     .then((snapshot) async {
                       if (snapshot.docs.isEmpty) {
@@ -1161,7 +1188,7 @@ class _RideConfirmationPageState extends State<RideConfirmationPage>
                             .doc(chatRoomId)
                             .collection('messages')
                             .add({
-                              'text': '${currentUserInfo?.fullName ?? user.displayName ?? '이름 없음'}님이 그룹에 참여했습니다.',
+                              'text': '${userName}님이 그룹에 참여했습니다.',
                               'sender_id': 'system',
                               'sender_name': '시스템',
                               'timestamp': FieldValue.serverTimestamp(),
