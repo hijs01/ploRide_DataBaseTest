@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'dart:async';
 
 class ChatRoomPage extends StatefulWidget {
   final String chatRoomId;
@@ -29,7 +30,12 @@ class _ChatRoomPageState extends State<ChatRoomPage>
   final ScrollController _scrollController = ScrollController();
   final FocusNode _focusNode = FocusNode();
   String? _currentUserId;
-  List<Map<String, dynamic>> _messages = [];
+  Map<String, dynamic>? _chatRoomData;
+  bool _isLoading = true;
+  bool _isSending = false;
+  StreamSubscription? _chatRoomSubscription;
+  StreamSubscription? _messagesSubscription;
+  List<QueryDocumentSnapshot> _messages = [];
   Map<String, String> _userNames = {};
   List<String> _roomMembers = [];
 
@@ -120,21 +126,25 @@ class _ChatRoomPageState extends State<ChatRoomPage>
   }
 
   void _loadMessages() {
-    _firestore
+    // 기존 구독이 있다면 취소
+    _messagesSubscription?.cancel();
+    
+    // 새로운 구독 설정
+    _messagesSubscription = _firestore
         .collection(widget.chatRoomCollection)
         .doc(widget.chatRoomId)
         .collection('messages')
         .orderBy('timestamp', descending: false)
         .snapshots()
         .listen((snapshot) async {
-          final List<Map<String, dynamic>> messageList = [];
+          final List<QueryDocumentSnapshot> messageList = [];
 
           for (var doc in snapshot.docs) {
-            final data = doc.data();
-            final senderId = data['senderId'] ?? data['sender_id'] ?? '';
+            final data = doc.data() as Map<String, dynamic>;
+            final senderId = data['sender_id'] ?? data['sender_id'] ?? '';
             String senderName = '';
 
-            // 시스템 메시지가 아닌 경우 사용자 이름 가져오기
+            // 시스템 메시지가 아닌 경우에만 사용자 이름 가져오기
             if (senderId != 'system') {
               try {
                 final userDoc =
@@ -149,54 +159,20 @@ class _ChatRoomPageState extends State<ChatRoomPage>
               }
             }
 
-            // 시스템 메시지인 경우 텍스트에서 사용자 이름을 실제 이름으로 대체
-            String messageText = data['text'] ?? '';
-            if (senderId == 'system' && messageText.contains('님이 그룹에 참여했습니다')) {
-              // 메시지에서 사용자 ID 추출
-              final userId = data['userId'] ?? '';
-              if (userId.isNotEmpty) {
-                try {
-                  final userDoc =
-                      await _firestore.collection('users').doc(userId).get();
-                  if (userDoc.exists) {
-                    final userData = userDoc.data();
-                    final fullname = userData?['fullname'] ?? '알 수 없는 사용자';
-                    // "이름 없음" 부분을 실제 이름으로 대체
-                    messageText = messageText.replaceAll('이름 없음', fullname);
-                  } else {
-                    print('사용자 문서가 존재하지 않음: $userId');
-                  }
-                } catch (e) {
-                  print('시스템 메시지 사용자 이름 조회 오류: $e');
-                }
-              } else {
-                print('시스템 메시지에 userId가 없음');
-              }
-
-              // 디버깅을 위한 로그 추가
-              print('시스템 메시지 데이터: ${data.toString()}');
-              print('처리된 메시지 텍스트: $messageText');
-            }
-
-            messageList.add({
-              'id': doc.id,
-              'text': messageText,
-              'senderId': senderId,
-              'senderName': senderName,
-              'timestamp': data['timestamp'],
-              'type': data['type'] ?? 'user',
-              'userId': data['userId'], // 시스템 메시지에서 사용자 ID 저장
-            });
+            // 시스템 메시지는 그대로 표시
+            messageList.add(doc);
           }
 
-          setState(() {
-            _messages = messageList;
-          });
+          if (mounted) {
+            setState(() {
+              _messages = messageList;
+            });
 
-          // 새 메시지가 추가될 때마다 스크롤을 아래로 이동
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            _scrollToBottom();
-          });
+            // 새 메시지가 추가될 때마다 스크롤을 아래로 이동
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              _scrollToBottom();
+            });
+          }
         });
   }
 
@@ -264,15 +240,26 @@ class _ChatRoomPageState extends State<ChatRoomPage>
 
     final messageText = _messageController.text.trim();
     final user = _auth.currentUser;
-    final displayName = user?.displayName ?? '알 수 없는 사용자';
+    String senderName = user?.displayName ?? '알 수 없는 사용자';
+
+    // 사용자 프로필에서 이름 가져오기
+    try {
+      final userDoc = await _firestore.collection('users').doc(_currentUserId).get();
+      if (userDoc.exists) {
+        final userData = userDoc.data();
+        senderName = userData?['fullname'] ?? senderName;
+      }
+    } catch (e) {
+      print('사용자 이름 조회 오류: $e');
+    }
 
     // 메시지 전송 전에 텍스트 필드 초기화
     _messageController.clear();
 
     final message = {
       'text': messageText,
-      'senderId': _currentUserId,
-      'sender_name': displayName,
+      'sender_id': _currentUserId,
+      'sender_name': senderName,
       'timestamp': FieldValue.serverTimestamp(),
       'type': 'user',
     };
@@ -343,11 +330,12 @@ class _ChatRoomPageState extends State<ChatRoomPage>
                   itemCount: _messages.length,
                   itemBuilder: (context, index) {
                     final message = _messages[index];
-                    final isMe = message['senderId'] == _currentUserId;
+                    final messageData = message.data() as Map<String, dynamic>;
+                    final isMe = messageData['sender_id'] == _currentUserId;
                     final isSystem =
-                        message['senderId'] == 'system' ||
-                        message['type'] == 'system';
-                    final timestamp = message['timestamp'] as Timestamp?;
+                        messageData['sender_id'] == 'system' ||
+                        messageData['type'] == 'system';
+                    final timestamp = messageData['timestamp'] as Timestamp?;
                     final formattedTime = _formatTimestamp(timestamp);
 
                     if (isSystem) {
@@ -364,7 +352,7 @@ class _ChatRoomPageState extends State<ChatRoomPage>
                             borderRadius: BorderRadius.circular(15),
                           ),
                           child: Text(
-                            message['text'],
+                            messageData['text'] ?? '',
                             style: TextStyle(
                               color:
                                   isDarkMode ? Colors.white70 : Colors.black87,
@@ -388,7 +376,7 @@ class _ChatRoomPageState extends State<ChatRoomPage>
                               bottom: 2.0,
                             ),
                             child: Text(
-                              message['senderName'] ?? '알 수 없는 사용자',
+                              messageData['sender_name'] ?? '알 수 없는 사용자',
                               style: TextStyle(
                                 fontSize: 12,
                                 color:
@@ -418,7 +406,7 @@ class _ChatRoomPageState extends State<ChatRoomPage>
                                     radius: 16,
                                     backgroundColor: Colors.grey[400],
                                     child: Text(
-                                      (message['senderName'] ?? '?')
+                                      (messageData['sender_name'] ?? '?')
                                           .substring(0, 1)
                                           .toUpperCase(),
                                       style: TextStyle(color: Colors.white),
@@ -467,7 +455,7 @@ class _ChatRoomPageState extends State<ChatRoomPage>
                                     ],
                                   ),
                                   child: Text(
-                                    message['text'],
+                                    messageData['text'],
                                     style: TextStyle(
                                       color: isMe ? Colors.white : textColor,
                                     ),
@@ -561,8 +549,45 @@ class _ChatRoomPageState extends State<ChatRoomPage>
   void dispose() {
     _messageController.dispose();
     _scrollController.dispose();
+    // 리스너 정리
+    if (_chatRoomSubscription != null) {
+      _chatRoomSubscription!.cancel();
+    }
+    if (_messagesSubscription != null) {
+      _messagesSubscription!.cancel();
+    }
     _focusNode.dispose();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
+  }
+
+  // setState 호출을 안전하게 만드는 헬퍼 메서드
+  void _safeSetState(VoidCallback fn) {
+    if (mounted) {
+      setState(fn);
+    }
+  }
+
+  // 메시지 전송 후 상태 업데이트
+  void _updateAfterMessageSend() {
+    _safeSetState(() {
+      _isSending = false;
+    });
+  }
+
+  // 채팅방 상태 업데이트
+  void _updateChatRoomState(Map<String, dynamic> data) {
+    _safeSetState(() {
+      _chatRoomData = data;
+      _isLoading = false;
+    });
+  }
+
+  // 메시지 목록 업데이트
+  void _updateMessages(List<QueryDocumentSnapshot> messages) {
+    _safeSetState(() {
+      _messages = messages;
+      _isLoading = false;
+    });
   }
 }
