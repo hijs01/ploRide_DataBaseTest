@@ -3,6 +3,7 @@ import 'package:cabrider/screens/mainpage.dart';
 import 'package:cabrider/screens/searchpage.dart';
 import 'package:cabrider/screens/settings_page.dart';
 import 'package:cabrider/screens/chat_page.dart';
+import 'package:cabrider/screens/history_page.dart';
 
 class HomePage extends StatefulWidget {
   static const String id = 'home';
@@ -23,7 +24,16 @@ class _HomePageState extends State<HomePage> {
       if (index == 0) {
         // 홈 탭 유지
       } else if (index == 1) {
-        // History 탭으로 변경
+        // History 페이지로 이동 (애니메이션 없음)
+        Navigator.push(
+          context,
+          PageRouteBuilder(
+            pageBuilder:
+                (context, animation, secondaryAnimation) => HistoryPage(),
+            transitionDuration: Duration.zero,
+            reverseTransitionDuration: Duration.zero,
+          ),
+        );
       } else if (index == 2) {
         // Chat 페이지로 이동 (애니메이션 없음)
         Navigator.push(

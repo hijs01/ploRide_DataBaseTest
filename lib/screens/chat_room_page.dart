@@ -279,13 +279,20 @@ class _ChatRoomPageState extends State<ChatRoomPage>
           .add(message);
 
       // 마지막 메시지 업데이트
-      await _firestore
-          .collection(widget.chatRoomCollection)
-          .doc(widget.chatRoomId)
-          .update({
-            'lastMessage': messageText,
-            'timestamp': FieldValue.serverTimestamp(),
-          });
+      try {
+        await _firestore
+            .collection(widget.chatRoomCollection)
+            .doc(widget.chatRoomId)
+            .update({
+              'lastMessage': messageText,
+              'last_message': messageText,
+              'last_message_time': FieldValue.serverTimestamp(),
+              'timestamp': FieldValue.serverTimestamp(),
+            });
+        print('메시지 업데이트 성공: last_message = $messageText');
+      } catch (e) {
+        print('메시지 업데이트 실패: $e');
+      }
 
       // 다른 멤버들에게 알림 전송
       await _sendNotificationToOtherMembers(messageText);

@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cabrider/screens/homepage.dart';
 import 'package:cabrider/screens/settings_page.dart';
 import 'package:cabrider/screens/chat_room_page.dart';
+import 'package:cabrider/screens/history_page.dart';
 import 'package:intl/intl.dart';
 import 'dart:async'; // StreamSubscription을 위한 임포트 추가
 
@@ -302,17 +303,18 @@ class _ChatPageState extends State<ChatPage> {
     setState(() {
       if (index != _selectedIndex) {
         if (index == 0 || index == 1) {
-          Navigator.push(
+          Navigator.pushReplacement(
             context,
             PageRouteBuilder(
               pageBuilder:
-                  (context, animation, secondaryAnimation) => HomePage(),
+                  (context, animation, secondaryAnimation) => 
+                  index == 0 ? HomePage() : HistoryPage(),
               transitionDuration: Duration.zero,
               reverseTransitionDuration: Duration.zero,
             ),
           );
         } else if (index == 3) {
-          Navigator.push(
+          Navigator.pushReplacement(
             context,
             PageRouteBuilder(
               pageBuilder:

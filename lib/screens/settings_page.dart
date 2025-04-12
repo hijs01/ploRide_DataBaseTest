@@ -5,6 +5,7 @@ import 'package:cabrider/screens/chat_page.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cabrider/screens/loginpage.dart';
+import 'package:cabrider/screens/history_page.dart';
 
 class SettingsPage extends StatefulWidget {
   static const String id = 'settings';
@@ -32,18 +33,19 @@ class _SettingsPageState extends State<SettingsPage> {
       if (index != _selectedIndex) {
         if (index == 0 || index == 1) {
           // Home 또는 History 탭으로 이동
-          Navigator.push(
+          Navigator.pushReplacement(
             context,
             PageRouteBuilder(
               pageBuilder:
-                  (context, animation, secondaryAnimation) => HomePage(),
+                  (context, animation, secondaryAnimation) => 
+                  index == 0 ? HomePage() : HistoryPage(),
               transitionDuration: Duration.zero,
               reverseTransitionDuration: Duration.zero,
             ),
           );
         } else if (index == 2) {
           // Chat 탭으로 이동
-          Navigator.push(
+          Navigator.pushReplacement(
             context,
             PageRouteBuilder(
               pageBuilder:
