@@ -40,14 +40,18 @@ class _ChatRoomPageState extends State<ChatRoomPage>
   List<String> _roomMembers = [];
   String? _pickupAddress;
   String? _destinationAddress;
+  bool _hasMoreMessages = true;
+  DocumentSnapshot? _lastDocument;
+  static const int _messageLimit = 20;
 
   @override
   void initState() {
     super.initState();
     _getCurrentUser();
-    _loadMessages();
+    _loadInitialMessages();
     _loadRoomMembers();
     _loadChatRoomData();
+    _setupRealtimeUpdates();
 
     // 키보드 상태 변경 감지를 위해 observer 등록
     WidgetsBinding.instance.addObserver(this);
@@ -59,6 +63,9 @@ class _ChatRoomPageState extends State<ChatRoomPage>
         _scrollToBottom();
       }
     });
+
+    // 스크롤 리스너 추가
+    _scrollController.addListener(_onScroll);
   }
 
   @override
@@ -132,55 +139,124 @@ class _ChatRoomPageState extends State<ChatRoomPage>
     }
   }
 
-  void _loadMessages() {
-    // 기존 구독이 있다면 취소
-    _messagesSubscription?.cancel();
-    
-    // 새로운 구독 설정
-    _messagesSubscription = _firestore
-        .collection(widget.chatRoomCollection)
-        .doc(widget.chatRoomId)
-        .collection('messages')
-        .orderBy('timestamp', descending: false)
-        .snapshots()
-        .listen((snapshot) async {
-          final List<QueryDocumentSnapshot> messageList = [];
+  void _onScroll() {
+    if (_scrollController.position.pixels == _scrollController.position.maxScrollExtent) {
+      _loadMoreMessages();
+    }
+  }
 
-          for (var doc in snapshot.docs) {
-            final data = doc.data() as Map<String, dynamic>;
-            final senderId = data['sender_id'] ?? '';
-            String senderName = '';
+  Future<void> _loadInitialMessages() async {
+    try {
+      final querySnapshot = await _firestore
+          .collection(widget.chatRoomCollection)
+          .doc(widget.chatRoomId)
+          .collection('messages')
+          .orderBy('timestamp', descending: true)
+          .limit(_messageLimit)
+          .get();
 
-            // 시스템 메시지가 아닌 경우에만 사용자 이름 가져오기
-            if (senderId != 'system' && senderId.isNotEmpty) {
-              try {
-                final userDoc =
-                    await _firestore.collection('users').doc(senderId).get();
-                if (userDoc.exists) {
-                  final userData = userDoc.data();
-                  senderName = userData?['fullname'] ?? '알 수 없는 사용자';
-                }
-              } catch (e) {
-                print('사용자 이름 조회 오류: $e');
-                senderName = '알 수 없는 사용자';
-              }
-            }
-
-            // 시스템 메시지는 그대로 표시
-            messageList.add(doc);
-          }
-
-          if (mounted) {
-            setState(() {
-              _messages = messageList;
-            });
-
-            // 새 메시지가 추가될 때마다 스크롤을 아래로 이동
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              _scrollToBottom();
-            });
-          }
+      if (querySnapshot.docs.isNotEmpty) {
+        _lastDocument = querySnapshot.docs.last;
+        _hasMoreMessages = querySnapshot.docs.length >= _messageLimit;
+        
+        // 메시지를 시간순으로 정렬
+        final messages = querySnapshot.docs.reversed.toList();
+        
+        // 사용자 정보 일괄 로드
+        await _loadUserNames(messages);
+        
+        setState(() {
+          _messages = messages;
+          _isLoading = false;
         });
+
+        // 새 메시지가 추가될 때마다 스크롤을 아래로 이동
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _scrollToBottom();
+        });
+      }
+    } catch (e) {
+      print('Error loading initial messages: $e');
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _loadMoreMessages() async {
+    if (!_hasMoreMessages || _isLoading) return;
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final querySnapshot = await _firestore
+          .collection(widget.chatRoomCollection)
+          .doc(widget.chatRoomId)
+          .collection('messages')
+          .orderBy('timestamp', descending: true)
+          .startAfterDocument(_lastDocument!)
+          .limit(_messageLimit)
+          .get();
+
+      if (querySnapshot.docs.isNotEmpty) {
+        _lastDocument = querySnapshot.docs.last;
+        _hasMoreMessages = querySnapshot.docs.length >= _messageLimit;
+        
+        // 메시지를 시간순으로 정렬
+        final newMessages = querySnapshot.docs.reversed.toList();
+        
+        // 사용자 정보 일괄 로드
+        await _loadUserNames(newMessages);
+        
+        setState(() {
+          _messages.insertAll(0, newMessages);
+          _isLoading = false;
+        });
+      } else {
+        setState(() {
+          _hasMoreMessages = false;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      print('Error loading more messages: $e');
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _loadUserNames(List<QueryDocumentSnapshot> messages) async {
+    final Set<String> userIds = {};
+    
+    // 메시지에서 사용자 ID 수집
+    for (var doc in messages) {
+      final data = doc.data() as Map<String, dynamic>;
+      final senderId = data['sender_id'] ?? '';
+      if (senderId != 'system' && senderId.isNotEmpty && !_userNames.containsKey(senderId)) {
+        userIds.add(senderId);
+      }
+    }
+
+    if (userIds.isEmpty) return;
+
+    try {
+      // 일괄 사용자 정보 조회
+      final userDocs = await Future.wait(
+        userIds.map((userId) => _firestore.collection('users').doc(userId).get())
+      );
+
+      for (var doc in userDocs) {
+        if (doc.exists) {
+          final userData = doc.data();
+          _userNames[doc.id] = userData?['fullname'] ?? '알 수 없는 사용자';
+        }
+      }
+    } catch (e) {
+      print('Error loading user names: $e');
+    }
   }
 
   String _formatTimestamp(Timestamp? timestamp) {
@@ -699,5 +775,40 @@ class _ChatRoomPageState extends State<ChatRoomPage>
         ),
       ],
     );
+  }
+
+  void _setupRealtimeUpdates() {
+    _messagesSubscription = _firestore
+        .collection(widget.chatRoomCollection)
+        .doc(widget.chatRoomId)
+        .collection('messages')
+        .orderBy('timestamp', descending: true)
+        .limit(1)
+        .snapshots()
+        .listen((snapshot) async {
+      if (snapshot.docs.isNotEmpty) {
+        final latestMessage = snapshot.docs.first;
+        final latestMessageData = latestMessage.data();
+        final latestTimestamp = latestMessageData['timestamp'] as Timestamp?;
+
+        // 현재 메시지 목록의 마지막 메시지와 비교
+        if (_messages.isEmpty || 
+            (latestTimestamp != null && 
+             latestTimestamp.millisecondsSinceEpoch > 
+             (_messages.last.data() as Map<String, dynamic>)['timestamp'].millisecondsSinceEpoch)) {
+          
+          // 새로운 메시지가 있는 경우
+          final newMessage = latestMessage;
+          await _loadUserNames([newMessage]);
+          
+          setState(() {
+            _messages.add(newMessage);
+          });
+          
+          // 새 메시지가 추가될 때 스크롤을 아래로 이동
+          _scrollToBottom();
+        }
+      }
+    });
   }
 }

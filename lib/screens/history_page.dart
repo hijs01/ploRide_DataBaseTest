@@ -23,8 +23,76 @@ class _HistoryPageState extends State<HistoryPage> {
   @override
   void initState() {
     super.initState();
-    // 테스트 데이터 추가
-    _addTestData();
+    print('HistoryPage initialized');
+    _checkUserData();
+    _deleteTestData(); // 테스트 데이터 삭제
+  }
+
+  Future<void> _checkUserData() async {
+    final currentUser = _auth.currentUser;
+    print('Current user: ${currentUser?.uid}');
+    
+    if (currentUser != null) {
+      // 사용자의 히스토리 데이터 확인
+      final historySnapshot = await _firestore
+          .collection('users')
+          .doc(currentUser.uid)
+          .collection('history')
+          .get();
+      
+      print('History count: ${historySnapshot.docs.length}');
+      
+      // psuToAirport 데이터 확인
+      final psuToAirportSnapshot = await _firestore
+          .collection('psuToAirport')
+          .get();
+      
+      print('psuToAirport count: ${psuToAirportSnapshot.docs.length}');
+      
+      // 현재 사용자가 멤버로 포함된 문서 확인
+      final userTrips = psuToAirportSnapshot.docs.where((doc) {
+        final data = doc.data();
+        final members = data['members'] as List<dynamic>?;
+        return members?.contains(currentUser.uid) ?? false;
+      }).toList();
+      
+      print('User trips count: ${userTrips.length}');
+    }
+  }
+
+  Future<void> _deleteTestData() async {
+    try {
+      final user = _auth.currentUser;
+      if (user != null) {
+        // psuToAirport 컬렉션에서 테스트 데이터 삭제
+        final testDataQuery = await _firestore
+            .collection('psuToAirport')
+            .where('pickup_info.address', isEqualTo: 'PSU 캠퍼스')
+            .where('destination_info.address', isEqualTo: '인천국제공항')
+            .get();
+        
+        for (var doc in testDataQuery.docs) {
+          await doc.reference.delete();
+          print('Deleted test data document: ${doc.id}');
+        }
+        
+        // users 컬렉션의 history에서 테스트 데이터 삭제
+        final historyQuery = await _firestore
+            .collection('users')
+            .doc(user.uid)
+            .collection('history')
+            .where('pickup', isEqualTo: 'PSU 캠퍼스')
+            .where('destination', isEqualTo: '인천국제공항')
+            .get();
+        
+        for (var doc in historyQuery.docs) {
+          await doc.reference.delete();
+          print('Deleted test history document: ${doc.id}');
+        }
+      }
+    } catch (e) {
+      print('Error deleting test data: $e');
+    }
   }
 
   void _onItemTapped(int index) {
@@ -73,6 +141,8 @@ class _HistoryPageState extends State<HistoryPage> {
   Widget build(BuildContext context) {
     final isDarkMode = MediaQuery.of(context).platformBrightness == Brightness.dark;
     final currentUser = _auth.currentUser;
+    
+    print('Building HistoryPage for user: ${currentUser?.uid}');
 
     return Scaffold(
       backgroundColor: isDarkMode ? Colors.black : Colors.white,
@@ -113,6 +183,7 @@ class _HistoryPageState extends State<HistoryPage> {
           }
 
           if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+            print('No data in psuToAirport collection');
             return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -135,13 +206,30 @@ class _HistoryPageState extends State<HistoryPage> {
             );
           }
 
-          // 현재 사용자의 uid와 일치하는 문서만 필터링
-          List<QueryDocumentSnapshot> userTrips = snapshot.data!.docs.where((doc) {
-            Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
-            List<dynamic> members = data['members'] ?? [];
-            return members.contains(currentUser?.uid);
-          }).toList();
-
+          print('Total documents in psuToAirport: ${snapshot.data!.docs.length}');
+          
+          // 현재 사용자의 여행만 필터링하고 시간순 정렬
+          final userTrips = snapshot.data!.docs
+              .where((doc) {
+                final data = doc.data() as Map<String, dynamic>;
+                final members = data['members'] as List<dynamic>?;
+                final isUserTrip = members?.contains(currentUser?.uid) ?? false;
+                print('Document ${doc.id}: members=${members}, isUserTrip=$isUserTrip');
+                return isUserTrip;
+              })
+              .toList()
+            ..sort((a, b) {
+              final timestampA = (a.data() as Map<String, dynamic>)['timestamp'] as Timestamp?;
+              final timestampB = (b.data() as Map<String, dynamic>)['timestamp'] as Timestamp?;
+              
+              if (timestampA == null) return 1;
+              if (timestampB == null) return -1;
+              
+              return timestampB.compareTo(timestampA); // 내림차순 정렬
+            });
+          
+          print('Filtered user trips count: ${userTrips.length}');
+          
           if (userTrips.isEmpty) {
             return Center(
               child: Column(
@@ -165,21 +253,11 @@ class _HistoryPageState extends State<HistoryPage> {
             );
           }
           
-          // 클라이언트 측에서 시간순 정렬
-          userTrips.sort((a, b) {
-            Timestamp? timestampA = (a.data() as Map<String, dynamic>)['timestamp'] as Timestamp?;
-            Timestamp? timestampB = (b.data() as Map<String, dynamic>)['timestamp'] as Timestamp?;
-            
-            if (timestampA == null) return 1;
-            if (timestampB == null) return -1;
-            
-            return timestampB.compareTo(timestampA); // 내림차순 정렬
-          });
-          
           return ListView.builder(
             itemCount: userTrips.length,
             itemBuilder: (context, index) {
               final tripData = userTrips[index].data() as Map<String, dynamic>;
+              print('Building trip item $index: $tripData'); // 디버그 로그 추가
               
               // pickup_info와 destination_info에서 address 정보 추출
               final pickupInfo = tripData['pickup_info'] as Map<String, dynamic>?;
@@ -191,8 +269,12 @@ class _HistoryPageState extends State<HistoryPage> {
               final timestamp = tripData['timestamp'] as Timestamp?;
               final date = timestamp?.toDate() ?? DateTime.now();
 
-              // 히스토리 데이터 저장
-              _saveToHistory(tripData);
+              print('Trip details - Pickup: $pickup, Destination: $destination, Status: $status'); // 디버그 로그 추가
+
+              // 히스토리 데이터는 한 번만 저장
+              if (index == 0) {
+                _saveToHistory(tripData);
+              }
 
               return Container(
                 margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -338,6 +420,8 @@ class _HistoryPageState extends State<HistoryPage> {
           final pickupInfo = tripData['pickup_info'] as Map<String, dynamic>?;
           final destinationInfo = tripData['destination_info'] as Map<String, dynamic>?;
           
+          print('Saving history with pickup: ${pickupInfo?['address']}, destination: ${destinationInfo?['address']}');
+          
           // Create new history entry
           await _firestore
               .collection('users')
@@ -354,44 +438,6 @@ class _HistoryPageState extends State<HistoryPage> {
       }
     } catch (e) {
       print('Error saving to history: $e');
-    }
-  }
-
-  Future<void> _addTestData() async {
-    try {
-      final user = _auth.currentUser;
-      if (user != null) {
-        // 테스트 데이터가 이미 있는지 확인
-        final testQuery = await _firestore
-            .collection('psuToAirport')
-            .where('members', arrayContains: user.uid)
-            .get();
-
-        if (testQuery.docs.isEmpty) {
-          // 테스트 데이터 추가
-          await _firestore.collection('psuToAirport').add({
-            'members': [user.uid],
-            'pickup_info': {
-              'address': 'PSU 캠퍼스',
-              'latitude': 37.5665,
-              'longitude': 126.9780,
-            },
-            'destination_info': {
-              'address': '인천국제공항',
-              'latitude': 37.4602,
-              'longitude': 126.4407,
-            },
-            'status': 'completed',
-            'timestamp': FieldValue.serverTimestamp(),
-            'tripId': 'test_trip_${DateTime.now().millisecondsSinceEpoch}',
-          });
-          print('Test data added successfully');
-        } else {
-          print('Test data already exists');
-        }
-      }
-    } catch (e) {
-      print('Error adding test data: $e');
     }
   }
 } 

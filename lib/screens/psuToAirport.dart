@@ -1,12 +1,19 @@
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_firestore/firebase_firestore.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/material.dart';
 
 class PSUToAirport extends StatefulWidget {
   // ... (existing code)
 }
 
 class _PSUToAirportState extends State<PSUToAirport> {
-  // ... (existing code)
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  String _tripStatus = '';
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(); // Replace with your actual UI
+  }
 
   Future<void> _updateTripStatus(String status) async {
     try {
