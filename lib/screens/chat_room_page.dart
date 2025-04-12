@@ -12,11 +12,11 @@ class ChatRoomPage extends StatefulWidget {
   final String chatRoomCollection;
 
   const ChatRoomPage({
-    Key? key,
+    super.key,
     required this.chatRoomId,
     required this.chatRoomName,
     this.chatRoomCollection = 'psuToAirport',
-  }) : super(key: key);
+  });
 
   @override
   _ChatRoomPageState createState() => _ChatRoomPageState();
@@ -29,6 +29,7 @@ class _ChatRoomPageState extends State<ChatRoomPage>
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final FocusNode _focusNode = FocusNode();
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   String? _currentUserId;
   Map<String, dynamic>? _chatRoomData;
   bool _isLoading = true;
@@ -36,7 +37,7 @@ class _ChatRoomPageState extends State<ChatRoomPage>
   StreamSubscription? _chatRoomSubscription;
   StreamSubscription? _messagesSubscription;
   List<QueryDocumentSnapshot> _messages = [];
-  Map<String, String> _userNames = {};
+  final Map<String, String> _userNames = {};
   List<String> _roomMembers = [];
   String? _pickupAddress;
   String? _destinationAddress;
@@ -113,7 +114,7 @@ class _ChatRoomPageState extends State<ChatRoomPage>
     if (userId.isEmpty) {
       return '알 수 없는 사용자';
     }
-    
+
     if (_userNames.containsKey(userId)) {
       return _userNames[userId]!;
     }
@@ -140,31 +141,33 @@ class _ChatRoomPageState extends State<ChatRoomPage>
   }
 
   void _onScroll() {
-    if (_scrollController.position.pixels == _scrollController.position.maxScrollExtent) {
+    if (_scrollController.position.pixels ==
+        _scrollController.position.maxScrollExtent) {
       _loadMoreMessages();
     }
   }
 
   Future<void> _loadInitialMessages() async {
     try {
-      final querySnapshot = await _firestore
-          .collection(widget.chatRoomCollection)
-          .doc(widget.chatRoomId)
-          .collection('messages')
-          .orderBy('timestamp', descending: true)
-          .limit(_messageLimit)
-          .get();
+      final querySnapshot =
+          await _firestore
+              .collection(widget.chatRoomCollection)
+              .doc(widget.chatRoomId)
+              .collection('messages')
+              .orderBy('timestamp', descending: true)
+              .limit(_messageLimit)
+              .get();
 
       if (querySnapshot.docs.isNotEmpty) {
         _lastDocument = querySnapshot.docs.last;
         _hasMoreMessages = querySnapshot.docs.length >= _messageLimit;
-        
+
         // 메시지를 시간순으로 정렬
         final messages = querySnapshot.docs.reversed.toList();
-        
+
         // 사용자 정보 일괄 로드
         await _loadUserNames(messages);
-        
+
         setState(() {
           _messages = messages;
           _isLoading = false;
@@ -191,25 +194,26 @@ class _ChatRoomPageState extends State<ChatRoomPage>
     });
 
     try {
-      final querySnapshot = await _firestore
-          .collection(widget.chatRoomCollection)
-          .doc(widget.chatRoomId)
-          .collection('messages')
-          .orderBy('timestamp', descending: true)
-          .startAfterDocument(_lastDocument!)
-          .limit(_messageLimit)
-          .get();
+      final querySnapshot =
+          await _firestore
+              .collection(widget.chatRoomCollection)
+              .doc(widget.chatRoomId)
+              .collection('messages')
+              .orderBy('timestamp', descending: true)
+              .startAfterDocument(_lastDocument!)
+              .limit(_messageLimit)
+              .get();
 
       if (querySnapshot.docs.isNotEmpty) {
         _lastDocument = querySnapshot.docs.last;
         _hasMoreMessages = querySnapshot.docs.length >= _messageLimit;
-        
+
         // 메시지를 시간순으로 정렬
         final newMessages = querySnapshot.docs.reversed.toList();
-        
+
         // 사용자 정보 일괄 로드
         await _loadUserNames(newMessages);
-        
+
         setState(() {
           _messages.insertAll(0, newMessages);
           _isLoading = false;
@@ -230,12 +234,14 @@ class _ChatRoomPageState extends State<ChatRoomPage>
 
   Future<void> _loadUserNames(List<QueryDocumentSnapshot> messages) async {
     final Set<String> userIds = {};
-    
+
     // 메시지에서 사용자 ID 수집
     for (var doc in messages) {
       final data = doc.data() as Map<String, dynamic>;
       final senderId = data['sender_id'] ?? '';
-      if (senderId != 'system' && senderId.isNotEmpty && !_userNames.containsKey(senderId)) {
+      if (senderId != 'system' &&
+          senderId.isNotEmpty &&
+          !_userNames.containsKey(senderId)) {
         userIds.add(senderId);
       }
     }
@@ -245,7 +251,9 @@ class _ChatRoomPageState extends State<ChatRoomPage>
     try {
       // 일괄 사용자 정보 조회
       final userDocs = await Future.wait(
-        userIds.map((userId) => _firestore.collection('users').doc(userId).get())
+        userIds.map(
+          (userId) => _firestore.collection('users').doc(userId).get(),
+        ),
       );
 
       for (var doc in userDocs) {
@@ -327,7 +335,8 @@ class _ChatRoomPageState extends State<ChatRoomPage>
 
     // 사용자 프로필에서 이름 가져오기
     try {
-      final userDoc = await _firestore.collection('users').doc(_currentUserId).get();
+      final userDoc =
+          await _firestore.collection('users').doc(_currentUserId).get();
       if (userDoc.exists) {
         final userData = userDoc.data();
         senderName = userData?['fullname'] ?? senderName;
@@ -393,12 +402,98 @@ class _ChatRoomPageState extends State<ChatRoomPage>
     final systemMessageColor = isDarkMode ? Colors.grey[800] : Colors.grey[300];
 
     return Scaffold(
+      key: _scaffoldKey,
       backgroundColor: backgroundColor,
       resizeToAvoidBottomInset: true,
       appBar: AppBar(
         backgroundColor: accentColor,
         title: _buildAppBarTitle(),
         automaticallyImplyLeading: true,
+        actions: [
+          IconButton(
+            icon: Icon(Icons.menu),
+            onPressed: () => _scaffoldKey.currentState?.openEndDrawer(),
+          ),
+        ],
+      ),
+      endDrawer: Drawer(
+        child: Column(
+          children: [
+            AppBar(title: Text('채팅방 정보'), automaticallyImplyLeading: false),
+            Expanded(
+              child: StreamBuilder<DocumentSnapshot>(
+                stream:
+                    _firestore
+                        .collection(widget.chatRoomCollection)
+                        .doc(widget.chatRoomId)
+                        .snapshots(),
+                builder: (context, snapshot) {
+                  if (!snapshot.hasData)
+                    return Center(child: CircularProgressIndicator());
+
+                  final data = snapshot.data!.data() as Map<String, dynamic>;
+                  final users = data['members'] as List<dynamic>? ?? [];
+                  final driver = data['driver_id'] as String? ?? '';
+
+                  return Column(
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Text(
+                          '참여자 목록',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      FutureBuilder<String>(
+                        future: _getUserName(driver),
+                        builder: (context, snapshot) {
+                          return ListTile(
+                            leading: CircleAvatar(child: Icon(Icons.person)),
+                            title: Text('드라이버'),
+                            subtitle: Text(snapshot.data ?? '로딩 중...'),
+                          );
+                        },
+                      ),
+                      Divider(),
+                      Expanded(
+                        child: ListView.builder(
+                          itemCount: users.length,
+                          itemBuilder: (context, index) {
+                            return FutureBuilder<String>(
+                              future: _getUserName(users[index]),
+                              builder: (context, snapshot) {
+                                return ListTile(
+                                  leading: CircleAvatar(
+                                    child: Icon(Icons.person),
+                                  ),
+                                  title: Text('승객 ${index + 1}'),
+                                  subtitle: Text(snapshot.data ?? '로딩 중...'),
+                                );
+                              },
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: ElevatedButton(
+                onPressed: () => _showExitDialog(context),
+                style: ElevatedButton.styleFrom(
+                  minimumSize: Size(double.infinity, 50),
+                ),
+                child: Text('채팅방 나가기'),
+              ),
+            ),
+          ],
+        ),
       ),
       body: SafeArea(
         child: Column(
@@ -470,7 +565,10 @@ class _ChatRoomPageState extends State<ChatRoomPage>
                               messageData['sender_name'] ?? '알 수 없는 사용자',
                               style: TextStyle(
                                 fontSize: 12,
-                                color: isDarkMode ? Colors.white70 : Colors.black54,
+                                color:
+                                    isDarkMode
+                                        ? Colors.white70
+                                        : Colors.black54,
                               ),
                               textAlign: TextAlign.left,
                             ),
@@ -693,23 +791,24 @@ class _ChatRoomPageState extends State<ChatRoomPage>
   // 채팅방 데이터 로드
   Future<void> _loadChatRoomData() async {
     try {
-      final roomDoc = await _firestore
-          .collection(widget.chatRoomCollection)
-          .doc(widget.chatRoomId)
-          .get();
+      final roomDoc =
+          await _firestore
+              .collection(widget.chatRoomCollection)
+              .doc(widget.chatRoomId)
+              .get();
 
       if (roomDoc.exists) {
         final data = roomDoc.data();
         if (data != null) {
           setState(() {
             _chatRoomData = data;
-            
+
             // 픽업 정보와 목적지 정보 가져오기
             if (data.containsKey('pickup_info')) {
               final pickupInfo = data['pickup_info'] as Map<String, dynamic>;
               _pickupAddress = pickupInfo['address'] as String?;
             }
-            
+
             if (data.containsKey('destination_info')) {
               final destInfo = data['destination_info'] as Map<String, dynamic>;
               _destinationAddress = destInfo['address'] as String?;
@@ -726,10 +825,10 @@ class _ChatRoomPageState extends State<ChatRoomPage>
     // 채팅방 이름에서 출발지와 목적지를 추출
     String departure = '';
     String destination = '';
-    
+
     // '_'로 분리 시도
     List<String> parts = widget.chatRoomName.split('_');
-    
+
     if (parts.length >= 2) {
       // '_'로 분리된 경우
       departure = parts[0];
@@ -749,7 +848,7 @@ class _ChatRoomPageState extends State<ChatRoomPage>
         destination = _destinationAddress ?? '목적지';
       }
     }
-    
+
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -786,29 +885,150 @@ class _ChatRoomPageState extends State<ChatRoomPage>
         .limit(1)
         .snapshots()
         .listen((snapshot) async {
-      if (snapshot.docs.isNotEmpty) {
-        final latestMessage = snapshot.docs.first;
-        final latestMessageData = latestMessage.data();
-        final latestTimestamp = latestMessageData['timestamp'] as Timestamp?;
+          if (snapshot.docs.isNotEmpty) {
+            final latestMessage = snapshot.docs.first;
+            final latestMessageData = latestMessage.data();
+            final latestTimestamp =
+                latestMessageData['timestamp'] as Timestamp?;
 
-        // 현재 메시지 목록의 마지막 메시지와 비교
-        if (_messages.isEmpty || 
-            (latestTimestamp != null && 
-             latestTimestamp.millisecondsSinceEpoch > 
-             (_messages.last.data() as Map<String, dynamic>)['timestamp'].millisecondsSinceEpoch)) {
-          
-          // 새로운 메시지가 있는 경우
-          final newMessage = latestMessage;
-          await _loadUserNames([newMessage]);
-          
-          setState(() {
-            _messages.add(newMessage);
-          });
-          
-          // 새 메시지가 추가될 때 스크롤을 아래로 이동
-          _scrollToBottom();
-        }
-      }
-    });
+            // 현재 메시지 목록의 마지막 메시지와 비교
+            if (_messages.isEmpty ||
+                (latestTimestamp != null &&
+                    latestTimestamp.millisecondsSinceEpoch >
+                        (_messages.last.data()
+                                as Map<String, dynamic>)['timestamp']
+                            .millisecondsSinceEpoch)) {
+              // 새로운 메시지가 있는 경우
+              final newMessage = latestMessage;
+              await _loadUserNames([newMessage]);
+
+              setState(() {
+                _messages.add(newMessage);
+              });
+
+              // 새 메시지가 추가될 때 스크롤을 아래로 이동
+              _scrollToBottom();
+            }
+          }
+        });
+  }
+
+  void _showExitDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: Text('채팅방 나가기'),
+            content: Text('채팅방을 나가시겠습니까?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text('취소'),
+              ),
+              TextButton(
+                onPressed: () async {
+                  try {
+                    final user = _auth.currentUser;
+                    if (user != null) {
+                      // 사용자의 이름 가져오기
+                      final userDoc =
+                          await _firestore
+                              .collection('users')
+                              .doc(user.uid)
+                              .get();
+                      final userName =
+                          userDoc.data()?['fullname'] ?? '알 수 없는 사용자';
+
+                      // 시스템 메시지 추가
+                      await _firestore
+                          .collection(widget.chatRoomCollection)
+                          .doc(widget.chatRoomId)
+                          .collection('messages')
+                          .add({
+                            'text': '$userName님이 그룹에서 나갔습니다.',
+                            'sender_id': 'system',
+                            'type': 'system',
+                            'timestamp': FieldValue.serverTimestamp(),
+                          });
+
+                      // 채팅방 멤버 목록에서 제거 및 수화물/멤버 수 업데이트
+                      final roomDoc =
+                          await _firestore
+                              .collection(widget.chatRoomCollection)
+                              .doc(widget.chatRoomId)
+                              .get();
+
+                      if (roomDoc.exists) {
+                        final roomData = roomDoc.data() as Map<String, dynamic>;
+                        final currentMembers = List<String>.from(
+                          roomData['members'] ?? [],
+                        );
+                        final currentLuggageCount =
+                            roomData['luggage_count_total'] ?? 0;
+                        final userLuggageCount =
+                            roomData['user_luggage_counts']?[user.uid] ?? 0;
+
+                        // 멤버 목록에서 제거
+                        currentMembers.remove(user.uid);
+
+                        // 업데이트할 데이터 준비
+                        Map<String, dynamic> updateData = {
+                          'members': currentMembers,
+                          'member_count': currentMembers.length,
+                          'updatedAt': FieldValue.serverTimestamp(),
+                        };
+
+                        // 수화물 수 업데이트
+                        if (currentLuggageCount > 0 && userLuggageCount > 0) {
+                          updateData['luggage_count_total'] =
+                              currentLuggageCount - userLuggageCount;
+                        }
+
+                        // 사용자의 수화물 정보 제거
+                        updateData['user_luggage_counts.${user.uid}'] =
+                            FieldValue.delete();
+
+                        // 채팅방 정보 업데이트
+                        await _firestore
+                            .collection(widget.chatRoomCollection)
+                            .doc(widget.chatRoomId)
+                            .update(updateData);
+
+                        // 사용자의 채팅방 목록에서 제거
+                        await _firestore
+                            .collection('users')
+                            .doc(user.uid)
+                            .collection('chatRooms')
+                            .doc(widget.chatRoomId)
+                            .delete();
+
+                        // 사용자의 채팅방 목록에서도 제거 (users 컬렉션의 chatRooms 필드)
+                        await _firestore
+                            .collection('users')
+                            .doc(user.uid)
+                            .update({
+                              'chatRooms': FieldValue.arrayRemove([
+                                widget.chatRoomId,
+                              ]),
+                            });
+                      }
+
+                      // 다이얼로그 닫기
+                      Navigator.pop(context);
+
+                      // 채팅방 화면 닫고 채팅방 목록으로 이동
+                      Navigator.pop(context); // 다이얼로그 닫기
+                      Navigator.pop(context); // 채팅방 화면 닫기
+                    }
+                  } catch (e) {
+                    print('채팅방 나가기 오류: $e');
+                    Navigator.pop(context); // 오류가 발생해도 다이얼로그는 닫기
+                  }
+                },
+                child: Text('나가기', style: TextStyle(color: Colors.red)),
+              ),
+            ],
+          ),
+    );
   }
 }

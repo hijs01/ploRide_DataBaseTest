@@ -13,6 +13,8 @@ import 'package:cabrider/screens/homepage.dart';
 class RideConfirmationPage extends StatefulWidget {
   static const String id = 'rideconfirmation';
 
+  const RideConfirmationPage({super.key});
+
   @override
   _RideConfirmationPageState createState() => _RideConfirmationPageState();
 }
@@ -925,7 +927,7 @@ class _RideConfirmationPageState extends State<RideConfirmationPage>
       } else {
         // 둘 다 아닌 경우(일반 케이스) 기본값 설정
         chatRoomCollection = 'generalRides';
-        locationIdentifier = '${pickupName}_to_${destinationName}'.replaceAll(
+        locationIdentifier = '${pickupName}_to_$destinationName'.replaceAll(
           " ",
           "_",
         );
@@ -1074,6 +1076,7 @@ class _RideConfirmationPageState extends State<RideConfirmationPage>
                 'room_number': chatRoomNumber,
                 'collection_name': chatRoomCollection,
                 'luggage_count_total': luggageCount,
+                'user_luggage_counts': {user.uid: luggageCount},
                 // 새로운 필드 추가: 드라이버 앱 관련 필드
                 'driver_accepted': false, // 드라이버가 수락했는지 여부
                 'driver_id': '', // 수락한 드라이버 ID
@@ -1088,14 +1091,16 @@ class _RideConfirmationPageState extends State<RideConfirmationPage>
               // 시스템 메시지 추가
               try {
                 // 사용자 정보 가져오기
-                DocumentSnapshot userDoc = await FirebaseFirestore.instance
-                    .collection('users')
-                    .doc(user.uid)
-                    .get();
+                DocumentSnapshot userDoc =
+                    await FirebaseFirestore.instance
+                        .collection('users')
+                        .doc(user.uid)
+                        .get();
 
                 String userName = '알 수 없음';
                 if (userDoc.exists) {
-                  Map<String, dynamic> userData = userDoc.data() as Map<String, dynamic>;
+                  Map<String, dynamic> userData =
+                      userDoc.data() as Map<String, dynamic>;
                   userName = userData['fullname'] ?? '알 수 없음';
                 }
 
@@ -1103,7 +1108,7 @@ class _RideConfirmationPageState extends State<RideConfirmationPage>
                     .collection(chatRoomCollection)
                     .doc(chatRoomId)
                     .collection('messages')
-                    .where('text', isEqualTo: '${userName}님이 그룹에 참여했습니다.')
+                    .where('text', isEqualTo: '$userName님이 그룹에 참여했습니다.')
                     .get()
                     .then((snapshot) async {
                       if (snapshot.docs.isEmpty) {
@@ -1112,7 +1117,7 @@ class _RideConfirmationPageState extends State<RideConfirmationPage>
                             .doc(chatRoomId)
                             .collection('messages')
                             .add({
-                              'text': '${userName}님이 그룹에 참여했습니다.',
+                              'text': '$userName님이 그룹에 참여했습니다.',
                               'sender_id': 'system',
                               'sender_name': '시스템',
                               'timestamp': FieldValue.serverTimestamp(),
@@ -1139,14 +1144,16 @@ class _RideConfirmationPageState extends State<RideConfirmationPage>
 
               if (!members.contains(user.uid)) {
                 // 사용자 정보 가져오기
-                DocumentSnapshot userDoc = await FirebaseFirestore.instance
-                    .collection('users')
-                    .doc(user.uid)
-                    .get();
+                DocumentSnapshot userDoc =
+                    await FirebaseFirestore.instance
+                        .collection('users')
+                        .doc(user.uid)
+                        .get();
 
                 String userName = '알 수 없음';
                 if (userDoc.exists) {
-                  Map<String, dynamic> userData = userDoc.data() as Map<String, dynamic>;
+                  Map<String, dynamic> userData =
+                      userDoc.data() as Map<String, dynamic>;
                   userName = userData['fullname'] ?? '알 수 없음';
                 }
 
@@ -1157,9 +1164,10 @@ class _RideConfirmationPageState extends State<RideConfirmationPage>
                 Map<String, dynamic> updateData = {
                   'members': FieldValue.arrayUnion([user.uid]),
                   'member_count': FieldValue.increment(1),
-                  'last_message': '${userName}님이 그룹에 참여했습니다.',
+                  'last_message': '$userName님이 그룹에 참여했습니다.',
                   'last_message_time': FieldValue.serverTimestamp(),
                   'luggage_count_total': FieldValue.increment(luggageCount),
+                  'user_luggage_counts.${user.uid}': luggageCount,
                 };
 
                 // 1명이 모이면 드라이버 앱에 표시 가능하도록 설정
@@ -1179,7 +1187,7 @@ class _RideConfirmationPageState extends State<RideConfirmationPage>
                     .collection(chatRoomCollection)
                     .doc(chatRoomId)
                     .collection('messages')
-                    .where('text', isEqualTo: '${userName}님이 그룹에 참여했습니다.')
+                    .where('text', isEqualTo: '$userName님이 그룹에 참여했습니다.')
                     .get()
                     .then((snapshot) async {
                       if (snapshot.docs.isEmpty) {
@@ -1188,7 +1196,7 @@ class _RideConfirmationPageState extends State<RideConfirmationPage>
                             .doc(chatRoomId)
                             .collection('messages')
                             .add({
-                              'text': '${userName}님이 그룹에 참여했습니다.',
+                              'text': '$userName님이 그룹에 참여했습니다.',
                               'sender_id': 'system',
                               'sender_name': '시스템',
                               'timestamp': FieldValue.serverTimestamp(),
@@ -1216,7 +1224,7 @@ class _RideConfirmationPageState extends State<RideConfirmationPage>
         String userChatRoomPath = '$chatRoomCollection/$chatRoomId';
 
         // 고유한 문서 ID 생성 (안전한 방법)
-        String safeDocId = "${chatRoomCollection}_${chatRoomId}".replaceAll(
+        String safeDocId = "${chatRoomCollection}_$chatRoomId".replaceAll(
           '/',
           '_',
         );
@@ -1267,12 +1275,10 @@ class _RideConfirmationPageState extends State<RideConfirmationPage>
         }
 
         return; // 모든 작업 완료
-
       } catch (e) {
         print('사용자 정보 저장 중 오류: $e');
         throw Exception('예약 정보 저장 중 오류가 발생했습니다. 네트워크 연결을 확인해주세요.');
       }
-
     } catch (e) {
       print('_processRide 오류: $e');
       String errorMessage = '예약 처리 중 오류가 발생했습니다';
@@ -1422,7 +1428,7 @@ class _RideConfirmationPageState extends State<RideConfirmationPage>
                         // 각 멤버의 채팅방 정보 업데이트
                         for (String memberId in members) {
                           String memberSafeDocId =
-                              "${chatRoomCollection}_${chatRoomId}".replaceAll(
+                              "${chatRoomCollection}_$chatRoomId".replaceAll(
                                 '/',
                                 '_',
                               );
@@ -1440,12 +1446,16 @@ class _RideConfirmationPageState extends State<RideConfirmationPage>
                         }
 
                         // 채팅방에 시스템 메시지 추가 (중복 방지를 위해 이전 메시지 확인)
-                        QuerySnapshot existingMessages = await FirebaseFirestore.instance
-                            .collection(chatRoomCollection)
-                            .doc(chatRoomId)
-                            .collection('messages')
-                            .where('text', isEqualTo: '드라이버가 요청을 수락했습니다. 채팅방이 활성화되었습니다.')
-                            .get();
+                        QuerySnapshot existingMessages =
+                            await FirebaseFirestore.instance
+                                .collection(chatRoomCollection)
+                                .doc(chatRoomId)
+                                .collection('messages')
+                                .where(
+                                  'text',
+                                  isEqualTo: '드라이버가 요청을 수락했습니다. 채팅방이 활성화되었습니다.',
+                                )
+                                .get();
 
                         if (existingMessages.docs.isEmpty) {
                           await FirebaseFirestore.instance

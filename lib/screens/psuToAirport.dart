@@ -3,7 +3,19 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 class PSUToAirport extends StatefulWidget {
-  // ... (existing code)
+  final String tripId;
+  final String pickup;
+  final String destination;
+
+  const PSUToAirport({
+    super.key,
+    required this.tripId,
+    required this.pickup,
+    required this.destination,
+  });
+
+  @override
+  _PSUToAirportState createState() => _PSUToAirportState();
 }
 
 class _PSUToAirportState extends State<PSUToAirport> {
@@ -26,7 +38,11 @@ class _PSUToAirportState extends State<PSUToAirport> {
         });
 
         // Save to history collection
-        final tripData = await _firestore.collection('psuToAirport').doc(widget.tripId).get();
+        final tripData =
+            await _firestore
+                .collection('psuToAirport')
+                .doc(widget.tripId)
+                .get();
         if (tripData.exists) {
           final data = tripData.data() as Map<String, dynamic>;
           await _firestore
@@ -34,12 +50,12 @@ class _PSUToAirportState extends State<PSUToAirport> {
               .doc(user.uid)
               .collection('history')
               .add({
-            'pickup': data['pickup'] ?? '',
-            'destination': data['destination'] ?? '',
-            'status': status,
-            'timestamp': FieldValue.serverTimestamp(),
-            'tripId': widget.tripId,
-          });
+                'pickup': data['pickup'] ?? '',
+                'destination': data['destination'] ?? '',
+                'status': status,
+                'timestamp': FieldValue.serverTimestamp(),
+                'tripId': widget.tripId,
+              });
         }
 
         setState(() {
@@ -51,5 +67,5 @@ class _PSUToAirportState extends State<PSUToAirport> {
     }
   }
 
-  // ... (rest of the existing code)
-} 
+  // ... (rest of the existing code
+}

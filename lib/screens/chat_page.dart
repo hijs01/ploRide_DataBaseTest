@@ -11,6 +11,8 @@ import 'dart:async'; // StreamSubscription을 위한 임포트 추가
 class ChatPage extends StatefulWidget {
   static const String id = 'chat';
 
+  const ChatPage({super.key});
+
   @override
   _ChatPageState createState() => _ChatPageState();
 }
@@ -22,7 +24,7 @@ class _ChatPageState extends State<ChatPage> {
   String? _currentUserId;
   List<Map<String, dynamic>> _chatRooms = [];
   bool _isLoading = true;
-  List<StreamSubscription> _chatRoomSubscriptions = [];
+  final List<StreamSubscription> _chatRoomSubscriptions = [];
 
   @override
   void initState() {
@@ -145,6 +147,20 @@ class _ChatPageState extends State<ChatPage> {
       final String chatRoomCollection =
           userRoomData['chat_room_collection'] ?? '';
 
+      // 사용자가 실제로 해당 채팅방의 멤버인지 확인
+      List<dynamic> members = chatRoomData['members'] ?? [];
+      if (!members.contains(_currentUserId)) {
+        // 사용자가 멤버가 아니면 채팅방을 표시하지 않음
+        setState(() {
+          _chatRooms.removeWhere(
+            (room) =>
+                room['id'] == chatRoomId &&
+                room['collection'] == chatRoomCollection,
+          );
+        });
+        return;
+      }
+
       // driver_accepted 또는 chat_visible이 true인지 확인
       bool isVisible =
           chatRoomData['driver_accepted'] == true ||
@@ -209,6 +225,13 @@ class _ChatPageState extends State<ChatPage> {
 
       if (chatRoomDoc.exists) {
         final chatRoomData = chatRoomDoc.data() as Map<String, dynamic>;
+
+        // 사용자가 실제로 해당 채팅방의 멤버인지 확인
+        List<dynamic> members = chatRoomData['members'] ?? [];
+        if (!members.contains(_currentUserId)) {
+          // 사용자가 멤버가 아니면 채팅방을 표시하지 않음
+          return;
+        }
 
         // driver_accepted 또는 chat_visible이 true인지 확인
         bool isVisible =
@@ -307,8 +330,8 @@ class _ChatPageState extends State<ChatPage> {
             context,
             PageRouteBuilder(
               pageBuilder:
-                  (context, animation, secondaryAnimation) => 
-                  index == 0 ? HomePage() : HistoryPage(),
+                  (context, animation, secondaryAnimation) =>
+                      index == 0 ? HomePage() : HistoryPage(),
               transitionDuration: Duration.zero,
               reverseTransitionDuration: Duration.zero,
             ),
