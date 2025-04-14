@@ -254,7 +254,7 @@ class _LoginpageState extends State<Loginpage>
                         ),
                         SizedBox(height: 20), // 간격 조정
                         Text(
-                          'PLO RIDE',
+                          'TAGO',
                           style: TextStyle(
                             fontSize: 28,
                             fontWeight: FontWeight.bold,
@@ -263,7 +263,7 @@ class _LoginpageState extends State<Loginpage>
                         ),
                         SizedBox(height: 10), // 간격 유지
                         Text(
-                          'WE ARE, PLO RIDE',
+                          'WE ARE, TAGO',
                           style: TextStyle(
                             fontSize: 16,
                             color: Colors.white.withOpacity(0.9),

@@ -120,6 +120,16 @@ class _ChatRoomPageState extends State<ChatRoomPage>
     }
 
     try {
+      // 먼저 drivers 컬렉션에서 확인
+      final driverDoc = await _firestore.collection('drivers').doc(userId).get();
+      if (driverDoc.exists) {
+        final driverData = driverDoc.data();
+        final driverName = driverData?['fullname'] ?? '알 수 없는 사용자';
+        _userNames[userId] = driverName;
+        return driverName;
+      }
+
+      // drivers 컬렉션에 없으면 users 컬렉션에서 확인
       final userDoc = await _firestore.collection('users').doc(userId).get();
       if (userDoc.exists) {
         final userData = userDoc.data();
@@ -477,19 +487,58 @@ class _ChatRoomPageState extends State<ChatRoomPage>
                           },
                         ),
                       ),
+                      // 예상 가격 표시
+                      Container(
+                        padding: EdgeInsets.all(16.0),
+                        decoration: BoxDecoration(
+                          color: Colors.grey[100],
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '예상 가격',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            SizedBox(height: 8),
+                            Text(
+                              users.length <= 2 ? '\$500' : 
+                              users.length == 3 ? '\$440' : '\$500',
+                              style: TextStyle(
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                                color: accentColor,
+                              ),
+                            ),
+                            SizedBox(height: 4),
+                            Text(
+                              '${users.length}명 기준',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      SizedBox(height: 16),
+                      Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: ElevatedButton(
+                          onPressed: () => _showExitDialog(context),
+                          style: ElevatedButton.styleFrom(
+                            minimumSize: Size(double.infinity, 50),
+                          ),
+                          child: Text('채팅방 나가기'),
+                        ),
+                      ),
                     ],
                   );
                 },
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: ElevatedButton(
-                onPressed: () => _showExitDialog(context),
-                style: ElevatedButton.styleFrom(
-                  minimumSize: Size(double.infinity, 50),
-                ),
-                child: Text('채팅방 나가기'),
               ),
             ),
           ],
