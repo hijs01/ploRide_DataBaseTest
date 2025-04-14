@@ -1008,7 +1008,12 @@ class _ChatRoomPageState extends State<ChatRoomPage>
                               .get();
 
                       if (roomDoc.exists) {
-                        final roomData = roomDoc.data() as Map<String, dynamic>;
+                        final roomData = roomDoc.data();
+                        if (roomData == null) {
+                          print('채팅방 데이터가 null입니다.');
+                          return;
+                        }
+
                         final currentMembers = List<String>.from(
                           roomData['members'] ?? [],
                         );
@@ -1043,31 +1048,76 @@ class _ChatRoomPageState extends State<ChatRoomPage>
                             .doc(widget.chatRoomId)
                             .update(updateData);
 
-                        // 사용자의 채팅방 목록에서 제거
-                        await _firestore
-                            .collection('users')
-                            .doc(user.uid)
-                            .collection('chatRooms')
-                            .doc(widget.chatRoomId)
-                            .delete();
+                        // 멤버가 0명이 되면 채팅방 삭제
+                        if (currentMembers.isEmpty) {
+                          try {
+                            // 채팅방의 모든 메시지 삭제
+                            final messagesSnapshot = await _firestore
+                                .collection(widget.chatRoomCollection)
+                                .doc(widget.chatRoomId)
+                                .collection('messages')
+                                .get();
+                            
+                            // 모든 메시지 삭제
+                            for (var doc in messagesSnapshot.docs) {
+                              await doc.reference.delete();
+                            }
+                            
+                            // 채팅방 문서 삭제
+                            await _firestore
+                                .collection(widget.chatRoomCollection)
+                                .doc(widget.chatRoomId)
+                                .delete();
 
-                        // 사용자의 채팅방 목록에서도 제거 (users 컬렉션의 chatRooms 필드)
-                        await _firestore
-                            .collection('users')
-                            .doc(user.uid)
-                            .update({
-                              'chatRooms': FieldValue.arrayRemove([
-                                widget.chatRoomId,
-                              ]),
-                            });
+                            // 사용자의 채팅방 목록에서도 제거 (users 컬렉션의 chatRooms 필드)
+                            await _firestore
+                                .collection('users')
+                                .doc(user.uid)
+                                .update({
+                                  'chatRooms': FieldValue.arrayRemove([
+                                    widget.chatRoomId,
+                                  ]),
+                                });
+
+                            // 사용자의 채팅방 목록에서 제거
+                            await _firestore
+                                .collection('users')
+                                .doc(user.uid)
+                                .collection('chatRooms')
+                                .doc(widget.chatRoomId)
+                                .delete();
+
+                            print('채팅방이 성공적으로 삭제되었습니다.');
+                          } catch (e) {
+                            print('채팅방 삭제 중 오류 발생: $e');
+                          }
+                        } else {
+                          // 사용자의 채팅방 목록에서 제거
+                          await _firestore
+                              .collection('users')
+                              .doc(user.uid)
+                              .collection('chatRooms')
+                              .doc(widget.chatRoomId)
+                              .delete();
+
+                          // 사용자의 채팅방 목록에서도 제거 (users 컬렉션의 chatRooms 필드)
+                          await _firestore
+                              .collection('users')
+                              .doc(user.uid)
+                              .update({
+                                'chatRooms': FieldValue.arrayRemove([
+                                  widget.chatRoomId,
+                                ]),
+                              });
+                        }
+
+                        // 다이얼로그 닫기
+                        Navigator.pop(context);
+
+                        // 채팅방 화면 닫고 채팅방 목록으로 이동
+                        Navigator.pop(context); // 다이얼로그 닫기
+                        Navigator.pop(context); // 채팅방 화면 닫기
                       }
-
-                      // 다이얼로그 닫기
-                      Navigator.pop(context);
-
-                      // 채팅방 화면 닫고 채팅방 목록으로 이동
-                      Navigator.pop(context); // 다이얼로그 닫기
-                      Navigator.pop(context); // 채팅방 화면 닫기
                     }
                   } catch (e) {
                     print('채팅방 나가기 오류: $e');

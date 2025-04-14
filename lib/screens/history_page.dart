@@ -140,235 +140,198 @@ class _HistoryPageState extends State<HistoryPage> {
   @override
   Widget build(BuildContext context) {
     final isDarkMode = MediaQuery.of(context).platformBrightness == Brightness.dark;
-    final currentUser = _auth.currentUser;
-    
-    print('Building HistoryPage for user: ${currentUser?.uid}');
+    final currentUser = FirebaseAuth.instance.currentUser;
 
     return Scaffold(
       backgroundColor: isDarkMode ? Colors.black : Colors.white,
       appBar: AppBar(
-        elevation: 0,
+        title: Text('이용 내역'),
         backgroundColor: isDarkMode ? Colors.black : Colors.white,
-        title: Text(
-          '이용 내역',
-          style: TextStyle(
-            color: isDarkMode ? Colors.white : Colors.black,
-            fontSize: 22,
-            fontWeight: FontWeight.bold,
-          ),
+        elevation: 0,
+        iconTheme: IconThemeData(
+          color: isDarkMode ? Colors.white : Colors.black,
         ),
-        automaticallyImplyLeading: false,
+        titleTextStyle: TextStyle(
+          color: isDarkMode ? Colors.white : Colors.black,
+          fontSize: 20,
+          fontWeight: FontWeight.bold,
+        ),
       ),
-      body: StreamBuilder<QuerySnapshot>(
-        stream: _firestore
-            .collection('psuToAirport')
-            .snapshots(),
-        builder: (context, snapshot) {
-          if (snapshot.hasError) {
-            print('Error loading history: ${snapshot.error}');
-            return Center(
+      body: currentUser == null
+          ? Center(
               child: Text(
-                '오류가 발생했습니다',
+                '로그인이 필요합니다',
                 style: TextStyle(
+                  fontSize: 18,
                   color: isDarkMode ? Colors.white : Colors.black,
                 ),
               ),
-            );
-          }
-
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return Center(
-              child: CircularProgressIndicator(),
-            );
-          }
-
-          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-            print('No data in psuToAirport collection');
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.history,
-                    size: 64,
-                    color: isDarkMode ? Colors.grey[600] : Colors.grey[400],
-                  ),
-                  SizedBox(height: 16),
-                  Text(
-                    '이용 내역이 없습니다',
-                    style: TextStyle(
-                      fontSize: 18,
-                      color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
-                    ),
-                  ),
-                ],
-              ),
-            );
-          }
-
-          print('Total documents in psuToAirport: ${snapshot.data!.docs.length}');
-          
-          // 현재 사용자의 여행만 필터링하고 시간순 정렬
-          final userTrips = snapshot.data!.docs
-              .where((doc) {
-                final data = doc.data() as Map<String, dynamic>;
-                final members = data['members'] as List<dynamic>?;
-                final isUserTrip = members?.contains(currentUser?.uid) ?? false;
-                print('Document ${doc.id}: members=${members}, isUserTrip=$isUserTrip');
-                return isUserTrip;
-              })
-              .toList()
-            ..sort((a, b) {
-              final timestampA = (a.data() as Map<String, dynamic>)['timestamp'] as Timestamp?;
-              final timestampB = (b.data() as Map<String, dynamic>)['timestamp'] as Timestamp?;
-              
-              if (timestampA == null) return 1;
-              if (timestampB == null) return -1;
-              
-              return timestampB.compareTo(timestampA); // 내림차순 정렬
-            });
-          
-          print('Filtered user trips count: ${userTrips.length}');
-          
-          if (userTrips.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.history,
-                    size: 64,
-                    color: isDarkMode ? Colors.grey[600] : Colors.grey[400],
-                  ),
-                  SizedBox(height: 16),
-                  Text(
-                    '이용 내역이 없습니다',
-                    style: TextStyle(
-                      fontSize: 18,
-                      color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
-                    ),
-                  ),
-                ],
-              ),
-            );
-          }
-          
-          return ListView.builder(
-            itemCount: userTrips.length,
-            itemBuilder: (context, index) {
-              final tripData = userTrips[index].data() as Map<String, dynamic>;
-              print('Building trip item $index: $tripData'); // 디버그 로그 추가
-              
-              // pickup_info와 destination_info에서 address 정보 추출
-              final pickupInfo = tripData['pickup_info'] as Map<String, dynamic>?;
-              final destinationInfo = tripData['destination_info'] as Map<String, dynamic>?;
-              
-              final pickup = pickupInfo?['address'] ?? '출발지 정보 없음';
-              final destination = destinationInfo?['address'] ?? '도착지 정보 없음';
-              final status = tripData['status'] ?? '상태 정보 없음';
-              final timestamp = tripData['timestamp'] as Timestamp?;
-              final date = timestamp?.toDate() ?? DateTime.now();
-
-              print('Trip details - Pickup: $pickup, Destination: $destination, Status: $status'); // 디버그 로그 추가
-
-              // 히스토리 데이터는 한 번만 저장
-              if (index == 0) {
-                _saveToHistory(tripData);
-              }
-
-              return Container(
-                margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                decoration: BoxDecoration(
-                  color: isDarkMode ? Color(0xFF1E1E1E) : Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: [
-                    BoxShadow(
-                      color: isDarkMode ? Colors.black12 : Colors.grey.withOpacity(0.1),
-                      blurRadius: 10,
-                      offset: Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: ListTile(
-                  contentPadding: EdgeInsets.all(16),
-                  title: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.location_on,
-                            color: Colors.red,
-                            size: 16,
-                          ),
-                          SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              pickup,
-                              style: TextStyle(
-                                color: isDarkMode ? Colors.white : Colors.black,
-                                fontSize: 16,
-                              ),
-                            ),
-                          ),
-                        ],
+            )
+          : StreamBuilder<QuerySnapshot>(
+              stream: FirebaseFirestore.instance
+                  .collection('users')
+                  .doc(currentUser.uid)
+                  .collection('history')
+                  .orderBy('timestamp', descending: true)
+                  .snapshots(),
+              builder: (context, snapshot) {
+                if (snapshot.hasError) {
+                  return Center(
+                    child: Text(
+                      '오류가 발생했습니다',
+                      style: TextStyle(
+                        fontSize: 18,
+                        color: isDarkMode ? Colors.white : Colors.black,
                       ),
-                      SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.flag,
-                            color: Colors.green,
-                            size: 16,
-                          ),
-                          SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              destination,
-                              style: TextStyle(
-                                color: isDarkMode ? Colors.white : Colors.black,
-                                fontSize: 16,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                  subtitle: Padding(
-                    padding: const EdgeInsets.only(top: 8.0),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    ),
+                  );
+                }
+
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return Center(
+                    child: CircularProgressIndicator(),
+                  );
+                }
+
+                final userTrips = snapshot.data?.docs ?? [];
+                
+                print('User trips count: ${userTrips.length}');
+                
+                if (userTrips.isEmpty) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Text(
-                          '${date.year}년 ${date.month}월 ${date.day}일 ${date.hour}:${date.minute.toString().padLeft(2, '0')}',
-                          style: TextStyle(
-                            color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
-                          ),
+                        Icon(
+                          Icons.history,
+                          size: 64,
+                          color: isDarkMode ? Colors.grey[600] : Colors.grey[400],
                         ),
-                        Container(
-                          padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: _getStatusColor(status).withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Text(
-                            status,
-                            style: TextStyle(
-                              color: _getStatusColor(status),
-                              fontWeight: FontWeight.bold,
-                            ),
+                        SizedBox(height: 16),
+                        Text(
+                          '이용 내역이 없습니다',
+                          style: TextStyle(
+                            fontSize: 18,
+                            color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
                           ),
                         ),
                       ],
                     ),
-                  ),
-                ),
-              );
-            },
-          );
-        },
-      ),
+                  );
+                }
+                
+                return ListView.builder(
+                  itemCount: userTrips.length,
+                  itemBuilder: (context, index) {
+                    final tripData = userTrips[index].data() as Map<String, dynamic>;
+                    print('Building trip item $index: $tripData'); // 디버그 로그 추가
+                    
+                    final pickup = tripData['pickup'] ?? '출발지 정보 없음';
+                    final destination = tripData['destination'] ?? '도착지 정보 없음';
+                    final status = tripData['status'] ?? '상태 정보 없음';
+                    final timestamp = tripData['timestamp'] as Timestamp?;
+                    final date = timestamp?.toDate() ?? DateTime.now();
+
+                    print('Trip details - Pickup: $pickup, Destination: $destination, Status: $status'); // 디버그 로그 추가
+
+                    // 히스토리 데이터는 한 번만 저장
+                    if (index == 0) {
+                      _saveToHistory(tripData);
+                    }
+
+                    return Container(
+                      margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: isDarkMode ? Color(0xFF1E1E1E) : Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: isDarkMode ? Colors.black12 : Colors.grey.withOpacity(0.1),
+                            blurRadius: 10,
+                            offset: Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: ListTile(
+                        contentPadding: EdgeInsets.all(16),
+                        title: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.location_on,
+                                  color: Colors.red,
+                                  size: 16,
+                                ),
+                                SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    pickup,
+                                    style: TextStyle(
+                                      color: isDarkMode ? Colors.white : Colors.black,
+                                      fontSize: 16,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            SizedBox(height: 8),
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.flag,
+                                  color: Colors.green,
+                                  size: 16,
+                                ),
+                                SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    destination,
+                                    style: TextStyle(
+                                      color: isDarkMode ? Colors.white : Colors.black,
+                                      fontSize: 16,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                        subtitle: Padding(
+                          padding: const EdgeInsets.only(top: 8.0),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                '${date.year}년 ${date.month}월 ${date.day}일 ${date.hour}:${date.minute.toString().padLeft(2, '0')}',
+                                style: TextStyle(
+                                  color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                                ),
+                              ),
+                              Container(
+                                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: _getStatusColor(status).withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Text(
+                                  status,
+                                  style: TextStyle(
+                                    color: _getStatusColor(status),
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
       bottomNavigationBar: BottomNavigationBar(
         items: const <BottomNavigationBarItem>[
           BottomNavigationBarItem(icon: Icon(Icons.home), label: '홈'),
