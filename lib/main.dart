@@ -17,6 +17,7 @@ import 'package:provider/provider.dart';
 import 'package:cabrider/dataprovider/appdata.dart';
 import 'package:cabrider/helpers/helpermethods.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 // 백그라운드 메시지 핸들러
 @pragma('vm:entry-point')
@@ -166,8 +167,11 @@ Future<void> main() async {
 
   // Provider로 감싼 앱 실행
   runApp(
-    ChangeNotifierProvider(
-      create: (context) => AppData(),
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => AppData()),
+        ChangeNotifierProvider(create: (_) => ThemeProvider()),
+      ],
       child: const MyApp(),
     ),
   );
@@ -176,30 +180,59 @@ Future<void> main() async {
 // 전역 NavigatorKey 선언
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
+class ThemeProvider with ChangeNotifier {
+  bool _darkMode = false;  // 기본값을 false로 설정하여 화이트 모드로 시작
+
+  bool get darkMode => _darkMode;
+
+  ThemeProvider() {
+    _loadThemeFromPrefs();
+  }
+
+  void _loadThemeFromPrefs() async {
+    final prefs = await SharedPreferences.getInstance();
+    _darkMode = prefs.getBool('darkMode') ?? false;
+    notifyListeners();
+  }
+
+  void toggleDarkMode() async {
+    _darkMode = !_darkMode;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('darkMode', _darkMode);
+    notifyListeners();
+  }
+}
+
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      navigatorKey: navigatorKey, // 전역 NavigatorKey 설정
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-        fontFamily: 'Brand-Regular',
-        visualDensity: VisualDensity.adaptivePlatformDensity,
-      ),
-      // 로그인 상태에 따라 초기 라우트 설정
-      initialRoute: currentFirebaseUser == null ? Loginpage.id : HomePage.id,
-      routes: {
-        MainPage.id: (context) => MainPage(),
-        RegistrationPage.id: (context) => RegistrationPage(),
-        Loginpage.id: (context) => Loginpage(),
-        SearchPage.id: (context) => SearchPage(),
-        HomePage.id: (context) => HomePage(),
-        SettingsPage.id: (context) => SettingsPage(),
-        EmailVerificationPage.id: (context) => EmailVerificationPage(email: ''),
-        'rideconfirmation': (context) => RideConfirmationPage(),
+    return Consumer<ThemeProvider>(
+      builder: (context, themeProvider, child) {
+        return MaterialApp(
+          navigatorKey: navigatorKey, // 전역 NavigatorKey 설정
+          debugShowCheckedModeBanner: false,
+          theme: ThemeData(
+            primarySwatch: Colors.blue,
+            fontFamily: 'Brand-Regular',
+            visualDensity: VisualDensity.adaptivePlatformDensity,
+            brightness: themeProvider.darkMode ? Brightness.dark : Brightness.light,
+            scaffoldBackgroundColor: themeProvider.darkMode ? Colors.black : Colors.white,  // 배경색 설정
+          ),
+          // 로그인 상태에 따라 초기 라우트 설정
+          initialRoute: currentFirebaseUser == null ? Loginpage.id : HomePage.id,
+          routes: {
+            MainPage.id: (context) => MainPage(),
+            RegistrationPage.id: (context) => RegistrationPage(),
+            Loginpage.id: (context) => Loginpage(),
+            SearchPage.id: (context) => SearchPage(),
+            HomePage.id: (context) => HomePage(),
+            SettingsPage.id: (context) => SettingsPage(),
+            EmailVerificationPage.id: (context) => EmailVerificationPage(email: ''),
+            'rideconfirmation': (context) => RideConfirmationPage(),
+          },
+        );
       },
     );
   }

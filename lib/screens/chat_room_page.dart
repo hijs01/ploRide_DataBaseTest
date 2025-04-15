@@ -53,6 +53,7 @@ class _ChatRoomPageState extends State<ChatRoomPage>
     _loadRoomMembers();
     _loadChatRoomData();
     _setupRealtimeUpdates();
+    _addToHistory();
 
     // 키보드 상태 변경 감지를 위해 observer 등록
     WidgetsBinding.instance.addObserver(this);
@@ -1123,5 +1124,36 @@ class _ChatRoomPageState extends State<ChatRoomPage>
         ],
       ),
     );
+  }
+
+  void _addToHistory() async {
+    final user = _auth.currentUser;
+    if (user != null) {
+      // 채팅방 정보 가져오기
+      final chatRoomDoc = await _firestore
+          .collection(widget.chatRoomCollection)
+          .doc(widget.chatRoomId)
+          .get();
+
+      if (chatRoomDoc.exists) {
+        final chatRoomData = chatRoomDoc.data();
+        if (chatRoomData != null) {
+          // 히스토리에 저장
+          await _firestore
+              .collection('users')
+              .doc(user.uid)
+              .collection('history')
+              .add({
+            'chatRoomId': widget.chatRoomId,
+            'chatRoomName': widget.chatRoomName,
+            'pickup': chatRoomData['pickup_info']?['address'] ?? '',
+            'destination': chatRoomData['destination_info']?['address'] ?? '',
+            'status': 'accepted',
+            'timestamp': FieldValue.serverTimestamp(),
+            'tripId': widget.chatRoomId,
+          });
+        }
+      }
+    }
   }
 }

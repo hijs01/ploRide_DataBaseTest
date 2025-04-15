@@ -25,6 +25,10 @@ class _SettingsPageState extends State<SettingsPage> {
   int _selectedIndex = 3; // 현재 Profile 탭이 선택됨
   String selectedLanguage = '한국어';
 
+  // 앱의 주요 색상 테마 - 앱 전체에서 사용되는 값과 일치하도록 수정
+  final Color primaryColor = Color(0xFF3F51B5); // 인디고 색상
+  final Color accentColor = Color(0xFF5C6BC0); // 밝은 인디고 색상
+
   // 언어 옵션
   final List<String> languages = ['English', '한국어', '中文', '日本語', 'Español'];
 
@@ -129,19 +133,20 @@ class _SettingsPageState extends State<SettingsPage> {
     }
   }
 
+  // 다크 모드 상태 변경 함수
+  void toggleDarkMode(bool value) {
+    setState(() {
+      darkModeEnabled = value;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
-    final isDarkMode =
-        MediaQuery.of(context).platformBrightness == Brightness.dark ||
-        darkModeEnabled;
+    final isDarkMode = darkModeEnabled;  // darkModeEnabled 값만 사용
     final textColor = isDarkMode ? Colors.white : Colors.black;
-    final backgroundColor = isDarkMode ? Color(0xFF121212) : Colors.white;
-    final cardColor = isDarkMode ? Color(0xFF1E1E1E) : Colors.white;
+    final backgroundColor = isDarkMode ? Colors.black : Colors.white;
+    final cardColor = isDarkMode ? Colors.grey[900]! : Colors.grey[100]!;
     final shadowColor = isDarkMode ? Colors.transparent : Colors.black12;
-
-    // 앱의 주요 색상 테마 - 앱 전체에서 사용되는 값과 일치하도록 수정
-    final primaryColor = Color(0xFF3F51B5); // 원래 인디고 색상으로 되돌림
-    final accentColor = Color(0xFF3F51B5); // 원래 인디고 색상으로 되돌림
 
     // 설정 페이지의 내용
     Widget content = Scaffold(
@@ -157,7 +162,7 @@ class _SettingsPageState extends State<SettingsPage> {
             fontWeight: FontWeight.bold,
           ),
         ),
-        automaticallyImplyLeading: false, // 뒤로가기 버튼 제거
+        automaticallyImplyLeading: false,
       ),
       body: ListView(
         padding: EdgeInsets.symmetric(horizontal: 16),
@@ -294,11 +299,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 title: '다크 모드',
                 subtitle: '앱의 어두운 테마를 활성화합니다',
                 value: darkModeEnabled,
-                onChanged: (value) {
-                  setState(() {
-                    darkModeEnabled = value;
-                  });
-                },
+                onChanged: toggleDarkMode,
                 isDarkMode: isDarkMode,
                 primaryColor: primaryColor,
               ),
@@ -493,9 +494,9 @@ class _SettingsPageState extends State<SettingsPage> {
           BottomNavigationBarItem(icon: Icon(Icons.person), label: '프로필'),
         ],
         currentIndex: _selectedIndex,
-        selectedItemColor: isDarkMode ? Colors.white : Colors.blue,
+        selectedItemColor: isDarkMode ? Colors.white : primaryColor,
         unselectedItemColor: isDarkMode ? Colors.grey[600] : Colors.grey,
-        backgroundColor: isDarkMode ? Colors.black : Colors.white,
+        backgroundColor: backgroundColor,
         showSelectedLabels: true,
         showUnselectedLabels: true,
         type: BottomNavigationBarType.fixed,
@@ -540,7 +541,7 @@ class _SettingsPageState extends State<SettingsPage> {
     return Container(
       margin: EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
-        color: backgroundColor,
+        color: isDarkMode ? Colors.grey[900] : Colors.grey[100],
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(color: shadowColor, blurRadius: 10, offset: Offset(0, 4)),
@@ -556,10 +557,10 @@ class _SettingsPageState extends State<SettingsPage> {
                 Container(
                   padding: EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Color(0xFF536DFE).withOpacity(0.1),
+                    color: primaryColor.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: Icon(icon, size: 20, color: Color(0xFF536DFE)),
+                  child: Icon(icon, size: 20, color: primaryColor),
                 ),
                 SizedBox(width: 12),
                 Text(
@@ -573,7 +574,7 @@ class _SettingsPageState extends State<SettingsPage> {
               ],
             ),
           ),
-          Divider(thickness: 0.5),
+          Divider(thickness: 0.5, color: isDarkMode ? Colors.grey[800] : Colors.grey[300]),
           ...children,
         ],
       ),
@@ -594,19 +595,15 @@ class _SettingsPageState extends State<SettingsPage> {
       child: InkWell(
         borderRadius: BorderRadius.circular(8),
         onTap: onTap,
-        child: Padding(
+        child: Container(
+          color: isDarkMode ? Colors.grey[900] : Colors.grey[100],
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           child: Row(
             children: [
               Icon(
                 icon,
                 size: 24,
-                color:
-                    isDestructive
-                        ? Colors.red
-                        : isDarkMode
-                        ? Color(0xFF536DFE).withOpacity(0.8)
-                        : Color(0xFF536DFE),
+                color: isDestructive ? Colors.red : primaryColor,
               ),
               SizedBox(width: 16),
               Expanded(
@@ -618,12 +615,7 @@ class _SettingsPageState extends State<SettingsPage> {
                       style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w500,
-                        color:
-                            isDestructive
-                                ? Colors.red
-                                : isDarkMode
-                                ? Colors.white
-                                : Colors.black,
+                        color: isDestructive ? Colors.red : (isDarkMode ? Colors.white : Colors.black),
                       ),
                     ),
                     SizedBox(height: 2),
@@ -665,7 +657,7 @@ class _SettingsPageState extends State<SettingsPage> {
       trailing: CupertinoSwitch(
         value: value,
         onChanged: onChanged,
-        activeColor: primaryColor,
+        activeColor: Color(0xFF3F51B5),
         trackColor: isDarkMode ? Colors.grey[800] : Colors.grey[300],
       ),
     );

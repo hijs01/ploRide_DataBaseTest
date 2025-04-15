@@ -31,6 +31,7 @@ class _ChatPageState extends State<ChatPage> {
     super.initState();
     _getCurrentUser();
     _loadChatRooms();
+    _cleanupOldChatRooms(); // 오래된 채팅방 정리
   }
 
   @override
@@ -357,9 +358,9 @@ class _ChatPageState extends State<ChatPage> {
     final isDarkMode =
         MediaQuery.of(context).platformBrightness == Brightness.dark;
     final textColor = isDarkMode ? Colors.white : Colors.black;
-    final backgroundColor = isDarkMode ? Color(0xFF121212) : Color(0xFFF5F5F5);
-    final cardColor = isDarkMode ? Color(0xFF1E1E1E) : Colors.white;
-    final accentColor = Color(0xFF3F51B5);
+    final backgroundColor = isDarkMode ? Colors.black : Colors.white;
+    final cardColor = isDarkMode ? Colors.black : Colors.white;
+    final accentColor = Colors.black;
     final secondaryColor = Color(0xFF8BC34A);
 
     return WillPopScope(
@@ -377,7 +378,7 @@ class _ChatPageState extends State<ChatPage> {
       child: Scaffold(
         backgroundColor: backgroundColor,
         appBar: AppBar(
-          backgroundColor: accentColor,
+          backgroundColor: Colors.black,
           title: Text(
             '채팅방',
             style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
@@ -438,9 +439,9 @@ class _ChatPageState extends State<ChatPage> {
             BottomNavigationBarItem(icon: Icon(Icons.person), label: '프로필'),
           ],
           currentIndex: _selectedIndex,
-          selectedItemColor: accentColor,
+          selectedItemColor: Colors.white,
           unselectedItemColor: isDarkMode ? Colors.grey[600] : Colors.grey,
-          backgroundColor: isDarkMode ? Color(0xFF1E1E1E) : Colors.white,
+          backgroundColor: Colors.black,
           showSelectedLabels: true,
           showUnselectedLabels: true,
           type: BottomNavigationBarType.fixed,
@@ -462,183 +463,192 @@ class _ChatPageState extends State<ChatPage> {
     final formattedDate = DateFormat('M월 d일').format(departureTime);
     final formattedTime = DateFormat('HH:mm').format(departureTime);
 
-    // 채팅방이 보이지 않아야 하는 경우 빈 컨테이너 반환 (쿼리에서 이미 필터링됨)
-    // if (!(chatRoom['driver_accepted'] == true || chatRoom['chat_visible'] == true)) {
-    //   return Container();
-    // }
-
-    return Card(
+    return Container(
       margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      color: cardColor,
-      child: InkWell(
+      decoration: BoxDecoration(
+        color: cardColor,
         borderRadius: BorderRadius.circular(12),
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder:
-                  (context) => ChatRoomPage(
-                    chatRoomId: chatRoom['id'],
-                    chatRoomName: chatRoom['name'],
-                    chatRoomCollection: chatRoom['collection'],
-                  ),
-            ),
-          );
-        },
-        child: Padding(
-          padding: EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  // 확정 여부 표시
-                  Container(
-                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color:
-                          chatRoom['isConfirmed']
-                              ? secondaryColor
-                              : Colors.grey.withOpacity(0.3),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      chatRoom['isConfirmed'] ? '확정됨' : '미확정',
-                      style: TextStyle(
+        border: Border.all(
+          color: Colors.white,
+          width: 1.0,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 10,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => ChatRoomPage(
+                  chatRoomId: chatRoom['id'],
+                  chatRoomName: chatRoom['name'],
+                  chatRoomCollection: chatRoom['collection'],
+                ),
+              ),
+            );
+          },
+          child: Padding(
+            padding: EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    // 확정 여부 표시
+                    Container(
+                      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
                         color:
                             chatRoom['isConfirmed']
-                                ? Colors.white
-                                : textColor.withOpacity(0.7),
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
+                                ? secondaryColor
+                                : Colors.grey.withOpacity(0.3),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        chatRoom['isConfirmed'] ? '확정됨' : '미확정',
+                        style: TextStyle(
+                          color:
+                              chatRoom['isConfirmed']
+                                  ? Colors.white
+                                  : textColor.withOpacity(0.7),
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
-                  ),
-                  SizedBox(width: 8),
+                    SizedBox(width: 8),
 
-                  // 출발 시간 표시
-                  Icon(
-                    Icons.access_time,
-                    size: 16,
-                    color: textColor.withOpacity(0.7),
-                  ),
-                  SizedBox(width: 4),
-                  Text(
-                    '$formattedDate $formattedTime',
-                    style: TextStyle(
+                    // 출발 시간 표시
+                    Icon(
+                      Icons.access_time,
+                      size: 16,
                       color: textColor.withOpacity(0.7),
-                      fontSize: 14,
                     ),
-                  ),
-
-                  Spacer(),
-
-                  // 인원 표시
-                  Container(
-                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: accentColor.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      '${chatRoom['memberCount']}/${chatRoom['maxMembers']}명',
-                      style: TextStyle(
-                        color: accentColor,
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-
-              SizedBox(height: 12),
-
-              // 경로 정보
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(Icons.trip_origin, color: accentColor, size: 18),
-                      SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          '출발: ${chatRoom['origin']}',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            color: textColor,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ),
-                  SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Icon(Icons.location_on, color: accentColor, size: 18),
-                      SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          '도착: ${chatRoom['destination']}',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            color: textColor,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-
-              SizedBox(height: 12),
-
-              // 마지막 메시지 정보
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      chatRoom['lastMessage'] ?? '대화가 시작되지 않았습니다',
+                    SizedBox(width: 4),
+                    Text(
+                      '$formattedDate $formattedTime',
                       style: TextStyle(
                         color: textColor.withOpacity(0.7),
                         fontSize: 14,
                       ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
                     ),
-                  ),
-                  SizedBox(width: 8),
-                  Text(
-                    _formatTimestamp(chatRoom['timestamp']),
-                    style: TextStyle(
-                      color: textColor.withOpacity(0.5),
-                      fontSize: 12,
-                    ),
-                  ),
 
-                  // 새 메시지 표시
-                  if (chatRoom['hasNewMessages'] == true)
+                    Spacer(),
+
+                    // 인원 표시
                     Container(
-                      margin: EdgeInsets.only(left: 8),
-                      width: 10,
-                      height: 10,
+                      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: Colors.red,
-                        shape: BoxShape.circle,
+                        color: accentColor.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        '${chatRoom['memberCount']}/${chatRoom['maxMembers']}명',
+                        style: TextStyle(
+                          color: accentColor,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
-                ],
-              ),
-            ],
+                  ],
+                ),
+
+                SizedBox(height: 12),
+
+                // 경로 정보
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.trip_origin, color: accentColor, size: 18),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            '출발: ${chatRoom['origin']}',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: textColor,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Icon(Icons.location_on, color: accentColor, size: 18),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            '도착: ${chatRoom['destination']}',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: textColor,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+
+                SizedBox(height: 12),
+
+                // 마지막 메시지 정보
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        chatRoom['lastMessage'] ?? '대화가 시작되지 않았습니다',
+                        style: TextStyle(
+                          color: textColor.withOpacity(0.7),
+                          fontSize: 14,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    SizedBox(width: 8),
+                    Text(
+                      _formatTimestamp(chatRoom['timestamp']),
+                      style: TextStyle(
+                        color: textColor.withOpacity(0.5),
+                        fontSize: 12,
+                      ),
+                    ),
+
+                    // 새 메시지 표시
+                    if (chatRoom['hasNewMessages'] == true)
+                      Container(
+                        margin: EdgeInsets.only(left: 8),
+                        width: 10,
+                        height: 10,
+                        decoration: BoxDecoration(
+                          color: Colors.red,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -658,6 +668,68 @@ class _ChatPageState extends State<ChatPage> {
       return '${difference.inMinutes}분 전';
     } else {
       return '방금';
+    }
+  }
+
+  // ride_date 기준으로 7일이 지난 채팅방을 자동으로 삭제
+  Future<void> _cleanupOldChatRooms() async {
+    try {
+      if (_currentUserId == null) {
+        return;
+      }
+
+      // 현재 시간 가져오기
+      final now = DateTime.now();
+      final oneMinuteAgo = now.subtract(Duration(minutes: 1));
+      
+      // 사용자의 채팅방 목록 가져오기
+      final userChatRoomsSnapshot = await _firestore
+          .collection('users')
+          .doc(_currentUserId)
+          .collection('chatRooms')
+          .get();
+      
+      for (var userRoomDoc in userChatRoomsSnapshot.docs) {
+        final userRoomData = userRoomDoc.data();
+        final chatRoomCollection = userRoomData['chat_room_collection'] ?? '';
+        final chatRoomId = userRoomData['chat_room_id'] ?? '';
+        
+        if (chatRoomCollection.isEmpty || chatRoomId.isEmpty) {
+          continue;
+        }
+        
+        // 채팅방 정보 가져오기
+        final chatRoomDoc = await _firestore
+            .collection(chatRoomCollection)
+            .doc(chatRoomId)
+            .get();
+        
+        if (chatRoomDoc.exists) {
+          final chatRoomData = chatRoomDoc.data() as Map<String, dynamic>;
+          final rideDate = chatRoomData['ride_date_timestamp'] as Timestamp?;
+          
+          if (rideDate != null) {
+            final rideDateTime = rideDate.toDate();
+            
+            // ride_date가 1분 이상 지났는지 확인
+            if (rideDateTime.isBefore(oneMinuteAgo)) {
+              // 사용자의 채팅방 목록에서 삭제
+              await _firestore
+                  .collection('users')
+                  .doc(_currentUserId)
+                  .collection('chatRooms')
+                  .doc(userRoomDoc.id)
+                  .delete();
+              
+              print('Deleted old chat room: $chatRoomId from user chat rooms');
+              
+              // 채팅방 자체는 삭제하지 않고 유지 (다른 사용자가 아직 사용 중일 수 있음)
+            }
+          }
+        }
+      }
+    } catch (e) {
+      print('Error cleaning up old chat rooms: $e');
     }
   }
 }
