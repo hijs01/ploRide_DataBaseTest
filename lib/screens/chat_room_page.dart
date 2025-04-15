@@ -1112,6 +1112,7 @@ class _ChatRoomPageState extends State<ChatRoomPage>
 
                 // 채팅방 화면 닫고 채팅방 목록으로 이동
                 Navigator.pop(context); // 채팅방 화면 닫기
+                Navigator.pushReplacementNamed(context, 'chat'); // ChatPage로 이동
               } catch (e) {
                 print('채팅방 나가기 오류: $e');
                 Navigator.pop(context); // 오류가 발생해도 다이얼로그는 닫기

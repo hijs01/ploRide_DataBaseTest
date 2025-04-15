@@ -190,7 +190,7 @@ class MyApp extends StatelessWidget {
         visualDensity: VisualDensity.adaptivePlatformDensity,
       ),
       // 로그인 상태에 따라 초기 라우트 설정
-      initialRoute: currentFirebaseUser == null ? Loginpage.id : MainPage.id,
+      initialRoute: currentFirebaseUser == null ? Loginpage.id : HomePage.id,
       routes: {
         MainPage.id: (context) => MainPage(),
         RegistrationPage.id: (context) => RegistrationPage(),
