@@ -7,6 +7,7 @@ import 'package:cabrider/screens/chat_room_page.dart';
 import 'package:cabrider/screens/history_page.dart';
 import 'package:intl/intl.dart';
 import 'dart:async'; // StreamSubscription을 위한 임포트 추가
+import 'package:cabrider/themes/app_themes.dart'; // 앱 테마 가져오기
 
 class ChatPage extends StatefulWidget {
   static const String id = 'chat';
@@ -357,9 +358,9 @@ class _ChatPageState extends State<ChatPage> {
     final isDarkMode =
         MediaQuery.of(context).platformBrightness == Brightness.dark;
     final textColor = isDarkMode ? Colors.white : Colors.black;
-    final backgroundColor = isDarkMode ? Color(0xFF121212) : Color(0xFFF5F5F5);
+    final backgroundColor = isDarkMode ? Colors.black : Colors.white;
     final cardColor = isDarkMode ? Color(0xFF1E1E1E) : Colors.white;
-    final accentColor = Color(0xFF3F51B5);
+    final accentColor = Color(0xFF3F51B5); // 인디고 색상으로 통일
     final secondaryColor = Color(0xFF8BC34A);
 
     return WillPopScope(
@@ -377,23 +378,33 @@ class _ChatPageState extends State<ChatPage> {
       child: Scaffold(
         backgroundColor: backgroundColor,
         appBar: AppBar(
-          backgroundColor: accentColor,
+          backgroundColor: isDarkMode ? Colors.black : Colors.white,
           title: Text(
             '채팅방',
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+            style: TextStyle(
+              color: isDarkMode ? Colors.white : Colors.black,
+              fontWeight: FontWeight.bold,
+            ),
           ),
           elevation: 0,
           automaticallyImplyLeading: false,
           actions: [
             IconButton(
-              icon: Icon(Icons.refresh, color: Colors.white),
+              icon: Icon(
+                Icons.refresh,
+                color: isDarkMode ? Colors.white : Colors.black,
+              ),
               onPressed: _loadChatRooms,
             ),
           ],
         ),
         body:
             _isLoading
-                ? Center(child: CircularProgressIndicator())
+                ? Center(
+                  child: CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(accentColor),
+                  ),
+                )
                 : _chatRooms.isEmpty
                 ? Center(
                   child: Column(
@@ -438,9 +449,9 @@ class _ChatPageState extends State<ChatPage> {
             BottomNavigationBarItem(icon: Icon(Icons.person), label: '프로필'),
           ],
           currentIndex: _selectedIndex,
-          selectedItemColor: accentColor,
+          selectedItemColor: isDarkMode ? Colors.white : Colors.blue,
           unselectedItemColor: isDarkMode ? Colors.grey[600] : Colors.grey,
-          backgroundColor: isDarkMode ? Color(0xFF1E1E1E) : Colors.white,
+          backgroundColor: isDarkMode ? Colors.black : Colors.white,
           showSelectedLabels: true,
           showUnselectedLabels: true,
           type: BottomNavigationBarType.fixed,

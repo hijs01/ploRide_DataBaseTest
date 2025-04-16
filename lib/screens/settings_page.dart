@@ -259,7 +259,7 @@ class _SettingsPageState extends State<SettingsPage> {
               _buildSettingItem(
                 icon: Icons.support_agent,
                 title: '고객 지원',
-                subtitle: '문제가 있으면 문의하세요',
+                subtitle: 'ploride.dev@gmail.com',
                 isDarkMode: isDarkMode,
                 onTap: () {},
                 trailing: Icon(
@@ -271,30 +271,18 @@ class _SettingsPageState extends State<SettingsPage> {
             ],
           ),
 
-          // 기타 섹션
+          // 기타 섹션 제거하고 개발자 정보 섹션 추가
           _buildSectionCard(
             title: '기타',
-            icon: Icons.more_horiz,
+            icon: Icons.code,
             isDarkMode: isDarkMode,
             backgroundColor: cardColor,
             shadowColor: shadowColor,
             children: [
               _buildSettingItem(
-                icon: Icons.policy,
-                title: '개인 정보 보호 정책',
-                subtitle: '개인 정보가 어떻게 처리되는지 확인하세요',
-                isDarkMode: isDarkMode,
-                onTap: () {},
-                trailing: Icon(
-                  Icons.arrow_forward_ios,
-                  size: 16,
-                  color: isDarkMode ? Colors.grey : Colors.grey[600],
-                ),
-              ),
-              _buildSettingItem(
-                icon: Icons.description,
-                title: '이용 약관',
-                subtitle: '앱 사용에 관한 약관을 읽어보세요',
+                icon: Icons.person_outline,
+                title: '개발자',
+                subtitle: 'PLO TEAM',
                 isDarkMode: isDarkMode,
                 onTap: () {},
                 trailing: Icon(
