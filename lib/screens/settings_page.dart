@@ -25,8 +25,34 @@ class _SettingsPageState extends State<SettingsPage> {
   int _selectedIndex = 3; // 현재 Profile 탭이 선택됨
   String selectedLanguage = '한국어';
 
+  // 사용자 정보 변수
+  String _userEmail = '';
+  String _userName = '';
+
   // 언어 옵션
   final List<String> languages = ['English', '한국어', '中文', '日本語', 'Español'];
+
+  @override
+  void initState() {
+    super.initState();
+    _getUserInfo();
+  }
+
+  // 사용자 정보 가져오기
+  void _getUserInfo() {
+    User? currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser != null && currentUser.email != null) {
+      setState(() {
+        _userEmail = currentUser.email!;
+        _userName = _getUserNameFromEmail(_userEmail);
+      });
+    }
+  }
+
+  // 이메일에서 사용자 이름 추출
+  String _getUserNameFromEmail(String email) {
+    return email.split('@')[0];
+  }
 
   void _onItemTapped(int index) {
     setState(() {
@@ -37,8 +63,8 @@ class _SettingsPageState extends State<SettingsPage> {
             context,
             PageRouteBuilder(
               pageBuilder:
-                  (context, animation, secondaryAnimation) => 
-                  index == 0 ? HomePage() : HistoryPage(),
+                  (context, animation, secondaryAnimation) =>
+                      index == 0 ? HomePage() : HistoryPage(),
               transitionDuration: Duration.zero,
               reverseTransitionDuration: Duration.zero,
             ),
@@ -114,9 +140,9 @@ class _SettingsPageState extends State<SettingsPage> {
     try {
       await FirebaseAuth.instance.signOut();
       Navigator.pushNamedAndRemoveUntil(
-        context, 
-        Loginpage.id, 
-        (route) => false
+        context,
+        Loginpage.id,
+        (route) => false,
       );
     } catch (e) {
       print('로그아웃 중 오류 발생: $e');
@@ -191,7 +217,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 ),
                 SizedBox(height: 12),
                 Text(
-                  '국제 학생',
+                  '$_userName',
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 18,
@@ -200,157 +226,14 @@ class _SettingsPageState extends State<SettingsPage> {
                 ),
                 SizedBox(height: 4),
                 Text(
-                  'student@university.edu',
+                  _userEmail.isNotEmpty ? _userEmail : 'student@university.edu',
                   style: TextStyle(
                     color: Colors.white.withOpacity(0.8),
                     fontSize: 14,
                   ),
                 ),
-                SizedBox(height: 12),
-                OutlinedButton(
-                  onPressed: () {},
-                  child: Text('프로필 편집', style: TextStyle(color: Colors.white)),
-                  style: OutlinedButton.styleFrom(
-                    side: BorderSide(color: Colors.white),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                  ),
-                ),
               ],
             ),
-          ),
-
-          // 국제 학생 특화 섹션
-          _buildSectionCard(
-            title: '국제 학생 서비스',
-            icon: Icons.school,
-            isDarkMode: isDarkMode,
-            backgroundColor: cardColor,
-            shadowColor: shadowColor,
-            children: [
-              _buildSettingItem(
-                icon: Icons.language,
-                title: '언어 설정',
-                subtitle: '현재: $selectedLanguage',
-                isDarkMode: isDarkMode,
-                onTap: _showLanguageModal,
-                trailing: Icon(
-                  Icons.arrow_forward_ios,
-                  size: 16,
-                  color: isDarkMode ? Colors.grey : Colors.grey[600],
-                ),
-              ),
-              _buildSettingItem(
-                icon: Icons.translate,
-                title: '실시간 번역',
-                subtitle: '택시 운전사와의 대화를 실시간으로 번역합니다',
-                isDarkMode: isDarkMode,
-                onTap: () {},
-                trailing: Switch(
-                  value: true,
-                  onChanged: (value) {},
-                  activeColor: primaryColor,
-                ),
-              ),
-              _buildSettingItem(
-                icon: Icons.school,
-                title: '학생 할인',
-                subtitle: '학생 신분증을 등록하여 할인을 받으세요',
-                isDarkMode: isDarkMode,
-                onTap: () {},
-                trailing: Icon(
-                  Icons.arrow_forward_ios,
-                  size: 16,
-                  color: isDarkMode ? Colors.grey : Colors.grey[600],
-                ),
-              ),
-            ],
-          ),
-
-          // 앱 설정 섹션
-          _buildSectionCard(
-            title: '앱 설정',
-            icon: Icons.settings,
-            isDarkMode: isDarkMode,
-            backgroundColor: cardColor,
-            shadowColor: shadowColor,
-            children: [
-              _buildSwitchItem(
-                icon: Icons.notifications,
-                title: '알림',
-                subtitle: '푸시 알림을 켜거나 끕니다',
-                value: notificationsEnabled,
-                onChanged: (value) {
-                  setState(() {
-                    notificationsEnabled = value;
-                  });
-                },
-                isDarkMode: isDarkMode,
-                primaryColor: primaryColor,
-              ),
-              _buildSwitchItem(
-                icon: Icons.dark_mode,
-                title: '다크 모드',
-                subtitle: '앱의 어두운 테마를 활성화합니다',
-                value: darkModeEnabled,
-                onChanged: (value) {
-                  setState(() {
-                    darkModeEnabled = value;
-                  });
-                },
-                isDarkMode: isDarkMode,
-                primaryColor: primaryColor,
-              ),
-              _buildSwitchItem(
-                icon: Icons.location_on,
-                title: '위치 서비스',
-                subtitle: '앱의 위치 서비스를 활성화합니다',
-                value: locationServiceEnabled,
-                onChanged: (value) {
-                  setState(() {
-                    locationServiceEnabled = value;
-                  });
-                },
-                isDarkMode: isDarkMode,
-                primaryColor: primaryColor,
-              ),
-            ],
-          ),
-
-          // 결제 섹션
-          _buildSectionCard(
-            title: '결제',
-            icon: Icons.payment,
-            isDarkMode: isDarkMode,
-            backgroundColor: cardColor,
-            shadowColor: shadowColor,
-            children: [
-              _buildSettingItem(
-                icon: Icons.credit_card,
-                title: '결제 방법',
-                subtitle: '신용카드 및 다른 결제 방법을 관리합니다',
-                isDarkMode: isDarkMode,
-                onTap: () {},
-                trailing: Icon(
-                  Icons.arrow_forward_ios,
-                  size: 16,
-                  color: isDarkMode ? Colors.grey : Colors.grey[600],
-                ),
-              ),
-              _buildSettingItem(
-                icon: Icons.receipt_long,
-                title: '영수증',
-                subtitle: '이전 라이드의 영수증을 확인합니다',
-                isDarkMode: isDarkMode,
-                onTap: () {},
-                trailing: Icon(
-                  Icons.arrow_forward_ios,
-                  size: 16,
-                  color: isDarkMode ? Colors.grey : Colors.grey[600],
-                ),
-              ),
-            ],
           ),
 
           // 지원 섹션
