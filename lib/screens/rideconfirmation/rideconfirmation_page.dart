@@ -1273,6 +1273,25 @@ class _RideConfirmationPageState extends State<RideConfirmationPage>
 
         print('사용자의 채팅방 목록에 추가 완료');
 
+        // 히스토리에 즉시 추가
+        String status = isChatActivated ? '확정됨' : '드라이버의 수락을 기다리는 중';
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .collection('history')
+            .add({
+              'pickup': pickupMap['address'] ?? '',
+              'destination': destinationMap['address'] ?? '',
+              'status': status,
+              'timestamp': FieldValue.serverTimestamp(),
+              'tripId': chatRoomId,
+              'pickup_info': pickupMap,
+              'destination_info': destinationMap,
+            })
+            .timeout(Duration(seconds: 5));
+
+        print('사용자의 히스토리에 즉시 추가 완료');
+
         // driver_accepted가 true인 경우에만 추가 메시지 표시
         if (isChatActivated) {
           print('드라이버가 이미 수락한 채팅방입니다. 즉시 활성화됩니다.');
@@ -1449,6 +1468,21 @@ class _RideConfirmationPageState extends State<RideConfirmationPage>
                                 'driver_id': driverId,
                                 'chat_visible': true,
                               });
+
+                          // 히스토리 상태 업데이트
+                          QuerySnapshot historyQuery =
+                              await FirebaseFirestore.instance
+                                  .collection('users')
+                                  .doc(memberId)
+                                  .collection('history')
+                                  .where('tripId', isEqualTo: chatRoomId)
+                                  .get();
+
+                          for (var historyDoc in historyQuery.docs) {
+                            await historyDoc.reference.update({
+                              'status': '확정됨',
+                            });
+                          }
                         }
 
                         // 채팅방에 시스템 메시지 추가 (중복 방지를 위해 이전 메시지 확인)

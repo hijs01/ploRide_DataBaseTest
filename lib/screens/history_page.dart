@@ -251,11 +251,6 @@ class _HistoryPageState extends State<HistoryPage> {
                         'Trip details - Pickup: $pickup, Destination: $destination, Status: $status',
                       ); // 디버그 로그 추가
 
-                      // 히스토리 데이터는 한 번만 저장
-                      if (index == 0) {
-                        _saveToHistory(tripData);
-                      }
-
                       return Container(
                         margin: EdgeInsets.symmetric(
                           horizontal: 16,
@@ -395,54 +390,15 @@ class _HistoryPageState extends State<HistoryPage> {
       case 'completed':
         return Colors.green;
       case 'pending':
-        return Colors.grey;
+        return Colors.orange;
       case 'canceled':
         return Colors.red;
+      case '확정됨':
+        return Colors.green;
+      case '드라이버의 수락을 기다리는 중':
+        return Colors.orange;
       default:
         return Colors.grey;
-    }
-  }
-
-  Future<void> _saveToHistory(Map<String, dynamic> tripData) async {
-    try {
-      final user = _auth.currentUser;
-      if (user != null) {
-        // Check if history entry already exists
-        final historyQuery =
-            await _firestore
-                .collection('users')
-                .doc(user.uid)
-                .collection('history')
-                .where('tripId', isEqualTo: tripData['tripId'])
-                .get();
-
-        if (historyQuery.docs.isEmpty) {
-          // pickup_info와 destination_info에서 address 정보 추출
-          final pickupInfo = tripData['pickup_info'] as Map<String, dynamic>?;
-          final destinationInfo =
-              tripData['destination_info'] as Map<String, dynamic>?;
-
-          print(
-            'Saving history with pickup: ${pickupInfo?['address']}, destination: ${destinationInfo?['address']}',
-          );
-
-          // Create new history entry
-          await _firestore
-              .collection('users')
-              .doc(user.uid)
-              .collection('history')
-              .add({
-                'pickup': pickupInfo?['address'] ?? '',
-                'destination': destinationInfo?['address'] ?? '',
-                'status': tripData['status'] ?? '',
-                'timestamp':
-                    tripData['timestamp'] ?? FieldValue.serverTimestamp(),
-                'tripId': tripData['tripId'] ?? '',
-              });
-        }
-      }
-    } catch (e) {
-      print('Error saving to history: $e');
     }
   }
 }
