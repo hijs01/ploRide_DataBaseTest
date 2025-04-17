@@ -1312,6 +1312,8 @@ PODS:
   - flutter_geofire (0.0.1):
     - Flutter
     - GeoFire (~> 5.0)
+  - flutter_local_notifications (0.0.1):
+    - Flutter
   - GeoFire (5.0.0):
     - GeoFire/Database (= 5.0.0)
   - GeoFire/Database (5.0.0):
@@ -1508,6 +1510,7 @@ DEPENDENCIES:
   - FirebaseMessaging (~> 11.10.0)
   - Flutter (from `Flutter`)
   - flutter_geofire (from `.symlinks/plugins/flutter_geofire/ios`)
+  - flutter_local_notifications (from `.symlinks/plugins/flutter_local_notifications/ios`)
   - geolocator_apple (from `.symlinks/plugins/geolocator_apple/darwin`)
   - google_maps_flutter_ios (from `.symlinks/plugins/google_maps_flutter_ios/ios`)
   - GoogleUtilities (~> 8.0)
@@ -1559,6 +1562,8 @@ EXTERNAL SOURCES:
     :path: Flutter
   flutter_geofire:
     :path: ".symlinks/plugins/flutter_geofire/ios"
+  flutter_local_notifications:
+    :path: ".symlinks/plugins/flutter_local_notifications/ios"
   geolocator_apple:
     :path: ".symlinks/plugins/geolocator_apple/darwin"
   google_maps_flutter_ios:
@@ -1588,6 +1593,7 @@ SPEC CHECKSUMS:
   FirebaseSharedSwift: b1d32c3b29a911dc174bcf363f2f70bda9509d2f
   Flutter: e0871f40cf51350855a761d2e70bf5af5b9b5de7
   flutter_geofire: 4db95c0e127d63d73f3025575062058c29934018
+  flutter_local_notifications: ad39620c743ea4c15127860f4b5641649a988100
   GeoFire: a579ffdcdcf6fe74ef9efd7f887d4082598d6d1f
   geolocator_apple: ab36aa0e8b7d7a2d7639b3b4e48308394e8cef5e
   Google-Maps-iOS-Utils: 0a484b05ed21d88c9f9ebbacb007956edd508a96

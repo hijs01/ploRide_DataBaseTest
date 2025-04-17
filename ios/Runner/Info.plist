@@ -39,12 +39,18 @@
 	<string>이 앱은 택시 서비스를 제공하기 위해 위치 정보가 필요합니다.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>이 앱은 택시 서비스를 제공하기 위해 위치 정보가 필요합니다.</string>
+	<key>NSRemoteNotificationUsageDescription</key>
+	<string>채팅 메시지와 차량 호출 알림을 받기 위해 알림 권한이 필요합니다.</string>
+	<key>NSUserNotificationsUsageDescription</key>
+	<string>채팅 메시지와 차량 호출 알림을 받기 위해 알림 권한이 필요합니다.</string>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>UIBackgroundModes</key>
 	<array>
-		<string>location</string>
 		<string>remote-notification</string>
+		<string>location</string>
+		<string>processing</string>
+		<string>fetch</string>
 	</array>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>

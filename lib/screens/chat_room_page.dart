@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:async';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 class ChatRoomPage extends StatefulWidget {
   final String chatRoomId;
@@ -30,6 +31,7 @@ class _ChatRoomPageState extends State<ChatRoomPage>
   final ScrollController _scrollController = ScrollController();
   final FocusNode _focusNode = FocusNode();
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  late FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin;
   String? _currentUserId;
   Map<String, dynamic>? _chatRoomData;
   bool _isLoading = true;
@@ -48,11 +50,14 @@ class _ChatRoomPageState extends State<ChatRoomPage>
   @override
   void initState() {
     super.initState();
+    _initializeNotifications();
     _getCurrentUser();
     _loadInitialMessages();
     _loadRoomMembers();
     _loadChatRoomData();
     _setupRealtimeUpdates();
+    _setupChatRoomListener();
+    _setupMembersListener();
 
     // 키보드 상태 변경 감지를 위해 observer 등록
     WidgetsBinding.instance.addObserver(this);
@@ -91,6 +96,7 @@ class _ChatRoomPageState extends State<ChatRoomPage>
   // 채팅방 멤버 목록 로드
   Future<void> _loadRoomMembers() async {
     try {
+      print('채팅방 멤버 목록 로드 시작...');
       final roomDoc =
           await _firestore
               .collection(widget.chatRoomCollection)
@@ -100,13 +106,19 @@ class _ChatRoomPageState extends State<ChatRoomPage>
       if (roomDoc.exists) {
         final data = roomDoc.data();
         if (data != null && data.containsKey('members')) {
+          final List<String> members = List<String>.from(data['members']);
+          print('채팅방 멤버 목록: $members');
           setState(() {
-            _roomMembers = List<String>.from(data['members']);
+            _roomMembers = members;
           });
+        } else {
+          print('채팅방에 members 필드가 없습니다.');
         }
+      } else {
+        print('채팅방 문서를 찾을 수 없습니다.');
       }
     } catch (e) {
-      print('Error loading room members: $e');
+      print('채팅방 멤버 목록 로드 중 오류: $e');
     }
   }
 
@@ -121,7 +133,8 @@ class _ChatRoomPageState extends State<ChatRoomPage>
 
     try {
       // 먼저 drivers 컬렉션에서 확인
-      final driverDoc = await _firestore.collection('drivers').doc(userId).get();
+      final driverDoc =
+          await _firestore.collection('drivers').doc(userId).get();
       if (driverDoc.exists) {
         final driverData = driverDoc.data();
         final driverName = driverData?['fullname'] ?? '알 수 없는 사용자';
@@ -283,33 +296,118 @@ class _ChatRoomPageState extends State<ChatRoomPage>
     return DateFormat('HH:mm').format(dateTime);
   }
 
-  // 다른 채팅방 멤버들에게 알림 보내기
+  // 멤버 목록 실시간 업데이트 리스너
+  void _setupMembersListener() {
+    _firestore
+        .collection(widget.chatRoomCollection)
+        .doc(widget.chatRoomId)
+        .snapshots()
+        .listen((snapshot) {
+          if (!snapshot.exists) return;
+
+          final data = snapshot.data();
+          if (data != null && data.containsKey('members')) {
+            final List<String> members = List<String>.from(data['members']);
+            print('멤버 목록 업데이트: $members');
+            setState(() {
+              _roomMembers = members;
+            });
+          }
+        });
+  }
+
+  // 로컬 알림 표시 메서드 수정
+  Future<void> _showLocalNotification(String title, String message) async {
+    try {
+      const androidPlatformChannelSpecifics = AndroidNotificationDetails(
+        'chat_messages',
+        'Chat Messages',
+        channelDescription: 'Notifications for new chat messages',
+        importance: Importance.max,
+        priority: Priority.high,
+        showWhen: true,
+      );
+      const iOSPlatformChannelSpecifics = DarwinNotificationDetails(
+        presentAlert: true,
+        presentBadge: true,
+        presentSound: true,
+      );
+      const platformChannelSpecifics = NotificationDetails(
+        android: androidPlatformChannelSpecifics,
+        iOS: iOSPlatformChannelSpecifics,
+      );
+
+      await flutterLocalNotificationsPlugin.show(
+        0,
+        title,
+        message,
+        platformChannelSpecifics,
+      );
+      print('로컬 알림 표시 완료: $title - $message');
+    } catch (e) {
+      print('로컬 알림 표시 중 오류 발생: $e');
+    }
+  }
+
+  // 다른 채팅방 멤버들에게 알림 보내기 메서드 수정
   Future<void> _sendNotificationToOtherMembers(String messageText) async {
     try {
-      // 현재 사용자는 제외하고 알림 보내기
-      final otherMembers =
-          _roomMembers.where((uid) => uid != _currentUserId).toList();
+      print('=== 알림 전송 시작 ===');
 
-      if (otherMembers.isEmpty) return;
+      // 채팅방 정보 가져오기
+      final roomDoc =
+          await _firestore
+              .collection(widget.chatRoomCollection)
+              .doc(widget.chatRoomId)
+              .get();
 
-      final user = _auth.currentUser;
-      String senderName = user?.displayName ?? '알 수 없는 사용자';
+      if (!roomDoc.exists) {
+        print('채팅방을 찾을 수 없습니다.');
+        return;
+      }
 
-      // 사용자 프로필에서 이름 가져오기
+      final roomData = roomDoc.data()!;
+      final String? driverId = roomData['driver_id'];
+
+      print('채팅방 운전자 ID: $driverId');
+      print('현재 사용자 ID: $_currentUserId');
+
+      // 수신자 목록 생성 (멤버들 + 운전자)
+      Set<String> receivers = Set<String>.from(_roomMembers);
+
+      // 운전자가 있고, 멤버 목록에 없으면 추가
+      if (driverId != null && !receivers.contains(driverId)) {
+        receivers.add(driverId);
+      }
+
+      // 현재 사용자 제외
+      receivers.remove(_currentUserId);
+
+      final otherMembers = receivers.toList();
+      print('수신자 목록: $otherMembers');
+
+      if (otherMembers.isEmpty) {
+        print('수신자가 없어 알림을 보내지 않습니다.');
+        return;
+      }
+
+      // 발신자 이름 가져오기
+      String senderName = '알 수 없는 사용자';
       try {
         final userDoc =
             await _firestore.collection('users').doc(_currentUserId).get();
         if (userDoc.exists) {
-          final userData = userDoc.data();
-          senderName = userData?['fullname'] ?? senderName;
+          senderName = userDoc.data()?['fullname'] ?? senderName;
         }
       } catch (e) {
         print('사용자 이름 조회 오류: $e');
       }
 
-      // Cloud Function을 호출하여 알림 전송
+      // Cloud Function 호출
+      final functionRegion = 'us-central1';
+      final projectId = 'geetaxi-aa379';
       final url =
-          'https://us-central1-geetaxi-aa379.cloudfunctions.net/sendChatNotification';
+          'https://$functionRegion-$projectId.cloudfunctions.net/sendChatNotification';
 
       final requestData = {
         'chatRoomId': widget.chatRoomId,
@@ -320,19 +418,20 @@ class _ChatRoomPageState extends State<ChatRoomPage>
         'receiverIds': otherMembers,
       };
 
+      print('전송할 데이터: ${jsonEncode(requestData)}');
+
       final response = await http.post(
         Uri.parse(url),
         body: jsonEncode(requestData),
         headers: {'Content-Type': 'application/json'},
       );
 
-      if (response.statusCode == 200) {
-        print('채팅 알림 전송 성공');
-      } else {
-        print('채팅 알림 전송 실패: ${response.statusCode}, ${response.body}');
-      }
+      print('응답 상태 코드: ${response.statusCode}');
+      print('응답 내용: ${response.body}');
     } catch (e) {
       print('채팅 알림 전송 중 오류 발생: $e');
+    } finally {
+      print('=== 알림 전송 종료 ===');
     }
   }
 
@@ -382,6 +481,8 @@ class _ChatRoomPageState extends State<ChatRoomPage>
               'lastMessage': messageText,
               'last_message': messageText,
               'last_message_time': FieldValue.serverTimestamp(),
+              'last_message_sender_id': _currentUserId,
+              'last_message_sender_name': senderName,
               'timestamp': FieldValue.serverTimestamp(),
             });
         print('메시지 업데이트 성공: last_message = $messageText');
@@ -432,10 +533,11 @@ class _ChatRoomPageState extends State<ChatRoomPage>
             AppBar(title: Text('채팅방 정보'), automaticallyImplyLeading: false),
             Expanded(
               child: StreamBuilder<DocumentSnapshot>(
-                stream: _firestore
-                    .collection(widget.chatRoomCollection)
-                    .doc(widget.chatRoomId)
-                    .snapshots(),
+                stream:
+                    _firestore
+                        .collection(widget.chatRoomCollection)
+                        .doc(widget.chatRoomId)
+                        .snapshots(),
                 builder: (context, snapshot) {
                   if (snapshot.hasError) {
                     print('StreamBuilder error: ${snapshot.error}');
@@ -517,8 +619,11 @@ class _ChatRoomPageState extends State<ChatRoomPage>
                               ),
                               SizedBox(height: 8),
                               Text(
-                                users.length <= 2 ? '\$500' : 
-                                users.length == 3 ? '\$440' : '\$500',
+                                users.length <= 2
+                                    ? '\$500'
+                                    : users.length == 3
+                                    ? '\$440'
+                                    : '\$500',
                                 style: TextStyle(
                                   fontSize: 24,
                                   fontWeight: FontWeight.bold,
@@ -985,143 +1090,226 @@ class _ChatRoomPageState extends State<ChatRoomPage>
   void _showExitDialog(BuildContext context) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text('채팅방 나가기'),
-        content: Text('채팅방을 나가시겠습니까?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('취소'),
-          ),
-          TextButton(
-            onPressed: () async {
-              try {
-                final user = _auth.currentUser;
-                if (user == null) {
-                  Navigator.pop(context);
-                  return;
-                }
-
-                // 사용자의 이름 가져오기
-                final userDoc = await _firestore.collection('users').doc(user.uid).get();
-                final userName = userDoc.data()?['fullname'] ?? '알 수 없는 사용자';
-
-                // 시스템 메시지 추가
-                await _firestore
-                    .collection(widget.chatRoomCollection)
-                    .doc(widget.chatRoomId)
-                    .collection('messages')
-                    .add({
-                      'text': '$userName님이 그룹에서 나갔습니다.',
-                      'sender_id': 'system',
-                      'type': 'system',
-                      'timestamp': FieldValue.serverTimestamp(),
-                    });
-
-                // 채팅방 멤버 목록에서 제거 및 수화물/멤버 수 업데이트
-                final roomDoc = await _firestore
-                    .collection(widget.chatRoomCollection)
-                    .doc(widget.chatRoomId)
-                    .get();
-
-                if (!roomDoc.exists) {
-                  print('채팅방이 존재하지 않습니다.');
-                  Navigator.pop(context);
-                  Navigator.pop(context);
-                  return;
-                }
-
-                final roomData = roomDoc.data();
-                if (roomData == null) {
-                  print('채팅방 데이터가 null입니다.');
-                  Navigator.pop(context);
-                  Navigator.pop(context);
-                  return;
-                }
-
-                final currentMembers = List<String>.from(roomData['members'] ?? []);
-                final currentLuggageCount = roomData['luggage_count_total'] ?? 0;
-                final userLuggageCount = roomData['user_luggage_counts']?[user.uid] ?? 0;
-
-                // 멤버 목록에서 제거
-                currentMembers.remove(user.uid);
-
-                // 업데이트할 데이터 준비
-                Map<String, dynamic> updateData = {
-                  'members': currentMembers,
-                  'member_count': currentMembers.length,
-                  'updatedAt': FieldValue.serverTimestamp(),
-                };
-
-                // 수화물 수 업데이트
-                if (currentLuggageCount > 0 && userLuggageCount > 0) {
-                  updateData['luggage_count_total'] = currentLuggageCount - userLuggageCount;
-                }
-
-                // 사용자의 수화물 정보 제거
-                updateData['user_luggage_counts.${user.uid}'] = FieldValue.delete();
-
-                // 채팅방 정보 업데이트
-                await _firestore
-                    .collection(widget.chatRoomCollection)
-                    .doc(widget.chatRoomId)
-                    .update(updateData);
-
-                // 사용자의 채팅방 목록에서 제거
-                await _firestore
-                    .collection('users')
-                    .doc(user.uid)
-                    .collection('chatRooms')
-                    .doc(widget.chatRoomId)
-                    .delete();
-
-                // 사용자의 채팅방 목록에서도 제거 (users 컬렉션의 chatRooms 필드)
-                await _firestore.collection('users').doc(user.uid).update({
-                  'chatRooms': FieldValue.arrayRemove([widget.chatRoomId]),
-                });
-
-                // 멤버가 0명이 되면 채팅방 삭제
-                if (currentMembers.isEmpty) {
+      builder:
+          (context) => AlertDialog(
+            title: Text('채팅방 나가기'),
+            content: Text('채팅방을 나가시겠습니까?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text('취소'),
+              ),
+              TextButton(
+                onPressed: () async {
                   try {
-                    // 채팅방의 모든 메시지 삭제
-                    final messagesSnapshot = await _firestore
-                        .collection(widget.chatRoomCollection)
-                        .doc(widget.chatRoomId)
-                        .collection('messages')
-                        .get();
-
-                    // 모든 메시지 삭제
-                    for (var doc in messagesSnapshot.docs) {
-                      await doc.reference.delete();
+                    final user = _auth.currentUser;
+                    if (user == null) {
+                      Navigator.pop(context);
+                      return;
                     }
 
-                    // 채팅방 문서 삭제
+                    // 사용자의 이름 가져오기
+                    final userDoc =
+                        await _firestore
+                            .collection('users')
+                            .doc(user.uid)
+                            .get();
+                    final userName =
+                        userDoc.data()?['fullname'] ?? '알 수 없는 사용자';
+
+                    // 시스템 메시지 추가
                     await _firestore
                         .collection(widget.chatRoomCollection)
                         .doc(widget.chatRoomId)
+                        .collection('messages')
+                        .add({
+                          'text': '$userName님이 그룹에서 나갔습니다.',
+                          'sender_id': 'system',
+                          'type': 'system',
+                          'timestamp': FieldValue.serverTimestamp(),
+                        });
+
+                    // 채팅방 멤버 목록에서 제거 및 수화물/멤버 수 업데이트
+                    final roomDoc =
+                        await _firestore
+                            .collection(widget.chatRoomCollection)
+                            .doc(widget.chatRoomId)
+                            .get();
+
+                    if (!roomDoc.exists) {
+                      print('채팅방이 존재하지 않습니다.');
+                      Navigator.pop(context);
+                      Navigator.pop(context);
+                      return;
+                    }
+
+                    final roomData = roomDoc.data();
+                    if (roomData == null) {
+                      print('채팅방 데이터가 null입니다.');
+                      Navigator.pop(context);
+                      Navigator.pop(context);
+                      return;
+                    }
+
+                    final currentMembers = List<String>.from(
+                      roomData['members'] ?? [],
+                    );
+                    final currentLuggageCount =
+                        roomData['luggage_count_total'] ?? 0;
+                    final userLuggageCount =
+                        roomData['user_luggage_counts']?[user.uid] ?? 0;
+
+                    // 멤버 목록에서 제거
+                    currentMembers.remove(user.uid);
+
+                    // 업데이트할 데이터 준비
+                    Map<String, dynamic> updateData = {
+                      'members': currentMembers,
+                      'member_count': currentMembers.length,
+                      'updatedAt': FieldValue.serverTimestamp(),
+                    };
+
+                    // 수화물 수 업데이트
+                    if (currentLuggageCount > 0 && userLuggageCount > 0) {
+                      updateData['luggage_count_total'] =
+                          currentLuggageCount - userLuggageCount;
+                    }
+
+                    // 사용자의 수화물 정보 제거
+                    updateData['user_luggage_counts.${user.uid}'] =
+                        FieldValue.delete();
+
+                    // 채팅방 정보 업데이트
+                    await _firestore
+                        .collection(widget.chatRoomCollection)
+                        .doc(widget.chatRoomId)
+                        .update(updateData);
+
+                    // 사용자의 채팅방 목록에서 제거
+                    await _firestore
+                        .collection('users')
+                        .doc(user.uid)
+                        .collection('chatRooms')
+                        .doc(widget.chatRoomId)
                         .delete();
 
-                    print('채팅방이 성공적으로 삭제되었습니다.');
+                    // 사용자의 채팅방 목록에서도 제거 (users 컬렉션의 chatRooms 필드)
+                    await _firestore.collection('users').doc(user.uid).update({
+                      'chatRooms': FieldValue.arrayRemove([widget.chatRoomId]),
+                    });
+
+                    // 멤버가 0명이 되면 채팅방 삭제
+                    if (currentMembers.isEmpty) {
+                      try {
+                        // 채팅방의 모든 메시지 삭제
+                        final messagesSnapshot =
+                            await _firestore
+                                .collection(widget.chatRoomCollection)
+                                .doc(widget.chatRoomId)
+                                .collection('messages')
+                                .get();
+
+                        // 모든 메시지 삭제
+                        for (var doc in messagesSnapshot.docs) {
+                          await doc.reference.delete();
+                        }
+
+                        // 채팅방 문서 삭제
+                        await _firestore
+                            .collection(widget.chatRoomCollection)
+                            .doc(widget.chatRoomId)
+                            .delete();
+
+                        print('채팅방이 성공적으로 삭제되었습니다.');
+                      } catch (e) {
+                        print('채팅방 삭제 중 오류 발생: $e');
+                      }
+                    }
+
+                    // 다이얼로그 닫기
+                    Navigator.pop(context);
+
+                    // 채팅방 화면 닫고 채팅방 목록으로 이동
+                    Navigator.pop(context); // 채팅방 화면 닫기
+                    Navigator.pushReplacementNamed(
+                      context,
+                      'chat',
+                    ); // ChatPage로 이동
                   } catch (e) {
-                    print('채팅방 삭제 중 오류 발생: $e');
+                    print('채팅방 나가기 오류: $e');
+                    Navigator.pop(context); // 오류가 발생해도 다이얼로그는 닫기
                   }
-                }
+                },
+                child: Text('나가기', style: TextStyle(color: Colors.red)),
+              ),
+            ],
+          ),
+    );
+  }
 
-                // 다이얼로그 닫기
-                Navigator.pop(context);
+  // 채팅방 문서 변경 감지 설정
+  void _setupChatRoomListener() {
+    print('채팅방 리스너 설정...');
+    _chatRoomSubscription = _firestore
+        .collection(widget.chatRoomCollection)
+        .doc(widget.chatRoomId)
+        .snapshots()
+        .listen((snapshot) async {
+          if (!snapshot.exists) return;
 
-                // 채팅방 화면 닫고 채팅방 목록으로 이동
-                Navigator.pop(context); // 채팅방 화면 닫기
-                Navigator.pushReplacementNamed(context, 'chat'); // ChatPage로 이동
-              } catch (e) {
-                print('채팅방 나가기 오류: $e');
-                Navigator.pop(context); // 오류가 발생해도 다이얼로그는 닫기
-              }
-            },
-            child: Text('나가기', style: TextStyle(color: Colors.red)),
+          final data = snapshot.data() as Map<String, dynamic>;
+
+          // lastMessage 필드 변경 감지
+          final String lastMessage =
+              data['lastMessage'] ?? data['last_message'] ?? '';
+
+          if (lastMessage.isNotEmpty) {
+            print('새 메시지 감지: $lastMessage');
+            await _showLocalNotification('새 메시지', lastMessage);
+          }
+        });
+  }
+
+  Future<void> _initializeNotifications() async {
+    try {
+      flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
+
+      // Android 설정
+      const androidSettings = AndroidInitializationSettings(
+        '@mipmap/ic_launcher',
+      );
+
+      // iOS 설정
+      final darwinSettings = DarwinInitializationSettings(
+        requestAlertPermission: true,
+        requestBadgePermission: true,
+        requestSoundPermission: true,
+        notificationCategories: [
+          DarwinNotificationCategory(
+            'chat_messages',
+            actions: [DarwinNotificationAction.plain('id_1', 'Action 1')],
+            options: {DarwinNotificationCategoryOption.hiddenPreviewShowTitle},
           ),
         ],
-      ),
-    );
+      );
+
+      // 초기화 설정 통합
+      final initSettings = InitializationSettings(
+        android: androidSettings,
+        iOS: darwinSettings,
+      );
+
+      // 플러그인 초기화
+      await flutterLocalNotificationsPlugin.initialize(
+        initSettings,
+        onDidReceiveNotificationResponse: (details) {
+          print('알림 탭: ${details.payload}');
+        },
+      );
+
+      print('로컬 알림 초기화 완료');
+    } catch (e) {
+      print('로컬 알림 초기화 중 오류 발생: $e');
+    }
   }
 }
