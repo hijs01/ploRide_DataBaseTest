@@ -377,16 +377,16 @@ class _ChatPageState extends State<ChatPage> {
       child: Scaffold(
         backgroundColor: backgroundColor,
         appBar: AppBar(
-          backgroundColor: accentColor,
+          backgroundColor: backgroundColor,
           title: Text(
             '채팅방',
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+            style: TextStyle(color: textColor, fontWeight: FontWeight.bold),
           ),
           elevation: 0,
           automaticallyImplyLeading: false,
           actions: [
             IconButton(
-              icon: Icon(Icons.refresh, color: Colors.white),
+              icon: Icon(Icons.refresh, color: textColor),
               onPressed: _loadChatRooms,
             ),
           ],
@@ -438,9 +438,9 @@ class _ChatPageState extends State<ChatPage> {
             BottomNavigationBarItem(icon: Icon(Icons.person), label: '프로필'),
           ],
           currentIndex: _selectedIndex,
-          selectedItemColor: accentColor,
+          selectedItemColor: isDarkMode ? Colors.white : Colors.blue,
           unselectedItemColor: isDarkMode ? Colors.grey[600] : Colors.grey,
-          backgroundColor: isDarkMode ? Color(0xFF1E1E1E) : Colors.white,
+          backgroundColor: isDarkMode ? Colors.black : Colors.white,
           showSelectedLabels: true,
           showUnselectedLabels: true,
           type: BottomNavigationBarType.fixed,

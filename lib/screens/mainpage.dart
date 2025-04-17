@@ -734,9 +734,10 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                               // pushNamed 대신 push를 사용
                               context,
                               MaterialPageRoute(
-                                builder: (context) => SearchPage(
-                                  onLuggageCountChanged: updateLuggageCount,
-                                ),
+                                builder:
+                                    (context) => SearchPage(
+                                      onLuggageCountChanged: updateLuggageCount,
+                                    ),
                               ),
                             );
                             if (response == 'getDirection') {

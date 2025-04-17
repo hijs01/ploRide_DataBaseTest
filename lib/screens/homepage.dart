@@ -4,6 +4,9 @@ import 'package:cabrider/screens/searchpage.dart';
 import 'package:cabrider/screens/settings_page.dart';
 import 'package:cabrider/screens/chat_page.dart';
 import 'package:cabrider/screens/history_page.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class HomePage extends StatefulWidget {
   static const String id = 'home';
@@ -17,6 +20,23 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   GlobalKey<ScaffoldState> scaffoldKey = GlobalKey<ScaffoldState>();
   int _selectedIndex = 0;
+  String _userName = ''; // 사용자 이름 저장 변수 추가
+
+  @override
+  void initState() {
+    super.initState();
+    _getUserInfo(); // 사용자 정보 가져오기
+  }
+
+  // 사용자 정보 가져오기 함수 추가
+  void _getUserInfo() {
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser != null && currentUser.email != null) {
+      setState(() {
+        _userName = currentUser.email!.split('@')[0]; // 이메일에서 @ 앞부분 추출
+      });
+    }
+  }
 
   void _onItemTapped(int index) {
     setState(() {
@@ -39,8 +59,7 @@ class _HomePageState extends State<HomePage> {
         Navigator.push(
           context,
           PageRouteBuilder(
-            pageBuilder:
-                (context, animation, secondaryAnimation) => ChatPage(),
+            pageBuilder: (context, animation, secondaryAnimation) => ChatPage(),
             transitionDuration: Duration.zero,
             reverseTransitionDuration: Duration.zero,
           ),
@@ -106,7 +125,7 @@ class _HomePageState extends State<HomePage> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        'PLORIDE',
+                        'TAGO',
                         style: TextStyle(
                           fontSize: 24,
                           fontWeight: FontWeight.bold,
@@ -123,7 +142,7 @@ class _HomePageState extends State<HomePage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        '안녕하세요,',
+                        '안녕하세요, $_userName 님',
                         style: TextStyle(
                           fontSize: 26,
                           fontWeight: FontWeight.bold,
@@ -247,7 +266,7 @@ class _HomePageState extends State<HomePage> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        'PLORIDE',
+                        'TAGO',
                         style: TextStyle(
                           fontSize: 24,
                           fontWeight: FontWeight.bold,
@@ -264,7 +283,7 @@ class _HomePageState extends State<HomePage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        '안녕하세요,',
+                        '안녕하세요, $_userName',
                         style: TextStyle(
                           fontSize: 26,
                           fontWeight: FontWeight.bold,
@@ -465,18 +484,79 @@ class _HomePageState extends State<HomePage> {
 }
 
 // 홈 탭의 컨텐츠를 위한 별도의 위젯
-class HomeContent extends StatelessWidget {
+class HomeContent extends StatefulWidget {
   final bool isDarkMode;
 
   const HomeContent({Key? key, required this.isDarkMode}) : super(key: key);
 
   @override
+  State<HomeContent> createState() => _HomeContentState();
+}
+
+class _HomeContentState extends State<HomeContent> {
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  bool _isLoading = true;
+  Map<String, dynamic>? _reservedTrip;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadReservedTrip();
+  }
+
+  // 예약된 탑승 정보를 가져오는 함수
+  Future<void> _loadReservedTrip() async {
+    try {
+      final currentUser = _auth.currentUser;
+      if (currentUser == null) return;
+
+      print('사용자 ID: ${currentUser.uid}로 이용 내역 조회 시작');
+
+      // 사용자의 히스토리에서 가장 최근의 라이드 데이터 가져오기 (상태 필터 제거)
+      final historyQuery =
+          await _firestore
+              .collection('users')
+              .doc(currentUser.uid)
+              .collection('history')
+              .orderBy('timestamp', descending: true)
+              .limit(1)
+              .get();
+
+      print('조회된 문서 수: ${historyQuery.docs.length}');
+
+      if (historyQuery.docs.isNotEmpty) {
+        final tripData = historyQuery.docs.first.data();
+        print('가져온 데이터: $tripData');
+
+        setState(() {
+          _reservedTrip = tripData;
+          _isLoading = false;
+        });
+      } else {
+        print('이용 내역이 없습니다');
+        setState(() {
+          _reservedTrip = null;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      print('예약된 탑승 정보를 가져오는 중 오류 발생: $e');
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     // 색상 설정
-    final textColor = isDarkMode ? Colors.white : Colors.black;
-    final subTextColor = isDarkMode ? Colors.grey[400] : Colors.grey[600];
-    final cardColor = isDarkMode ? Color(0xFF1E1E1E) : Colors.white;
-    final cardBorderColor = isDarkMode ? Colors.grey[800] : Colors.grey[300];
+    final textColor = widget.isDarkMode ? Colors.white : Colors.black;
+    final subTextColor =
+        widget.isDarkMode ? Colors.grey[400] : Colors.grey[600];
+    final cardColor = widget.isDarkMode ? Color(0xFF1E1E1E) : Colors.white;
+    final cardBorderColor =
+        widget.isDarkMode ? Colors.grey[800] : Colors.grey[300];
     final accentColor = Color(0xFF3F51B5); // 인디고 색상
 
     return SingleChildScrollView(
@@ -489,104 +569,152 @@ class HomeContent extends StatelessWidget {
             SizedBox(height: 20),
 
             // 예약된 탑승 정보 (있는 경우)
-            Container(
-              decoration: BoxDecoration(
-                border: Border.all(
-                  color: accentColor.withOpacity(0.3),
-                  width: 1.5,
+            if (_isLoading)
+              Center(child: CircularProgressIndicator())
+            else if (_reservedTrip != null)
+              Container(
+                decoration: BoxDecoration(
+                  border: Border.all(
+                    color: accentColor.withOpacity(0.3),
+                    width: 1.5,
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                  color: cardColor,
                 ),
-                borderRadius: BorderRadius.circular(16),
-                color: cardColor,
-              ),
-              padding: EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(Icons.calendar_today, color: accentColor, size: 20),
-                      SizedBox(width: 8),
-                      Text(
-                        '예약된 탑승',
-                        style: TextStyle(
+                padding: EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.calendar_today,
                           color: accentColor,
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
+                          size: 20,
                         ),
-                      ),
-                    ],
-                  ),
-                  SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Container(
-                        width: 40,
-                        child: Column(
-                          children: [
-                            Icon(Icons.circle, color: Colors.green, size: 12),
-                            Container(
-                              width: 1,
-                              height: 30,
-                              color:
-                                  isDarkMode
-                                      ? Colors.grey[700]
-                                      : Colors.grey[400],
-                            ),
-                            Icon(
-                              Icons.location_on,
-                              color: Colors.red,
-                              size: 12,
-                            ),
-                          ],
+                        SizedBox(width: 8),
+                        Text(
+                          '최근 이용 내역',
+                          style: TextStyle(
+                            color: accentColor,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
-                      ),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              '인천국제공항 1터미널',
-                              style: TextStyle(color: textColor, fontSize: 15),
-                            ),
-                            SizedBox(height: 16),
-                            Text(
-                              '서울역',
-                              style: TextStyle(color: textColor, fontSize: 15),
-                            ),
-                          ],
+                      ],
+                    ),
+                    SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Container(
+                          width: 40,
+                          child: Column(
+                            children: [
+                              Icon(Icons.circle, color: Colors.green, size: 12),
+                              Container(
+                                width: 1,
+                                height: 30,
+                                color:
+                                    widget.isDarkMode
+                                        ? Colors.grey[700]
+                                        : Colors.grey[400],
+                              ),
+                              Icon(
+                                Icons.location_on,
+                                color: Colors.red,
+                                size: 12,
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
-                  SizedBox(height: 12),
-                  Divider(
-                    color: isDarkMode ? Colors.grey[800] : Colors.grey[300],
-                  ),
-                  SizedBox(height: 8),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        '2023년 10월 15일 오후 2:00',
-                        style: TextStyle(color: subTextColor, fontSize: 13),
-                      ),
-                      Text(
-                        '55,000원',
-                        style: TextStyle(
-                          color: textColor,
-                          fontWeight: FontWeight.bold,
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                _reservedTrip!['pickup'] ?? '출발지 정보 없음',
+                                style: TextStyle(
+                                  color: textColor,
+                                  fontSize: 15,
+                                ),
+                              ),
+                              SizedBox(height: 16),
+                              Text(
+                                _reservedTrip!['destination'] ?? '도착지 정보 없음',
+                                style: TextStyle(
+                                  color: textColor,
+                                  fontSize: 15,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
-                ],
+                      ],
+                    ),
+                    SizedBox(height: 12),
+                    Divider(
+                      color:
+                          widget.isDarkMode
+                              ? Colors.grey[800]
+                              : Colors.grey[300],
+                    ),
+                    SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            _formatDateTime(_reservedTrip!['timestamp']),
+                            style: TextStyle(color: subTextColor, fontSize: 13),
+                          ),
+                        ),
+                        if (_reservedTrip!.containsKey('status'))
+                          Container(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: _getStatusColor(
+                                _reservedTrip!['status'],
+                              ).withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: _getStatusColor(
+                                  _reservedTrip!['status'],
+                                ).withOpacity(0.3),
+                                width: 1,
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                _getStatusIcon(_reservedTrip!['status']),
+                                SizedBox(width: 4),
+                                Text(
+                                  _reservedTrip!['status'] ?? '상태 정보 없음',
+                                  style: TextStyle(
+                                    color: _getStatusColor(
+                                      _reservedTrip!['status'],
+                                    ),
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
-            ),
 
             SizedBox(height: 24),
 
             // 프로모션 배너
             Container(
+              height: 120,
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: [accentColor, Color(0xFF5C6BC0)],
@@ -598,14 +726,15 @@ class HomeContent extends StatelessWidget {
               padding: EdgeInsets.all(16),
               child: Row(
                 children: [
-                  Icon(Icons.local_offer, color: Colors.white, size: 32),
+                  Icon(Icons.shield, color: Colors.white, size: 32),
                   SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        SizedBox(height: 16),
                         Text(
-                          '첫 탑승 30% 할인',
+                          'PLO 와 함께할 용사',
                           style: TextStyle(
                             color: Colors.white,
                             fontSize: 18,
@@ -614,7 +743,7 @@ class HomeContent extends StatelessWidget {
                         ),
                         SizedBox(height: 6),
                         Text(
-                          '광고 내용',
+                          'PLO 와 함께할 기회 바로 지금입니다.',
                           style: TextStyle(
                             color: Colors.white.withOpacity(0.9),
                             fontSize: 13,
@@ -624,7 +753,9 @@ class HomeContent extends StatelessWidget {
                     ),
                   ),
                   ElevatedButton(
-                    onPressed: () {},
+                    onPressed: () async {
+                      _launchPLOInstagram();
+                    },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.white,
                       foregroundColor: accentColor,
@@ -634,198 +765,12 @@ class HomeContent extends StatelessWidget {
                       ),
                     ),
                     child: Text(
-                      '적용하기',
+                      'ㄱㄱ?',
                       style: TextStyle(fontWeight: FontWeight.bold),
                     ),
                   ),
                 ],
               ),
-            ),
-
-            SizedBox(height: 24),
-
-            // 광고 배너
-            Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [Color(0xFF2E7D32), Color(0xFF4CAF50)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
-                    blurRadius: 8,
-                    offset: Offset(0, 2),
-                  ),
-                ],
-              ),
-              padding: EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: Container(
-                      width: 60,
-                      height: 60,
-                      color: Colors.white,
-                      child: Center(
-                        child: Icon(
-                          Icons.directions_car,
-                          color: Color(0xFF2E7D32),
-                          size: 36,
-                        ),
-                      ),
-                    ),
-                  ),
-                  SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '광고 배너',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        SizedBox(height: 6),
-                        Text(
-                          '광고 내용',
-                          style: TextStyle(
-                            color: Colors.white.withOpacity(0.9),
-                            fontSize: 13,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            SizedBox(height: 24),
-
-            // 2분할 배너
-            Row(
-              children: [
-                // 왼쪽 배너
-                Expanded(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [Color(0xFF512DA8), Color(0xFF673AB7)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.08),
-                          blurRadius: 6,
-                          offset: Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    padding: EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          padding: EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Icon(
-                            Icons.emoji_events,
-                            color: Colors.white,
-                            size: 24,
-                          ),
-                        ),
-                        SizedBox(height: 12),
-                        Text(
-                          '광고 배너',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        SizedBox(height: 4),
-                        Text(
-                          '광고 내용',
-                          style: TextStyle(
-                            color: Colors.white.withOpacity(0.9),
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-
-                SizedBox(width: 12),
-
-                // 오른쪽 배너
-                Expanded(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [Color(0xFF0277BD), Color(0xFF039BE5)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.08),
-                          blurRadius: 6,
-                          offset: Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    padding: EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          padding: EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Icon(
-                            Icons.schedule,
-                            color: Colors.white,
-                            size: 24,
-                          ),
-                        ),
-                        SizedBox(height: 12),
-                        Text(
-                          '광고 배너',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        SizedBox(height: 4),
-                        Text(
-                          '광고 내용',
-                          style: TextStyle(
-                            color: Colors.white.withOpacity(0.9),
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
             ),
 
             SizedBox(height: 30),
@@ -835,174 +780,88 @@ class HomeContent extends StatelessWidget {
     );
   }
 
-  // 인기 목적지 카드 위젯
-  Widget _buildDestinationCard(
-    BuildContext context,
-    String title,
-    String subtitle,
-    IconData icon,
-    Color cardColor,
-    Color? borderColor,
-    Color textColor,
-    Color? subTextColor,
-    Color accentColor,
-  ) {
-    return GestureDetector(
-      onTap: () {
-        // 목적지 선택 처리
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => SearchPage()),
-        );
-      },
-      child: Container(
-        width: 160,
-        margin: EdgeInsets.only(right: 12),
-        decoration: BoxDecoration(
-          color: cardColor,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: borderColor ?? Colors.transparent),
-        ),
-        padding: EdgeInsets.all(12),
-        child: Row(
-          children: [
-            Container(
-              padding: EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: accentColor.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(icon, color: accentColor, size: 24),
-            ),
-            SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    title,
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: textColor,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  SizedBox(height: 4),
-                  Text(
-                    subtitle,
-                    style: TextStyle(fontSize: 12, color: subTextColor),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+  // Timestamp를 포맷팅하는 함수
+  String _formatDateTime(dynamic timestamp) {
+    if (timestamp == null) return '날짜 정보 없음';
+
+    if (timestamp is Timestamp) {
+      final date = timestamp.toDate();
+      return '${date.year}년 ${date.month}월 ${date.day}일 ${date.hour}:${date.minute.toString().padLeft(2, '0')}';
+    }
+
+    return '날짜 정보 없음';
   }
 
-  // 최근 이동 경로 카드 위젯
-  Widget _buildRecentRideCard(
-    String title,
-    String date,
-    String price,
-    Color cardColor,
-    Color? borderColor,
-    Color textColor,
-    Color? subTextColor,
-    Color accentColor,
-  ) {
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: cardColor,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: borderColor ?? Colors.transparent),
-      ),
-      padding: EdgeInsets.all(16),
-      child: Row(
-        children: [
-          Container(
-            padding: EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: accentColor.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(Icons.history, color: accentColor, size: 20),
-          ),
-          SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: textColor,
-                  ),
-                ),
-                SizedBox(height: 4),
-                Text(date, style: TextStyle(fontSize: 12, color: subTextColor)),
-              ],
-            ),
-          ),
-          Text(
-            price,
-            style: TextStyle(fontWeight: FontWeight.bold, color: accentColor),
-          ),
-        ],
-      ),
-    );
+  // 요금 정보를 포맷팅하는 함수
+  String _formatFare(dynamic fare) {
+    if (fare == null) return '요금 정보 없음';
+
+    if (fare is int || fare is double) {
+      return '${fare.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},')}원';
+    } else if (fare is String) {
+      try {
+        final numericFare = int.parse(fare);
+        return '${numericFare.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},')}원';
+      } catch (e) {
+        return fare;
+      }
+    }
+
+    return '요금 정보 없음';
   }
 
-  // 추천 패키지 카드 위젯
-  Widget _buildPackageCard(
-    String title,
-    String description,
-    IconData icon,
-    Color cardColor,
-    Color? borderColor,
-    Color textColor,
-    Color? subTextColor,
-    Color accentColor,
-  ) {
-    return Container(
-      decoration: BoxDecoration(
-        color: cardColor,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: borderColor ?? Colors.transparent),
-      ),
-      padding: EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: accentColor.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(icon, color: accentColor, size: 20),
-          ),
-          SizedBox(height: 12),
-          Text(
-            title,
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              color: textColor,
-              fontSize: 15,
-            ),
-          ),
-          SizedBox(height: 6),
-          Text(
-            description,
-            style: TextStyle(fontSize: 12, color: subTextColor, height: 1.4),
-          ),
-        ],
-      ),
+  Color _getStatusColor(String status) {
+    switch (status.toLowerCase()) {
+      case 'accepted':
+        return Colors.blue;
+      case 'completed':
+        return Colors.green;
+      case 'pending':
+        return Colors.orange;
+      case 'canceled':
+        return Colors.red;
+      case '확정됨':
+        return Colors.green;
+      case '드라이버의 수락을 기다리는 중':
+        return Colors.orange;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  Icon _getStatusIcon(String status) {
+    switch (status.toLowerCase()) {
+      case 'accepted':
+        return Icon(Icons.check_circle, color: Colors.blue);
+      case 'completed':
+        return Icon(Icons.done, color: Colors.green);
+      case 'pending':
+        return Icon(Icons.schedule, color: Colors.orange);
+      case 'canceled':
+        return Icon(Icons.cancel, color: Colors.red);
+      case '확정됨':
+        return Icon(Icons.check_circle, color: Colors.green);
+      case '드라이버의 수락을 기다리는 중':
+        return Icon(Icons.schedule, color: Colors.orange);
+      default:
+        return Icon(Icons.help_outline, color: Colors.grey);
+    }
+  }
+
+  // Instagram URL을 열기 위한 함수
+  Future<void> _launchPLOInstagram() async {
+    final Uri instagramUrl = Uri.parse(
+      'https://www.instagram.com/psu_plo?utm_source=ig_web_button_share_sheet&igsh=ZDNlZDc0MzIxNw==',
     );
+
+    try {
+      if (await canLaunchUrl(instagramUrl)) {
+        await launchUrl(instagramUrl, mode: LaunchMode.externalApplication);
+      } else {
+        print('Instagram URL을 열 수 없습니다: $instagramUrl');
+      }
+    } catch (e) {
+      print('URL 실행 중 오류 발생: $e');
+    }
   }
 }

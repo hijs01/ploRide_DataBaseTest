@@ -418,35 +418,38 @@ class _RideConfirmationPageState extends State<RideConfirmationPage>
                           shape: BoxShape.circle,
                         ),
                         child: Icon(
-                          Icons.receipt_long_rounded,
+                          Icons.check_circle_outline,
                           color: Colors.white,
                           size: 20,
                         ),
                       ),
                       SizedBox(width: 14),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            '예상 요금',
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: Colors.white.withOpacity(0.9),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              '주의!',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
-                          ),
-                          SizedBox(height: 3),
-                          Text(
-                            '15,000원',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
+                            SizedBox(height: 3),
+                            Text(
+                              '다시 한번 확인해 주세요!',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.white.withOpacity(0.9),
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
-                      Spacer(),
                       Container(
                         padding: EdgeInsets.symmetric(
                           horizontal: 12,
@@ -1050,7 +1053,13 @@ class _RideConfirmationPageState extends State<RideConfirmationPage>
 
               chatRoomNumber = maxRoomNumber + 1;
               // 새 채팅방 ID 생성 (locationIdentifier_번호)
-              chatRoomId = "${locationIdentifier}_$chatRoomNumber";
+              String prefix = "";
+              if (chatRoomCollection == 'psuToAirport') {
+                prefix = "pta_";
+              } else if (chatRoomCollection == 'airportToPsu') {
+                prefix = "atp_";
+              }
+              chatRoomId = "${prefix}${locationIdentifier}_$chatRoomNumber";
 
               print('새 채팅방 생성: $chatRoomId');
 
@@ -1266,6 +1275,24 @@ class _RideConfirmationPageState extends State<RideConfirmationPage>
             .timeout(Duration(seconds: 5));
 
         print('사용자의 채팅방 목록에 추가 완료');
+
+        // 사용자의 이용 내역(history)에 라이드 정보 추가
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .collection('history')
+            .add({
+              'pickup': pickupMap['address'],
+              'destination': destinationMap['address'],
+              'timestamp': FieldValue.serverTimestamp(),
+              'status': '드라이버의 수락을 기다리는 중',
+              'tripId': chatRoomId,
+              'collection': chatRoomCollection,
+              'ride_date': rideDateTime,
+            })
+            .timeout(Duration(seconds: 5));
+
+        print('사용자의 이용 내역에 라이드 정보 추가 완료');
 
         // driver_accepted가 true인 경우에만 추가 메시지 표시
         if (isChatActivated) {

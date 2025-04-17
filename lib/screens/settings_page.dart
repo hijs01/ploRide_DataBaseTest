@@ -6,6 +6,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cabrider/screens/loginpage.dart';
 import 'package:cabrider/screens/history_page.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class SettingsPage extends StatefulWidget {
   static const String id = 'settings';
@@ -28,6 +29,13 @@ class _SettingsPageState extends State<SettingsPage> {
   // 사용자 정보 변수
   String _userEmail = '';
   String _userName = '';
+
+  // PLO 인스타그램 링크
+  final String _ploInstagramUrl =
+      'https://www.instagram.com/psu_plo?utm_source=ig_web_button_share_sheet&igsh=ZDNlZDc0MzIxNw==';
+
+  // PLO 개발자 정보
+  final List<String> _developers = ['김태현', '박지성', '김기성', '송우주', '이정수', '홍인기'];
 
   // 언어 옵션
   final List<String> languages = ['English', '한국어', '中文', '日本語', 'Español'];
@@ -52,6 +60,138 @@ class _SettingsPageState extends State<SettingsPage> {
   // 이메일에서 사용자 이름 추출
   String _getUserNameFromEmail(String email) {
     return email.split('@')[0];
+  }
+
+  // 개발자 정보 다이얼로그 표시
+  void _showDevelopersInfo() {
+    final isDarkMode =
+        MediaQuery.of(context).platformBrightness == Brightness.dark ||
+        darkModeEnabled;
+    final primaryColor = Color(0xFF3F51B5);
+    final accentColor = Color(0xFF536DFE);
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: isDarkMode ? Color(0xFF1E1E1E) : Colors.white,
+          title: Text(
+            'PLO 개발자 정보',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 20,
+              color: isDarkMode ? Colors.white : Colors.black,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          content: Container(
+            width: double.maxFinite,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [primaryColor, accentColor],
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    '개발자 팀',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w500,
+                      fontSize: 16,
+                      color: Colors.white,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+                SizedBox(height: 20),
+                ..._developers
+                    .map(
+                      (developer) => Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 6.0),
+                        child: Container(
+                          padding: EdgeInsets.symmetric(
+                            vertical: 10,
+                            horizontal: 16,
+                          ),
+                          decoration: BoxDecoration(
+                            color:
+                                isDarkMode
+                                    ? Colors.black26
+                                    : primaryColor.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color:
+                                  isDarkMode
+                                      ? Colors.grey[800]!
+                                      : primaryColor.withOpacity(0.3),
+                              width: 1,
+                            ),
+                          ),
+                          child: Text(
+                            developer,
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: isDarkMode ? Colors.white : Colors.black87,
+                              fontWeight: FontWeight.w500,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      ),
+                    )
+                    .toList(),
+                SizedBox(height: 20),
+                Text(
+                  'PLO RIDE 앱을 개발한 팀입니다.',
+                  style: TextStyle(
+                    fontStyle: FontStyle.italic,
+                    fontSize: 14,
+                    color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            Container(
+              width: double.infinity,
+              margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: ElevatedButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: Text(
+                  '닫기',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: primaryColor,
+                  foregroundColor: Colors.white,
+                  padding: EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  elevation: 3,
+                ),
+              ),
+            ),
+          ],
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          elevation: 8,
+          contentPadding: EdgeInsets.fromLTRB(20, 20, 20, 16),
+        );
+      },
+    );
   }
 
   void _onItemTapped(int index) {
@@ -155,6 +295,24 @@ class _SettingsPageState extends State<SettingsPage> {
     }
   }
 
+  // 인스타그램 링크 열기
+  Future<void> _launchInstagram() async {
+    try {
+      final Uri url = Uri.parse(_ploInstagramUrl);
+      if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
+        throw Exception('인스타그램 링크를 열 수 없습니다');
+      }
+    } catch (e) {
+      print('인스타그램 링크 열기 오류: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('인스타그램 링크를 열 수 없습니다. 다시 시도해주세요.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDarkMode =
@@ -236,41 +394,6 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
           ),
 
-          // 지원 섹션
-          _buildSectionCard(
-            title: '지원',
-            icon: Icons.help_outline,
-            isDarkMode: isDarkMode,
-            backgroundColor: cardColor,
-            shadowColor: shadowColor,
-            children: [
-              _buildSettingItem(
-                icon: Icons.help,
-                title: '도움말',
-                subtitle: '자주 묻는 질문 및 도움말',
-                isDarkMode: isDarkMode,
-                onTap: () {},
-                trailing: Icon(
-                  Icons.arrow_forward_ios,
-                  size: 16,
-                  color: isDarkMode ? Colors.grey : Colors.grey[600],
-                ),
-              ),
-              _buildSettingItem(
-                icon: Icons.support_agent,
-                title: '고객 지원',
-                subtitle: '문제가 있으면 문의하세요',
-                isDarkMode: isDarkMode,
-                onTap: () {},
-                trailing: Icon(
-                  Icons.arrow_forward_ios,
-                  size: 16,
-                  color: isDarkMode ? Colors.grey : Colors.grey[600],
-                ),
-              ),
-            ],
-          ),
-
           // 기타 섹션
           _buildSectionCard(
             title: '기타',
@@ -280,11 +403,11 @@ class _SettingsPageState extends State<SettingsPage> {
             shadowColor: shadowColor,
             children: [
               _buildSettingItem(
-                icon: Icons.policy,
-                title: '개인 정보 보호 정책',
-                subtitle: '개인 정보가 어떻게 처리되는지 확인하세요',
+                icon: Icons.info,
+                title: 'PLO 개발자 정보',
+                subtitle: '개발팀에 대한 정보를 확인하세요',
                 isDarkMode: isDarkMode,
-                onTap: () {},
+                onTap: _showDevelopersInfo,
                 trailing: Icon(
                   Icons.arrow_forward_ios,
                   size: 16,
@@ -292,11 +415,11 @@ class _SettingsPageState extends State<SettingsPage> {
                 ),
               ),
               _buildSettingItem(
-                icon: Icons.description,
-                title: '이용 약관',
-                subtitle: '앱 사용에 관한 약관을 읽어보세요',
+                icon: Icons.support_agent,
+                title: '고객 지원',
+                subtitle: '터치해서 PLO 인스타로 문의하기',
                 isDarkMode: isDarkMode,
-                onTap: () {},
+                onTap: _launchInstagram,
                 trailing: Icon(
                   Icons.arrow_forward_ios,
                   size: 16,
