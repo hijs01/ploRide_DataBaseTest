@@ -1469,19 +1469,66 @@ class _RideConfirmationPageState extends State<RideConfirmationPage>
                                 'chat_visible': true,
                               });
 
-                          // 히스토리 상태 업데이트
-                          QuerySnapshot historyQuery =
-                              await FirebaseFirestore.instance
-                                  .collection('users')
-                                  .doc(memberId)
-                                  .collection('history')
-                                  .where('tripId', isEqualTo: chatRoomId)
-                                  .get();
+                          // 히스토리 상태 업데이트 개선
+                          print('사용자 $memberId의 히스토리 상태 업데이트 시도 중');
+                          try {
+                            // 히스토리 컬렉션에서 해당 tripId를 가진 모든 문서 찾기
+                            QuerySnapshot historyQuery =
+                                await FirebaseFirestore.instance
+                                    .collection('users')
+                                    .doc(memberId)
+                                    .collection('history')
+                                    .where('tripId', isEqualTo: chatRoomId)
+                                    .get();
 
-                          for (var historyDoc in historyQuery.docs) {
-                            await historyDoc.reference.update({
-                              'status': '확정됨',
-                            });
+                            print(
+                              '사용자 $memberId의 히스토리 문서 개수: ${historyQuery.docs.length}',
+                            );
+
+                            if (historyQuery.docs.isEmpty) {
+                              print(
+                                '사용자 $memberId의 히스토리에서 tripId=$chatRoomId를 찾을 수 없습니다.',
+                              );
+
+                              // 대안으로 히스토리 컬렉션에서 가장 최근 문서 확인
+                              QuerySnapshot recentHistoryQuery =
+                                  await FirebaseFirestore.instance
+                                      .collection('users')
+                                      .doc(memberId)
+                                      .collection('history')
+                                      .orderBy('timestamp', descending: true)
+                                      .limit(1)
+                                      .get();
+
+                              if (recentHistoryQuery.docs.isNotEmpty) {
+                                var historyDoc = recentHistoryQuery.docs.first;
+                                print('최근 히스토리 문서를 찾았습니다: ${historyDoc.id}');
+
+                                // 해당 문서의 pickup_info와 destination_info가 채팅방과 일치하는지 확인
+                                var historyData =
+                                    historyDoc.data() as Map<String, dynamic>;
+
+                                // 최근 히스토리 문서 상태 업데이트
+                                await historyDoc.reference.update({
+                                  'status': '확정됨',
+                                  'tripId': chatRoomId, // tripId도 업데이트
+                                });
+                                print('최근 히스토리 문서 상태를 "확정됨"으로 업데이트했습니다.');
+                              }
+                            } else {
+                              // 기존 방식: tripId로 찾은 문서 업데이트
+                              for (var historyDoc in historyQuery.docs) {
+                                print(
+                                  '히스토리 문서 ${historyDoc.id}의 상태를 "확정됨"으로 업데이트합니다.',
+                                );
+                                await historyDoc.reference.update({
+                                  'status': '확정됨',
+                                });
+                              }
+                              print('히스토리 상태 업데이트 완료');
+                            }
+                          } catch (e) {
+                            print('히스토리 상태 업데이트 중 오류 발생: $e');
                           }
                         }
 

@@ -26,6 +26,7 @@ class _HistoryPageState extends State<HistoryPage> {
     print('HistoryPage initialized');
     _checkUserData();
     _deleteTestData(); // 테스트 데이터 삭제
+    _checkAllRidesStatus(); // 모든 라이드 상태 확인
   }
 
   Future<void> _checkUserData() async {
@@ -98,6 +99,39 @@ class _HistoryPageState extends State<HistoryPage> {
     }
   }
 
+  // 모든 라이드 상태를 한 번에 확인하는 함수
+  Future<void> _checkAllRidesStatus() async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) return;
+
+      print('모든 라이드 상태 확인 시작');
+
+      // 히스토리에서 '드라이버의 수락을 기다리는 중' 상태인 항목만 가져오기
+      final pendingHistoryQuery =
+          await _firestore
+              .collection('users')
+              .doc(user.uid)
+              .collection('history')
+              .where('status', isEqualTo: '드라이버의 수락을 기다리는 중')
+              .get();
+
+      print('업데이트가 필요한 라이드 수: ${pendingHistoryQuery.docs.length}');
+
+      if (pendingHistoryQuery.docs.isEmpty) return;
+
+      // 해당 항목들의 채팅방 상태 확인 및 업데이트
+      for (var doc in pendingHistoryQuery.docs) {
+        final data = doc.data();
+        if (data.containsKey('tripId')) {
+          await _checkRideStatus(data, doc.reference);
+        }
+      }
+    } catch (e) {
+      print('모든 라이드 상태 확인 중 오류: $e');
+    }
+  }
+
   void _onItemTapped(int index) {
     setState(() {
       if (index != _selectedIndex) {
@@ -137,6 +171,15 @@ class _HistoryPageState extends State<HistoryPage> {
         }
         _selectedIndex = index;
       }
+    });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // 화면에 나타날 때마다 자동으로 상태 확인
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkAllRidesStatus();
     });
   }
 
@@ -358,6 +401,16 @@ class _HistoryPageState extends State<HistoryPage> {
                               ],
                             ),
                           ),
+                          onTap: () {
+                            // 상태가 '드라이버의 수락을 기다리는 중'인 경우에만 상태 확인
+                            if (status == '드라이버의 수락을 기다리는 중' &&
+                                tripData.containsKey('tripId')) {
+                              _checkRideStatus(
+                                tripData,
+                                userTrips[index].reference,
+                              );
+                            }
+                          },
                         ),
                       );
                     },
@@ -399,6 +452,59 @@ class _HistoryPageState extends State<HistoryPage> {
         return Colors.orange;
       default:
         return Colors.grey;
+    }
+  }
+
+  // 추가: 채팅방 상태를 확인하여 히스토리 상태 업데이트
+  Future<void> _checkRideStatus(
+    Map<String, dynamic> tripData,
+    DocumentReference historyRef,
+  ) async {
+    try {
+      final tripId = tripData['tripId'];
+      if (tripId == null || tripId.isEmpty) {
+        print('tripId가 비어있습니다');
+        return;
+      }
+
+      print('채팅방 상태 확인 중: $tripId');
+
+      // 해당 tripId가 속한 채팅방 컬렉션 찾기
+      final collections = ['psuToAirport', 'airportToPsu', 'generalRides'];
+
+      for (var collection in collections) {
+        try {
+          final chatDoc =
+              await _firestore.collection(collection).doc(tripId).get();
+
+          if (chatDoc.exists) {
+            final chatData = chatDoc.data() as Map<String, dynamic>;
+            final bool driverAccepted = chatData['driver_accepted'] ?? false;
+
+            print('채팅방 찾음 ($collection): driverAccepted=$driverAccepted');
+
+            if (driverAccepted) {
+              // 히스토리 상태 업데이트
+              await historyRef.update({'status': '확정됨'});
+
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('라이드 상태가 업데이트되었습니다: 확정됨'),
+                  backgroundColor: Colors.green,
+                  duration: Duration(seconds: 2),
+                ),
+              );
+              return;
+            }
+          }
+        } catch (e) {
+          print('$collection 컬렉션 확인 중 오류: $e');
+        }
+      }
+
+      print('해당 채팅방을 찾을 수 없거나 드라이버가 아직 수락하지 않았습니다.');
+    } catch (e) {
+      print('채팅방 상태 확인 중 오류: $e');
     }
   }
 }

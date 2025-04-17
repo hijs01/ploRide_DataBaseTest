@@ -292,8 +292,11 @@ class _ChatPageState extends State<ChatPage> {
       'name': chatRoomId.split('_').first.toUpperCase(), // ID의 첫 부분을 대문자로
       'origin': chatRoomCollection == 'psuToAirport' ? 'PSU' : '공항',
       'destination': chatRoomCollection == 'psuToAirport' ? '공항' : 'PSU',
-      'memberCount': chatRoomData['member_count'] ?? 0,
-      'maxMembers': 4,
+      'memberCount':
+          chatRoomData['members'] != null
+              ? (chatRoomData['members'] as List).length
+              : 0,
+      'maxMembers': chatRoomData['max_members'] ?? 4,
       'isConfirmed': chatRoomData['driver_accepted'] ?? false,
       'departureTime': chatRoomData['ride_date_timestamp'] ?? Timestamp.now(),
       'lastMessage': chatRoomData['last_message'] ?? '',
