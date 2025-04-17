@@ -21,11 +21,22 @@ class _HomePageState extends State<HomePage> {
   int _selectedIndex = 0;
   Map<String, dynamic>? latestRideData;
   bool isLoading = true;
+  String userName = '사용자';
 
   @override
   void initState() {
     super.initState();
     _fetchLatestRideData();
+    _getUserEmail();
+  }
+
+  void _getUserEmail() {
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser != null && currentUser.email != null) {
+      setState(() {
+        userName = currentUser.email!.split('@')[0];
+      });
+    }
   }
 
   Future<void> _fetchLatestRideData() async {
@@ -169,7 +180,7 @@ class _HomePageState extends State<HomePage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        '안녕하세요,',
+                        '안녕하세요, $userName님',
                         style: TextStyle(
                           fontSize: 26,
                           fontWeight: FontWeight.bold,
@@ -310,7 +321,7 @@ class _HomePageState extends State<HomePage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        '안녕하세요,',
+                        '안녕하세요, $userName님',
                         style: TextStyle(
                           fontSize: 26,
                           fontWeight: FontWeight.bold,
@@ -380,7 +391,7 @@ class _HomePageState extends State<HomePage> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'User Name',
+                            userName,
                             style: TextStyle(
                               fontSize: 20,
                               fontFamily: 'Brand-Bold',
