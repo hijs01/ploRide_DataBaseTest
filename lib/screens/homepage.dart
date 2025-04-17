@@ -6,6 +6,7 @@ import 'package:cabrider/screens/chat_page.dart';
 import 'package:cabrider/screens/history_page.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class HomePage extends StatefulWidget {
   static const String id = 'home';
@@ -676,6 +677,7 @@ class HomeContent extends StatelessWidget {
 
             // 프로모션 배너
             Container(
+              height: 120,
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: [accentColor, Color(0xFF5C6BC0)],
@@ -693,6 +695,7 @@ class HomeContent extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        SizedBox(height: 17),
                         Text(
                           'PLO와 함께',
                           style: TextStyle(
@@ -713,7 +716,19 @@ class HomeContent extends StatelessWidget {
                     ),
                   ),
                   ElevatedButton(
-                    onPressed: () {},
+                    onPressed: () async {
+                      final Uri url = Uri.parse(
+                        'https://www.instagram.com/psu_plo?utm_source=ig_web_button_share_sheet&igsh=ZDNlZDc0MzIxNw==',
+                      );
+                      try {
+                        await launchUrl(
+                          url,
+                          mode: LaunchMode.externalApplication,
+                        );
+                      } catch (e) {
+                        print('URL을 열 수 없습니다: $e');
+                      }
+                    },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.white,
                       foregroundColor: accentColor,
