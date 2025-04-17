@@ -11,6 +11,7 @@ import 'package:cabrider/screens/homepage.dart';
 import 'package:cabrider/screens/settings_page.dart';
 import 'package:cabrider/screens/rideconfirmation/rideconfirmation_page.dart';
 import 'package:cabrider/screens/email_verification_page.dart';
+import 'package:cabrider/screens/forgot_password_page.dart';
 import 'package:cabrider/screens/chat_room_page.dart';
 import 'package:cabrider/globalvariable.dart';
 import 'package:provider/provider.dart';
@@ -199,6 +200,7 @@ class MyApp extends StatelessWidget {
         HomePage.id: (context) => HomePage(),
         SettingsPage.id: (context) => SettingsPage(),
         EmailVerificationPage.id: (context) => EmailVerificationPage(email: ''),
+        ForgotPasswordPage.id: (context) => ForgotPasswordPage(),
         'rideconfirmation': (context) => RideConfirmationPage(),
       },
     );

@@ -2,6 +2,7 @@ import 'package:cabrider/brand_colors.dart';
 import 'package:cabrider/screens/homepage.dart';
 import 'package:cabrider/screens/registrationpage.dart';
 import 'package:cabrider/screens/email_verification_page.dart';
+import 'package:cabrider/screens/forgot_password_page.dart';
 import 'package:cabrider/widgets/ProgressDialog.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -466,7 +467,14 @@ class _LoginpageState extends State<Loginpage>
                               alignment: Alignment.centerRight,
                               child: TextButton(
                                 onPressed: () {
-                                  // 비밀번호 찾기 기능 (기존 TODO)
+                                  // 비밀번호 찾기 페이지로 이동
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder:
+                                          (context) => ForgotPasswordPage(),
+                                    ),
+                                  );
                                 },
                                 child: Text(
                                   '비밀번호를 잊으셨나요?',

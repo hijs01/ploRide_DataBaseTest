@@ -734,9 +734,10 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                               // pushNamed 대신 push를 사용
                               context,
                               MaterialPageRoute(
-                                builder: (context) => SearchPage(
-                                  onLuggageCountChanged: updateLuggageCount,
-                                ),
+                                builder:
+                                    (context) => SearchPage(
+                                      onLuggageCountChanged: updateLuggageCount,
+                                    ),
                               ),
                             );
                             if (response == 'getDirection') {
@@ -1422,8 +1423,8 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
       'Firestore 드라이버 위치 리스너 시작: 위치(${currentPosition!.latitude}, ${currentPosition!.longitude})',
     );
 
-    // Firestore에서 드라이버 위치 실시간 업데이트 구독
-    FirebaseFirestore.instance.collection('driversAvailable').snapshots().listen((
+    // Firestore에서 모든 드라이버 가져오기 (온라인/오프라인 상관없이)
+    FirebaseFirestore.instance.collection('drivers').snapshots().listen((
       snapshot,
     ) {
       // 기존 드라이버 목록 초기화
@@ -1431,58 +1432,45 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
 
       for (var doc in snapshot.docs) {
         try {
-          // 드라이버 위치 데이터 가져오기
+          // 드라이버 ID 가져오기
+          String driverId = doc.id;
+
+          // 드라이버 데이터
           Map<String, dynamic> data = doc.data();
 
-          // driver_id 필드 확인
-          String driverId = data['driver_id'] ?? doc.id;
+          // 위치 데이터가 있는 경우에만 처리
+          double? lat;
+          double? lng;
 
           // position 객체에서 위치 데이터 확인
           if (data['position'] != null) {
             Map<String, dynamic> position = data['position'];
-            double? lat = double.tryParse(
-              position['latitude']?.toString() ?? '',
-            );
-            double? lng = double.tryParse(
-              position['longitude']?.toString() ?? '',
-            );
-
-            if (lat != null && lng != null) {
-              // 현재 위치와의 거리 계산 (20km 이내만 표시)
-              double distance = HelperMethods.calculateDistance(
-                currentPosition!.latitude,
-                currentPosition!.longitude,
-                lat,
-                lng,
-              );
-
-              print(
-                '드라이버 발견: $driverId, 위치: ($lat, $lng), 거리: ${distance.toStringAsFixed(2)}km',
-              );
-
-              if (distance <= 20) {
-                // 20km 이내의 드라이버만 추가
-                NearbyDriver nearbyDriver = NearbyDriver(
-                  key: driverId,
-                  latitude: lat,
-                  longitude: lng,
-                );
-
-                FireHelper.nearbyDriverList.add(nearbyDriver);
-                print('드라이버 추가됨: $driverId');
-              }
-            }
-          } else {
-            print('드라이버 위치 데이터 누락: $driverId');
-            print('데이터 내용: $data');
+            lat = double.tryParse(position['latitude']?.toString() ?? '');
+            lng = double.tryParse(position['longitude']?.toString() ?? '');
           }
+
+          // 위치 데이터가 없는 경우 기본 위치 설정 (예: 서울 시청)
+          lat ??= 37.5666805;
+          lng ??= 126.9784147;
+
+          print('드라이버 발견: $driverId, 위치: ($lat, $lng)');
+
+          // 모든 드라이버 추가 (거리 제한 없음)
+          NearbyDriver nearbyDriver = NearbyDriver(
+            key: driverId,
+            latitude: lat,
+            longitude: lng,
+          );
+
+          FireHelper.nearbyDriverList.add(nearbyDriver);
+          print('드라이버 추가됨: $driverId');
         } catch (e) {
           print('드라이버 데이터 처리 중 오류: ${doc.id}, 오류: $e');
           print('원본 데이터: ${doc.data()}');
         }
       }
 
-      print('가용 드라이버 수: ${FireHelper.nearbyDriverList.length}');
+      print('총 드라이버 수: ${FireHelper.nearbyDriverList.length}');
       if (FireHelper.nearbyDriverList.isNotEmpty) {
         updateDriversOnMap();
       }
@@ -1804,57 +1792,36 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
       return;
     }
 
-    print('사용 가능한 드라이버 수: ${availableDrivers.length}');
-    print('사용 가능한 드라이버 목록:');
+    print('총 드라이버 수: ${availableDrivers.length}');
+    print('드라이버 목록:');
     for (var driver in availableDrivers) {
       print(
         '- 드라이버 ID: ${driver.key}, 위치: ${driver.latitude}, ${driver.longitude}',
       );
     }
 
-    var driver = availableDrivers[0];
-    print('선택된 드라이버: ${driver.key}');
-
-    // 현재 라이드 요청 ID 확인
-    if (currentRideRef == null) {
-      print('라이드 요청이 아직 생성되지 않았습니다.');
-      return;
+    // 모든 드라이버에게 알림 보내기
+    for (var driver in availableDrivers) {
+      notifyDriver(driver);
     }
-
-    // 드라이버에게 알림 전송
-    notifyDriver(driver);
-
-    // 다음 드라이버를 위해 목록에서 제거
-    availableDrivers.removeAt(0);
-
-    // 10초 후에도 응답이 없으면 다음 드라이버에게 알림
-    Future.delayed(Duration(seconds: 10), () {
-      // Firestore에서 드라이버 응답 확인
-      if (currentRideRef != null) {
-        currentRideRef!.get().then((DocumentSnapshot snapshot) {
-          if (snapshot.exists) {
-            Map<String, dynamic> data = snapshot.data() as Map<String, dynamic>;
-            if (data['status'] == 'pending' && availableDrivers.isNotEmpty) {
-              print('첫 번째 드라이버가 응답하지 않았습니다. 다음 드라이버에게 알림을 보냅니다.');
-              findDriver();
-            }
-          }
-        });
-      }
-    });
   }
 
   void notifyDriver(NearbyDriver driver) {
     // 드라이버 ID 로깅
     print('알림을 보낼 드라이버 ID: ${driver.key}');
 
+    // 현재 라이드 요청 ID 저장
+    String? rideId = currentRideRef?.id;
+
+    if (rideId == null) {
+      print('라이드 요청이 아직 생성되지 않았습니다.');
+      return;
+    }
+
     // 드라이버 문서 참조
     DocumentReference driverDocRef = FirebaseFirestore.instance
         .collection('drivers')
         .doc(driver.key);
-
-    // 현재 라이드 요청 ID 저장
-    String? rideId = currentRideRef?.id;
 
     // 드라이버 문서 업데이트
     driverDocRef
@@ -1867,6 +1834,18 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
         })
         .catchError((error) {
           print('드라이버 문서 업데이트 실패: $error');
+
+          // 문서가 없는 경우 생성 시도
+          if (error.toString().contains('not found')) {
+            driverDocRef
+                .set({
+                  'newtrip': rideId,
+                  'last_notification_time': FieldValue.serverTimestamp(),
+                })
+                .then((_) {
+                  print('드라이버 문서 생성 완료: newtrip = $rideId');
+                });
+          }
         });
 
     // 드라이버에게 직접 알림 전송
@@ -1875,119 +1854,6 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
       context: context,
       ride_id: rideId,
     );
-
-    // 30초 지나면 타임아웃으로 처리
-    const oneSecTick = Duration(seconds: 1);
-
-    var timer = Timer.periodic(oneSecTick, (timer) {
-      // ride request 취소되면 타이머 멈추기
-      if (appState != "REQUESTING") {
-        driverDocRef.update({'newtrip': 'cancelled'});
-        timer.cancel();
-        driverRequestTimeout = 30;
-      }
-
-      driverRequestTimeout--;
-
-      // 드라이버 응답 확인을 위한 리스너 설정
-      if (currentRideRef != null) {
-        currentRideRef!.snapshots().listen((DocumentSnapshot snapshot) {
-          if (snapshot.exists) {
-            Map<String, dynamic> data = snapshot.data() as Map<String, dynamic>;
-            // 드라이버가 수락한 경우
-            if (data['status'] == 'accepted') {
-              timer.cancel();
-              driverRequestTimeout = 30;
-            }
-          }
-        });
-      }
-
-      if (driverRequestTimeout == 0) {
-        // 드라이버에게 타임아웃 알려주기
-        driverDocRef.update({'newtrip': 'timeout'});
-        driverRequestTimeout = 30;
-        timer.cancel();
-
-        // 다음 가장 가까운 드라이버 선택
-        findDriver();
-      }
-    });
-
-    // 테스트용: 모든 가능한 경로에 알림 데이터 저장
-    testAllNotificationPaths(driver.key, rideId);
-  }
-
-  // 테스트용: 모든 가능한 경로에 알림 데이터 저장
-  void testAllNotificationPaths(String driverId, String? rideId) async {
-    if (rideId == null) return;
-
-    try {
-      print('===== 테스트: 모든 가능한 경로에 알림 데이터 저장 =====');
-
-      // 기본 알림 데이터
-      var notificationData = {
-        'ride_id': rideId,
-        'timestamp': FieldValue.serverTimestamp(),
-        'status': 'new',
-        'pickup_address': '테스트 출발지',
-        'destination_address': '테스트 목적지',
-        'read': false,
-      };
-
-      // 1. drivers/{driverId} 문서 업데이트
-      await FirebaseFirestore.instance
-          .collection('drivers')
-          .doc(driverId)
-          .update({
-            'newtrip': rideId,
-            'last_updated': FieldValue.serverTimestamp(),
-          });
-      print('1. drivers/$driverId 문서 업데이트 완료');
-
-      // 2. drivers/{driverId}/notifications 컬렉션에 알림 추가
-      DocumentReference notificationRef = await FirebaseFirestore.instance
-          .collection('drivers')
-          .doc(driverId)
-          .collection('notifications')
-          .add(notificationData);
-      print(
-        '2. drivers/$driverId/notifications 컬렉션에 알림 추가 완료: ${notificationRef.id}',
-      );
-
-      // 3. drivers/{driverId} 문서에 알림 표시 업데이트
-      await FirebaseFirestore.instance
-          .collection('drivers')
-          .doc(driverId)
-          .update({
-            'has_new_notification': true,
-            'last_notification': notificationData,
-          });
-      print('3. drivers/$driverId 문서에 알림 표시 업데이트 완료');
-
-      // 4. 알림 테스트용 HTTP 엔드포인트 호출
-      String url =
-          'https://us-central1-geetaxi-aa379.cloudfunctions.net/sendPushToDriver';
-      Map<String, dynamic> requestData = {
-        'driverId': driverId,
-        'rideId': rideId,
-        'pickup_address': '테스트 출발지',
-        'destination_address': '테스트 목적지',
-      };
-
-      var response = await http.post(
-        Uri.parse(url),
-        body: jsonEncode(requestData),
-        headers: {'Content-Type': 'application/json'},
-      );
-
-      print('4. HTTP 요청 결과: ${response.statusCode}');
-      print('응답: ${response.body}');
-
-      print('===== 테스트 완료: 모든 가능한 경로에 알림 데이터 저장됨 =====');
-    } catch (e) {
-      print('테스트 중 오류 발생: $e');
-    }
   }
 
   // 임시 픽업 마커 업데이트 메서드
