@@ -1049,8 +1049,14 @@ class _RideConfirmationPageState extends State<RideConfirmationPage>
               }
 
               chatRoomNumber = maxRoomNumber + 1;
-              // 새 채팅방 ID 생성 (locationIdentifier_번호)
-              chatRoomId = "${locationIdentifier}_$chatRoomNumber";
+              // 새 채팅방 ID 생성 (prefix_locationIdentifier_번호)
+              String prefix = "";
+              if (chatRoomCollection == 'psuToAirport') {
+                prefix = "pta_";
+              } else if (chatRoomCollection == 'airportToPsu') {
+                prefix = "atp_";
+              }
+              chatRoomId = "${prefix}${locationIdentifier}_$chatRoomNumber";
 
               print('새 채팅방 생성: $chatRoomId');
 
