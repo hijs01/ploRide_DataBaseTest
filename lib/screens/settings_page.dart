@@ -6,6 +6,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cabrider/screens/loginpage.dart';
 import 'package:cabrider/screens/history_page.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class SettingsPage extends StatefulWidget {
   static const String id = 'settings';
@@ -31,6 +32,10 @@ class _SettingsPageState extends State<SettingsPage> {
 
   // 언어 옵션
   final List<String> languages = ['English', '한국어', '中文', '日本語', 'Español'];
+
+  // Instagram 링크
+  final String instagramUrl =
+      'https://www.instagram.com/psu_plo?utm_source=ig_web_button_share_sheet&igsh=ZDNlZDc0MzIxNw==';
 
   @override
   void initState() {
@@ -155,6 +160,14 @@ class _SettingsPageState extends State<SettingsPage> {
     }
   }
 
+  // Instagram 링크 열기 함수
+  Future<void> _launchInstagram() async {
+    final Uri url = Uri.parse(instagramUrl);
+    if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
+      throw Exception('링크를 열 수 없습니다: $url');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDarkMode =
@@ -261,7 +274,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 title: '고객 지원',
                 subtitle: 'ploride.dev@gmail.com',
                 isDarkMode: isDarkMode,
-                onTap: () {},
+                onTap: _launchInstagram,
                 trailing: Icon(
                   Icons.arrow_forward_ios,
                   size: 16,
@@ -284,7 +297,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 title: '개발자',
                 subtitle: 'PLO TEAM',
                 isDarkMode: isDarkMode,
-                onTap: () {},
+                onTap: _launchInstagram,
                 trailing: Icon(
                   Icons.arrow_forward_ios,
                   size: 16,
