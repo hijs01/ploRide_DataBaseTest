@@ -4,6 +4,8 @@ import 'package:cabrider/screens/searchpage.dart';
 import 'package:cabrider/screens/settings_page.dart';
 import 'package:cabrider/screens/chat_page.dart';
 import 'package:cabrider/screens/history_page.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class HomePage extends StatefulWidget {
   static const String id = 'home';
@@ -17,6 +19,51 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   GlobalKey<ScaffoldState> scaffoldKey = GlobalKey<ScaffoldState>();
   int _selectedIndex = 0;
+  Map<String, dynamic>? latestRideData;
+  bool isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchLatestRideData();
+  }
+
+  Future<void> _fetchLatestRideData() async {
+    try {
+      final currentUser = FirebaseAuth.instance.currentUser;
+
+      if (currentUser != null) {
+        final historySnapshot =
+            await FirebaseFirestore.instance
+                .collection('users')
+                .doc(currentUser.uid)
+                .collection('history')
+                .orderBy('timestamp', descending: true)
+                .limit(1)
+                .get();
+
+        if (historySnapshot.docs.isNotEmpty) {
+          setState(() {
+            latestRideData = historySnapshot.docs.first.data();
+            isLoading = false;
+          });
+        } else {
+          setState(() {
+            isLoading = false;
+          });
+        }
+      } else {
+        setState(() {
+          isLoading = false;
+        });
+      }
+    } catch (e) {
+      print('Error fetching latest ride data: $e');
+      setState(() {
+        isLoading = false;
+      });
+    }
+  }
 
   void _onItemTapped(int index) {
     setState(() {
@@ -39,8 +86,7 @@ class _HomePageState extends State<HomePage> {
         Navigator.push(
           context,
           PageRouteBuilder(
-            pageBuilder:
-                (context, animation, secondaryAnimation) => ChatPage(),
+            pageBuilder: (context, animation, secondaryAnimation) => ChatPage(),
             transitionDuration: Duration.zero,
             reverseTransitionDuration: Duration.zero,
           ),
@@ -67,7 +113,7 @@ class _HomePageState extends State<HomePage> {
 
     // 각 탭에 해당하는 화면 위젯들
     final List<Widget> pages = [
-      HomeContent(isDarkMode: isDarkMode),
+      HomeContent(isDarkMode: isDarkMode, latestRideData: latestRideData),
       Center(
         child: Text(
           'No rides to be updated',
@@ -106,7 +152,7 @@ class _HomePageState extends State<HomePage> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        'PLORIDE',
+                        'TAGO',
                         style: TextStyle(
                           fontSize: 24,
                           fontWeight: FontWeight.bold,
@@ -467,8 +513,10 @@ class _HomePageState extends State<HomePage> {
 // 홈 탭의 컨텐츠를 위한 별도의 위젯
 class HomeContent extends StatelessWidget {
   final bool isDarkMode;
+  final Map<String, dynamic>? latestRideData;
 
-  const HomeContent({Key? key, required this.isDarkMode}) : super(key: key);
+  const HomeContent({Key? key, required this.isDarkMode, this.latestRideData})
+    : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -489,101 +537,131 @@ class HomeContent extends StatelessWidget {
             SizedBox(height: 20),
 
             // 예약된 탑승 정보 (있는 경우)
-            Container(
-              decoration: BoxDecoration(
-                border: Border.all(
-                  color: accentColor.withOpacity(0.3),
-                  width: 1.5,
-                ),
-                borderRadius: BorderRadius.circular(16),
-                color: cardColor,
-              ),
-              padding: EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
+            latestRideData != null
+                ? Container(
+                  decoration: BoxDecoration(
+                    border: Border.all(
+                      color: accentColor.withOpacity(0.3),
+                      width: 1.5,
+                    ),
+                    borderRadius: BorderRadius.circular(16),
+                    color: cardColor,
+                  ),
+                  padding: EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(Icons.calendar_today, color: accentColor, size: 20),
-                      SizedBox(width: 8),
-                      Text(
-                        '예약된 탑승',
-                        style: TextStyle(
-                          color: accentColor,
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.calendar_today,
+                            color: accentColor,
+                            size: 20,
+                          ),
+                          SizedBox(width: 8),
+                          Text(
+                            '예약된 탑승',
+                            style: TextStyle(
+                              color: accentColor,
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Container(
+                            width: 40,
+                            child: Column(
+                              children: [
+                                Icon(
+                                  Icons.circle,
+                                  color: Colors.green,
+                                  size: 12,
+                                ),
+                                Container(
+                                  width: 1,
+                                  height: 30,
+                                  color:
+                                      isDarkMode
+                                          ? Colors.grey[700]
+                                          : Colors.grey[400],
+                                ),
+                                Icon(
+                                  Icons.location_on,
+                                  color: Colors.red,
+                                  size: 12,
+                                ),
+                              ],
+                            ),
+                          ),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  latestRideData!['pickup'] ?? '출발지 정보 없음',
+                                  style: TextStyle(
+                                    color: textColor,
+                                    fontSize: 15,
+                                  ),
+                                ),
+                                SizedBox(height: 16),
+                                Text(
+                                  latestRideData!['destination'] ?? '도착지 정보 없음',
+                                  style: TextStyle(
+                                    color: textColor,
+                                    fontSize: 15,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 12),
+                      Divider(
+                        color: isDarkMode ? Colors.grey[800] : Colors.grey[300],
+                      ),
+                      SizedBox(height: 8),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            _formatTimestamp(latestRideData!['timestamp']),
+                            style: TextStyle(color: subTextColor, fontSize: 13),
+                          ),
+                          Container(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: _getStatusColor(
+                                latestRideData!['status'] ?? '',
+                              ).withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              latestRideData!['status'] ?? '상태 정보 없음',
+                              style: TextStyle(
+                                color: _getStatusColor(
+                                  latestRideData!['status'] ?? '',
+                                ),
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
-                  SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Container(
-                        width: 40,
-                        child: Column(
-                          children: [
-                            Icon(Icons.circle, color: Colors.green, size: 12),
-                            Container(
-                              width: 1,
-                              height: 30,
-                              color:
-                                  isDarkMode
-                                      ? Colors.grey[700]
-                                      : Colors.grey[400],
-                            ),
-                            Icon(
-                              Icons.location_on,
-                              color: Colors.red,
-                              size: 12,
-                            ),
-                          ],
-                        ),
-                      ),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              '인천국제공항 1터미널',
-                              style: TextStyle(color: textColor, fontSize: 15),
-                            ),
-                            SizedBox(height: 16),
-                            Text(
-                              '서울역',
-                              style: TextStyle(color: textColor, fontSize: 15),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  SizedBox(height: 12),
-                  Divider(
-                    color: isDarkMode ? Colors.grey[800] : Colors.grey[300],
-                  ),
-                  SizedBox(height: 8),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        '2023년 10월 15일 오후 2:00',
-                        style: TextStyle(color: subTextColor, fontSize: 13),
-                      ),
-                      Text(
-                        '55,000원',
-                        style: TextStyle(
-                          color: textColor,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
+                )
+                : SizedBox(), // 데이터가 없으면 표시하지 않음
 
-            SizedBox(height: 24),
+            SizedBox(height: 40),
 
             // 프로모션 배너
             Container(
@@ -605,7 +683,7 @@ class HomeContent extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          '첫 탑승 30% 할인',
+                          'PLO와 함께',
                           style: TextStyle(
                             color: Colors.white,
                             fontSize: 18,
@@ -614,7 +692,7 @@ class HomeContent extends StatelessWidget {
                         ),
                         SizedBox(height: 6),
                         Text(
-                          '광고 내용',
+                          'PLO와 함께할 용사 구합니다',
                           style: TextStyle(
                             color: Colors.white.withOpacity(0.9),
                             fontSize: 13,
@@ -634,7 +712,7 @@ class HomeContent extends StatelessWidget {
                       ),
                     ),
                     child: Text(
-                      '적용하기',
+                      'ㄱㄱ?',
                       style: TextStyle(fontWeight: FontWeight.bold),
                     ),
                   ),
@@ -642,197 +720,41 @@ class HomeContent extends StatelessWidget {
               ),
             ),
 
-            SizedBox(height: 24),
-
-            // 광고 배너
-            Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [Color(0xFF2E7D32), Color(0xFF4CAF50)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
-                    blurRadius: 8,
-                    offset: Offset(0, 2),
-                  ),
-                ],
-              ),
-              padding: EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: Container(
-                      width: 60,
-                      height: 60,
-                      color: Colors.white,
-                      child: Center(
-                        child: Icon(
-                          Icons.directions_car,
-                          color: Color(0xFF2E7D32),
-                          size: 36,
-                        ),
-                      ),
-                    ),
-                  ),
-                  SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '광고 배너',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        SizedBox(height: 6),
-                        Text(
-                          '광고 내용',
-                          style: TextStyle(
-                            color: Colors.white.withOpacity(0.9),
-                            fontSize: 13,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            SizedBox(height: 24),
-
-            // 2분할 배너
-            Row(
-              children: [
-                // 왼쪽 배너
-                Expanded(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [Color(0xFF512DA8), Color(0xFF673AB7)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.08),
-                          blurRadius: 6,
-                          offset: Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    padding: EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          padding: EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Icon(
-                            Icons.emoji_events,
-                            color: Colors.white,
-                            size: 24,
-                          ),
-                        ),
-                        SizedBox(height: 12),
-                        Text(
-                          '광고 배너',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        SizedBox(height: 4),
-                        Text(
-                          '광고 내용',
-                          style: TextStyle(
-                            color: Colors.white.withOpacity(0.9),
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-
-                SizedBox(width: 12),
-
-                // 오른쪽 배너
-                Expanded(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [Color(0xFF0277BD), Color(0xFF039BE5)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.08),
-                          blurRadius: 6,
-                          offset: Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    padding: EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          padding: EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Icon(
-                            Icons.schedule,
-                            color: Colors.white,
-                            size: 24,
-                          ),
-                        ),
-                        SizedBox(height: 12),
-                        Text(
-                          '광고 배너',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        SizedBox(height: 4),
-                        Text(
-                          '광고 내용',
-                          style: TextStyle(
-                            color: Colors.white.withOpacity(0.9),
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-
             SizedBox(height: 30),
           ],
         ),
       ),
     );
+  }
+
+  // 상태에 따른 색상 반환
+  Color _getStatusColor(String status) {
+    switch (status.toLowerCase()) {
+      case 'accepted':
+        return Colors.blue;
+      case 'completed':
+        return Colors.green;
+      case 'pending':
+        return Colors.orange;
+      case 'canceled':
+        return Colors.red;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  // 타임스탬프 포맷 메서드
+  String _formatTimestamp(dynamic timestamp) {
+    if (timestamp == null) return '날짜 정보 없음';
+
+    DateTime date;
+    if (timestamp is Timestamp) {
+      date = timestamp.toDate();
+    } else {
+      return '날짜 정보 없음';
+    }
+
+    return '${date.year}년 ${date.month}월 ${date.day}일 ${date.hour}:${date.minute.toString().padLeft(2, '0')}';
   }
 
   // 인기 목적지 카드 위젯
