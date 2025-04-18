@@ -23,7 +23,7 @@ class ChatRoomPage extends StatefulWidget {
 }
 
 class _ChatRoomPageState extends State<ChatRoomPage>
-    with WidgetsBindingObserver {
+    with WidgetsBindingObserver, TickerProviderStateMixin {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final TextEditingController _messageController = TextEditingController();
@@ -34,6 +34,7 @@ class _ChatRoomPageState extends State<ChatRoomPage>
   Map<String, dynamic>? _chatRoomData;
   bool _isLoading = true;
   bool _isSending = false;
+  bool _hasScrolledToBottom = false; // 스크롤 상태 추적
   StreamSubscription? _chatRoomSubscription;
   StreamSubscription? _messagesSubscription;
   List<QueryDocumentSnapshot> _messages = [];
@@ -44,6 +45,8 @@ class _ChatRoomPageState extends State<ChatRoomPage>
   bool _hasMoreMessages = true;
   DocumentSnapshot? _lastDocument;
   static const int _messageLimit = 20;
+  final Map<String, AnimationController> _messageAnimations = {};
+  final Map<String, Animation<double>> _messageSlideAnimations = {};
 
   @override
   void initState() {
@@ -59,8 +62,8 @@ class _ChatRoomPageState extends State<ChatRoomPage>
 
     // 포커스 변경 감지
     _focusNode.addListener(() {
-      if (_focusNode.hasFocus) {
-        // 포커스를 받으면 즉시 스크롤을 아래로 이동
+      if (_focusNode.hasFocus && _hasScrolledToBottom) {
+        // 이미 스크롤이 아래로 내려간 경우에만 포커스 변경 시 스크롤
         _scrollToBottom();
       }
     });
@@ -72,9 +75,8 @@ class _ChatRoomPageState extends State<ChatRoomPage>
   @override
   void didChangeMetrics() {
     super.didChangeMetrics();
-    // 키보드가 나타날 때 스크롤을 아래로 이동
-    if (MediaQuery.of(context).viewInsets.bottom > 0) {
-      // 키보드가 나타났을 때
+    // 키보드가 나타날 때 스크롤을 아래로 이동 (이미 스크롤이 아래로 내려간 경우에만)
+    if (MediaQuery.of(context).viewInsets.bottom > 0 && _hasScrolledToBottom) {
       _scrollToBottom();
     }
   }
@@ -147,7 +149,11 @@ class _ChatRoomPageState extends State<ChatRoomPage>
 
   void _scrollToBottom() {
     if (_scrollController.hasClients) {
-      _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+      _scrollController.animateTo(
+        _scrollController.position.maxScrollExtent,
+        duration: Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      );
     }
   }
 
@@ -184,16 +190,22 @@ class _ChatRoomPageState extends State<ChatRoomPage>
           _isLoading = false;
         });
 
-        // 새 메시지가 추가될 때마다 스크롤을 아래로 이동
+        // 메시지가 로드된 후 즉시 스크롤을 아래로 이동
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          _scrollToBottom();
+          _scrollToBottomImmediately();
         });
+      } else {
+        setState(() {
+          _isLoading = false;
+        });
+        _hasScrolledToBottom = true;
       }
     } catch (e) {
       print('Error loading initial messages: $e');
       setState(() {
         _isLoading = false;
       });
+      _hasScrolledToBottom = true;
     }
   }
 
@@ -337,71 +349,6 @@ class _ChatRoomPageState extends State<ChatRoomPage>
     }
   }
 
-  Future<void> _sendMessage() async {
-    if (_messageController.text.trim().isEmpty) return;
-
-    final messageText = _messageController.text.trim();
-    final user = _auth.currentUser;
-    String senderName = user?.displayName ?? '알 수 없는 사용자';
-
-    // 사용자 프로필에서 이름 가져오기
-    try {
-      final userDoc =
-          await _firestore.collection('users').doc(_currentUserId).get();
-      if (userDoc.exists) {
-        final userData = userDoc.data();
-        senderName = userData?['fullname'] ?? senderName;
-      }
-    } catch (e) {
-      print('사용자 이름 조회 오류: $e');
-    }
-
-    // 메시지 전송 전에 텍스트 필드 초기화
-    _messageController.clear();
-
-    final message = {
-      'text': messageText,
-      'sender_id': _currentUserId,
-      'sender_name': senderName,
-      'timestamp': FieldValue.serverTimestamp(),
-      'type': 'user',
-    };
-
-    try {
-      await _firestore
-          .collection(widget.chatRoomCollection)
-          .doc(widget.chatRoomId)
-          .collection('messages')
-          .add(message);
-
-      // 마지막 메시지 업데이트
-      try {
-        await _firestore
-            .collection(widget.chatRoomCollection)
-            .doc(widget.chatRoomId)
-            .update({
-              'lastMessage': messageText,
-              'last_message': messageText,
-              'last_message_time': FieldValue.serverTimestamp(),
-              'timestamp': FieldValue.serverTimestamp(),
-            });
-        print('메시지 업데이트 성공: last_message = $messageText');
-      } catch (e) {
-        print('메시지 업데이트 실패: $e');
-      }
-
-      // 다른 멤버들에게 알림 전송
-      await _sendNotificationToOtherMembers(messageText);
-
-      // 메시지 전송 후 스크롤을 아래로 이동
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _scrollToBottom();
-      });
-    } catch (e) {
-      print('Error sending message: $e');
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final isDarkMode =
@@ -409,7 +356,7 @@ class _ChatRoomPageState extends State<ChatRoomPage>
     final textColor = isDarkMode ? Colors.white : Colors.black;
     final backgroundColor = isDarkMode ? Colors.black : Colors.white;
     final messageColor = isDarkMode ? Color(0xFF1E1E1E) : Colors.white;
-    final accentColor = Color(0xFF3F51B5);
+    final accentColor = isDarkMode ? Color(0xFF0056B3) : Color(0xFF0047AB); // 더 어두운 파란색
     final systemMessageColor = isDarkMode ? Colors.grey[800] : Colors.grey[300];
 
     return Scaffold(
@@ -417,156 +364,247 @@ class _ChatRoomPageState extends State<ChatRoomPage>
       backgroundColor: backgroundColor,
       resizeToAvoidBottomInset: true,
       appBar: AppBar(
-        backgroundColor: accentColor,
+        backgroundColor: isDarkMode ? Colors.black : Colors.white,
+        elevation: 0,
         title: _buildAppBarTitle(),
         automaticallyImplyLeading: true,
+        iconTheme: IconThemeData(color: Colors.white),
         actions: [
           IconButton(
-            icon: Icon(Icons.menu),
+            icon: Icon(Icons.menu, color: isDarkMode ? Colors.white : Colors.black),
             onPressed: () => _scaffoldKey.currentState?.openEndDrawer(),
           ),
         ],
       ),
       endDrawer: Drawer(
-        child: Column(
-          children: [
-            AppBar(title: Text('채팅방 정보'), automaticallyImplyLeading: false),
-            Expanded(
-              child: StreamBuilder<DocumentSnapshot>(
-                stream:
-                    _firestore
-                        .collection(widget.chatRoomCollection)
-                        .doc(widget.chatRoomId)
-                        .snapshots(),
-                builder: (context, snapshot) {
-                  if (snapshot.hasError) {
-                    print('StreamBuilder error: ${snapshot.error}');
-                    return Center(
-                      child: Text(
-                        '채팅방 정보를 불러오는 중 오류가 발생했습니다.',
-                        style: TextStyle(color: Colors.grey),
+        backgroundColor: isDarkMode ? Colors.grey[900] : Colors.grey[100],
+        child: SafeArea(
+          child: Column(
+            children: [
+              Container(
+                color: isDarkMode ? Colors.grey[900] : Colors.grey[100],
+                child: AppBar(
+                  title: Text(
+                    '채팅방 정보',
+                    style: TextStyle(
+                      color: isDarkMode ? Colors.white : Colors.black,
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  backgroundColor: isDarkMode ? Colors.grey[900] : Colors.grey[100],
+                  elevation: 0,
+                  automaticallyImplyLeading: false,
+                  actions: [
+                    IconButton(
+                      icon: Icon(
+                        Icons.close,
+                        color: isDarkMode ? Colors.white : Colors.black,
                       ),
-                    );
-                  }
-
-                  if (!snapshot.hasData) {
-                    return Center(child: CircularProgressIndicator());
-                  }
-
-                  try {
-                    final data = snapshot.data!.data() as Map<String, dynamic>;
-                    final users = data['members'] as List<dynamic>? ?? [];
-                    final driver = data['driver_id'] as String? ?? '';
-
-                    return Column(
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.all(16.0),
-                          child: Text(
-                            '참여자 목록',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                        FutureBuilder<String>(
-                          future: _getUserName(driver),
-                          builder: (context, snapshot) {
-                            return ListTile(
-                              leading: CircleAvatar(child: Icon(Icons.person)),
-                              title: Text('드라이버'),
-                              subtitle: Text(snapshot.data ?? '로딩 중...'),
-                            );
-                          },
-                        ),
-                        Divider(),
-                        Expanded(
-                          child: ListView.builder(
-                            itemCount: users.length,
-                            itemBuilder: (context, index) {
-                              return FutureBuilder<String>(
-                                future: _getUserName(users[index]),
-                                builder: (context, snapshot) {
-                                  return ListTile(
-                                    leading: CircleAvatar(
-                                      child: Icon(Icons.person),
-                                    ),
-                                    title: Text('승객 ${index + 1}'),
-                                    subtitle: Text(snapshot.data ?? '로딩 중...'),
-                                  );
-                                },
-                              );
-                            },
-                          ),
-                        ),
-                        // 예상 가격 표시
-                        Container(
-                          padding: EdgeInsets.all(16.0),
-                          decoration: BoxDecoration(
-                            color: Colors.grey[100],
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                '예상 가격',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              SizedBox(height: 8),
-                              Text(
-                                users.length <= 2
-                                    ? '\$500'
-                                    : users.length == 3
-                                    ? '\$440'
-                                    : '\$500',
-                                style: TextStyle(
-                                  fontSize: 24,
-                                  fontWeight: FontWeight.bold,
-                                  color: accentColor,
-                                ),
-                              ),
-                              SizedBox(height: 4),
-                              Text(
-                                '${users.length}명 기준',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: Colors.grey[600],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        SizedBox(height: 16),
-                        Padding(
-                          padding: const EdgeInsets.all(16.0),
-                          child: ElevatedButton(
-                            onPressed: () => _showExitDialog(context),
-                            style: ElevatedButton.styleFrom(
-                              minimumSize: Size(double.infinity, 50),
-                            ),
-                            child: Text('채팅방 나가기'),
-                          ),
-                        ),
-                      ],
-                    );
-                  } catch (e) {
-                    print('Error loading chat room data: $e');
-                    return Center(
-                      child: Text(
-                        '채팅방 정보를 불러오는 중 오류가 발생했습니다.',
-                        style: TextStyle(color: Colors.grey),
-                      ),
-                    );
-                  }
-                },
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
+              Expanded(
+                child: StreamBuilder<DocumentSnapshot>(
+                  stream: _firestore
+                      .collection(widget.chatRoomCollection)
+                      .doc(widget.chatRoomId)
+                      .snapshots(),
+                  builder: (context, snapshot) {
+                    if (snapshot.hasError) {
+                      print('StreamBuilder error: ${snapshot.error}');
+                      return Center(
+                        child: Text(
+                          '채팅방 정보를 불러오는 중 오류가 발생했습니다.',
+                          style: TextStyle(color: Colors.grey),
+                        ),
+                      );
+                    }
+
+                    if (!snapshot.hasData) {
+                      return Center(child: CircularProgressIndicator());
+                    }
+
+                    try {
+                      final data = snapshot.data!.data() as Map<String, dynamic>;
+                      final users = data['members'] as List<dynamic>? ?? [];
+                      final driver = data['driver_id'] as String? ?? '';
+
+                      return SingleChildScrollView(
+                        child: Column(
+                          children: [
+                            Container(
+                              padding: EdgeInsets.all(16.0),
+                              decoration: BoxDecoration(
+                                color: isDarkMode ? Colors.grey[800] : Colors.white,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              margin: EdgeInsets.all(16.0),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    '참여자 목록',
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                      color: isDarkMode ? Colors.white : Colors.black,
+                                    ),
+                                  ),
+                                  SizedBox(height: 16),
+                                  FutureBuilder<String>(
+                                    future: _getUserName(driver),
+                                    builder: (context, snapshot) {
+                                      return ListTile(
+                                        leading: CircleAvatar(
+                                          backgroundColor: accentColor,
+                                          child: Icon(Icons.person, color: Colors.white),
+                                        ),
+                                        title: Text(
+                                          '드라이버',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            color: isDarkMode ? Colors.white : Colors.black,
+                                          ),
+                                        ),
+                                        subtitle: Text(
+                                          snapshot.data ?? '로딩 중...',
+                                          style: TextStyle(
+                                            color: isDarkMode ? Colors.white70 : Colors.black87,
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                  Divider(color: isDarkMode ? Colors.grey[700] : Colors.grey[300]),
+                                  ListView.builder(
+                                    shrinkWrap: true,
+                                    physics: NeverScrollableScrollPhysics(),
+                                    itemCount: users.length,
+                                    itemBuilder: (context, index) {
+                                      return FutureBuilder<String>(
+                                        future: _getUserName(users[index]),
+                                        builder: (context, snapshot) {
+                                          return ListTile(
+                                            leading: CircleAvatar(
+                                              backgroundColor: accentColor.withOpacity(0.8),
+                                              child: Icon(Icons.person, color: Colors.white),
+                                            ),
+                                            title: Text(
+                                              '승객 ${index + 1}',
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                color: isDarkMode ? Colors.white : Colors.black,
+                                              ),
+                                            ),
+                                            subtitle: Text(
+                                              snapshot.data ?? '로딩 중...',
+                                              style: TextStyle(
+                                                color: isDarkMode ? Colors.white70 : Colors.black87,
+                                              ),
+                                            ),
+                                          );
+                                        },
+                                      );
+                                    },
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Container(
+                              padding: EdgeInsets.all(16.0),
+                              decoration: BoxDecoration(
+                                color: isDarkMode ? Colors.grey[900] : Colors.grey[100],
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              margin: EdgeInsets.symmetric(horizontal: 16.0),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    '예상 가격',
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                      color: isDarkMode ? Colors.white : Colors.black,
+                                    ),
+                                  ),
+                                  SizedBox(height: 8),
+                                  Text(
+                                    users.length <= 2
+                                        ? '\$500'
+                                        : users.length == 3
+                                        ? '\$440'
+                                        : '\$500',
+                                    style: TextStyle(
+                                      fontSize: 24,
+                                      fontWeight: FontWeight.bold,
+                                      color: accentColor,
+                                    ),
+                                  ),
+                                  SizedBox(height: 4),
+                                  Text(
+                                    '${users.length}명 기준',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: isDarkMode ? Colors.white70 : Colors.grey[600],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            SizedBox(height: 80), // 하단 버튼을 위한 여백
+                          ],
+                        ),
+                      );
+                    } catch (e) {
+                      print('Error loading chat room data: $e');
+                      return Center(
+                        child: Text(
+                          '채팅방 정보를 불러오는 중 오류가 발생했습니다.',
+                          style: TextStyle(color: Colors.grey),
+                        ),
+                      );
+                    }
+                  },
+                ),
+              ),
+              Container(
+                decoration: BoxDecoration(
+                  color: isDarkMode ? Colors.grey[900] : Colors.grey[100],
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.1),
+                      blurRadius: 4,
+                      offset: Offset(0, -2),
+                    ),
+                  ],
+                ),
+                padding: EdgeInsets.all(16.0),
+                child: ElevatedButton(
+                  onPressed: () => _showExitDialog(context),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.red,
+                    foregroundColor: Colors.white,
+                    minimumSize: Size(double.infinity, 50),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    elevation: 2,
+                  ),
+                  child: Text(
+                    '채팅방 나가기',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
       body: SafeArea(
@@ -575,7 +613,6 @@ class _ChatRoomPageState extends State<ChatRoomPage>
             Expanded(
               child: GestureDetector(
                 onTap: () {
-                  // 키보드를 닫기 위해 포커스를 해제
                   FocusScope.of(context).unfocus();
                 },
                 child: ListView.builder(
@@ -590,6 +627,7 @@ class _ChatRoomPageState extends State<ChatRoomPage>
                   itemBuilder: (context, index) {
                     final message = _messages[index];
                     final messageData = message.data() as Map<String, dynamic>;
+                    messageData['id'] = message.id; // 메시지 ID 추가
                     final isMe = messageData['sender_id'] == _currentUserId;
                     final isSystem =
                         messageData['sender_id'] == 'system' ||
@@ -598,7 +636,6 @@ class _ChatRoomPageState extends State<ChatRoomPage>
                     final formattedTime = _formatTimestamp(timestamp);
 
                     if (isSystem) {
-                      // 시스템 메시지 UI
                       return Center(
                         child: Container(
                           margin: EdgeInsets.symmetric(vertical: 10),
@@ -613,8 +650,7 @@ class _ChatRoomPageState extends State<ChatRoomPage>
                           child: Text(
                             messageData['text'] ?? '',
                             style: TextStyle(
-                              color:
-                                  isDarkMode ? Colors.white70 : Colors.black87,
+                              color: isDarkMode ? Colors.white70 : Colors.black87,
                               fontSize: 12,
                             ),
                           ),
@@ -624,9 +660,7 @@ class _ChatRoomPageState extends State<ChatRoomPage>
 
                     return Column(
                       crossAxisAlignment:
-                          isMe
-                              ? CrossAxisAlignment.end
-                              : CrossAxisAlignment.start,
+                          isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
                       children: [
                         if (!isMe)
                           Padding(
@@ -639,116 +673,19 @@ class _ChatRoomPageState extends State<ChatRoomPage>
                               messageData['sender_name'] ?? '알 수 없는 사용자',
                               style: TextStyle(
                                 fontSize: 12,
-                                color:
-                                    isDarkMode
-                                        ? Colors.white70
-                                        : Colors.black54,
+                                color: isDarkMode ? Colors.white70 : Colors.black54,
                               ),
                               textAlign: TextAlign.left,
                             ),
                           ),
-                        Container(
-                          margin: EdgeInsets.only(
-                            bottom: isMe ? 4 : 8,
-                            right: isMe ? 0 : 0,
-                            left: isMe ? 0 : 0,
-                          ),
-                          child: Row(
-                            mainAxisAlignment:
-                                isMe
-                                    ? MainAxisAlignment.end
-                                    : MainAxisAlignment.start,
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            children: [
-                              if (!isMe)
-                                Container(
-                                  margin: EdgeInsets.only(right: 4),
-                                  child: CircleAvatar(
-                                    radius: 16,
-                                    backgroundColor: Colors.grey[400],
-                                    child: FittedBox(
-                                      fit: BoxFit.scaleDown,
-                                      child: Center(
-                                        child: Padding(
-                                          padding: EdgeInsets.all(4),
-                                          child: Text(
-                                            (messageData['sender_name'] ?? '?')
-                                                .substring(0, 1)
-                                                .toUpperCase(),
-                                            style: TextStyle(
-                                              color: Colors.white,
-                                              fontSize: 14,
-                                              fontWeight: FontWeight.w600,
-                                              height: 1,
-                                            ),
-                                            textAlign: TextAlign.center,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              if (isMe)
-                                Padding(
-                                  padding: EdgeInsets.only(right: 2, bottom: 2),
-                                  child: Text(
-                                    formattedTime,
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      color:
-                                          isDarkMode
-                                              ? Colors.white54
-                                              : Colors.black54,
-                                    ),
-                                  ),
-                                ),
-                              Flexible(
-                                child: Container(
-                                  margin: EdgeInsets.only(
-                                    top: 2,
-                                    bottom: 2,
-                                    left: isMe ? 0 : 4,
-                                    right: isMe ? 0 : 4,
-                                  ),
-                                  padding: EdgeInsets.symmetric(
-                                    horizontal: 16,
-                                    vertical: 10,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: isMe ? accentColor : messageColor,
-                                    borderRadius: BorderRadius.circular(20),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.black.withOpacity(0.1),
-                                        blurRadius: 4,
-                                        offset: Offset(0, 2),
-                                      ),
-                                    ],
-                                  ),
-                                  child: Text(
-                                    messageData['text'],
-                                    style: TextStyle(
-                                      color: isMe ? Colors.white : textColor,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              if (!isMe)
-                                Padding(
-                                  padding: EdgeInsets.only(left: 2, bottom: 2),
-                                  child: Text(
-                                    formattedTime,
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      color:
-                                          isDarkMode
-                                              ? Colors.white54
-                                              : Colors.black54,
-                                    ),
-                                  ),
-                                ),
-                            ],
-                          ),
+                        _buildMessageBubble(
+                          messageData,
+                          isMe,
+                          isDarkMode,
+                          accentColor,
+                          messageColor,
+                          textColor,
+                          formattedTime,
                         ),
                       ],
                     );
@@ -828,6 +765,8 @@ class _ChatRoomPageState extends State<ChatRoomPage>
       _messagesSubscription!.cancel();
     }
     _focusNode.dispose();
+    // 애니메이션 컨트롤러 정리
+    _messageAnimations.values.forEach((controller) => controller.dispose());
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -880,12 +819,36 @@ class _ChatRoomPageState extends State<ChatRoomPage>
             // 픽업 정보와 목적지 정보 가져오기
             if (data.containsKey('pickup_info')) {
               final pickupInfo = data['pickup_info'] as Map<String, dynamic>;
-              _pickupAddress = pickupInfo['address'] as String?;
+              String address = pickupInfo['address'] as String? ?? '';
+              
+              // PSU 관련 문자열이 포함된 경우 "-" 이후의 텍스트만 표시
+              if (address.toLowerCase().contains('penn state') || 
+                  address.toLowerCase().contains('psu') ||
+                  address.toLowerCase().contains('pittsburgh') ||
+                  address.toLowerCase().contains('pollock')) {
+                if (address.contains('-')) {
+                  address = address.split('-').last.trim();
+                }
+              }
+              
+              _pickupAddress = address;
             }
 
             if (data.containsKey('destination_info')) {
               final destInfo = data['destination_info'] as Map<String, dynamic>;
-              _destinationAddress = destInfo['address'] as String?;
+              String address = destInfo['address'] as String? ?? '';
+              
+              // PSU 관련 문자열이 포함된 경우 "-" 이후의 텍스트만 표시
+              if (address.toLowerCase().contains('penn state') || 
+                  address.toLowerCase().contains('psu') ||
+                  address.toLowerCase().contains('pittsburgh') ||
+                  address.toLowerCase().contains('pollock')) {
+                if (address.contains('-')) {
+                  address = address.split('-').last.trim();
+                }
+              }
+              
+              _destinationAddress = address;
             }
           });
         }
@@ -923,31 +886,287 @@ class _ChatRoomPageState extends State<ChatRoomPage>
       }
     }
 
+    // PSU 관련 문자열이 포함된 경우 "-" 이후의 텍스트만 표시
+    if (departure.toLowerCase().contains('penn state') || 
+        departure.toLowerCase().contains('psu') ||
+        departure.toLowerCase().contains('pittsburgh') ||
+        departure.toLowerCase().contains('pollock')) {
+      if (departure.contains('-')) {
+        departure = departure.split('-').last.trim();
+      }
+    }
+
+    if (destination.toLowerCase().contains('penn state') || 
+        destination.toLowerCase().contains('psu') ||
+        destination.toLowerCase().contains('pittsburgh') ||
+        destination.toLowerCase().contains('pollock')) {
+      if (destination.contains('-')) {
+        destination = destination.split('-').last.trim();
+      }
+    }
+
+    // 공항 코드 추출 (괄호 안의 코드만 표시)
+    if (departure.toLowerCase().contains('airport') || 
+        departure.toLowerCase().contains('newark') ||
+        departure.toLowerCase().contains('jfk') ||
+        departure.toLowerCase().contains('lax') ||
+        departure.toLowerCase().contains('ord') ||
+        departure.toLowerCase().contains('sfo')) {
+      RegExp regex = RegExp(r'\(([^)]+)\)');
+      Match? match = regex.firstMatch(departure);
+      if (match != null) {
+        departure = match.group(1) ?? departure;
+      }
+    }
+
+    if (destination.toLowerCase().contains('airport') || 
+        destination.toLowerCase().contains('newark') ||
+        destination.toLowerCase().contains('jfk') ||
+        destination.toLowerCase().contains('lax') ||
+        destination.toLowerCase().contains('ord') ||
+        destination.toLowerCase().contains('sfo')) {
+      RegExp regex = RegExp(r'\(([^)]+)\)');
+      Match? match = regex.firstMatch(destination);
+      if (match != null) {
+        destination = match.group(1) ?? destination;
+      }
+    }
+
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         Flexible(
           child: Text(
             departure,
-            style: TextStyle(color: Colors.white, fontSize: 14),
+            style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w500),
             overflow: TextOverflow.ellipsis,
             maxLines: 1,
           ),
         ),
         Padding(
           padding: EdgeInsets.symmetric(horizontal: 4),
-          child: Icon(Icons.arrow_forward, color: Colors.white, size: 16),
+          child: Icon(Icons.arrow_forward, color: Colors.white, size: 18),
         ),
         Flexible(
           child: Text(
             destination,
-            style: TextStyle(color: Colors.white, fontSize: 14),
+            style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w500),
             overflow: TextOverflow.ellipsis,
             maxLines: 1,
           ),
         ),
       ],
     );
+  }
+
+  Widget _buildMessageBubble(
+    Map<String, dynamic> messageData,
+    bool isMe,
+    bool isDarkMode,
+    Color accentColor,
+    Color messageColor,
+    Color textColor,
+    String formattedTime,
+  ) {
+    final messageId = messageData['id'] as String? ?? '';
+    
+    // 애니메이션이 없는 경우에만 새로 생성
+    if (!_messageAnimations.containsKey(messageId)) {
+      final controller = AnimationController(
+        duration: Duration(milliseconds: 300),
+        vsync: this,
+      );
+
+      final animation = Tween<double>(
+        begin: 50.0,
+        end: 0.0,
+      ).animate(CurvedAnimation(
+        parent: controller,
+        curve: Curves.easeOut,
+      ));
+
+      _messageAnimations[messageId] = controller;
+      _messageSlideAnimations[messageId] = animation;
+      controller.forward();
+    }
+
+    return AnimatedBuilder(
+      animation: _messageSlideAnimations[messageId] ?? kAlwaysCompleteAnimation,
+      builder: (context, child) {
+        final animation = _messageSlideAnimations[messageId];
+        final offset = animation?.value ?? 0.0;
+        final opacity = animation?.value == 0 ? 1.0 : 0.0;
+        
+        return Transform.translate(
+          offset: Offset(0, offset),
+          child: Opacity(
+            opacity: opacity,
+            child: Container(
+              margin: EdgeInsets.only(
+                bottom: isMe ? 4 : 8,
+                right: isMe ? 0 : 0,
+                left: isMe ? 0 : 0,
+              ),
+              child: Row(
+                mainAxisAlignment:
+                    isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  if (!isMe)
+                    Container(
+                      margin: EdgeInsets.only(right: 4),
+                      child: CircleAvatar(
+                        radius: 16,
+                        backgroundColor: Colors.grey[400],
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Center(
+                            child: Padding(
+                              padding: EdgeInsets.all(4),
+                              child: Text(
+                                (messageData['sender_name'] ?? '?')
+                                    .substring(0, 1)
+                                    .toUpperCase(),
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  height: 1,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  if (isMe)
+                    Padding(
+                      padding: EdgeInsets.only(left: 2, bottom: 2),
+                      child: Text(
+                        formattedTime,
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: isDarkMode ? Colors.white54 : Colors.black54,
+                        ),
+                      ),
+                    ),
+                  Flexible(
+                    child: Container(
+                      margin: EdgeInsets.only(
+                        top: 2,
+                        bottom: 2,
+                        left: isMe ? 4 : 4,
+                        right: isMe ? 4 : 4,
+                      ),
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 10,
+                      ),
+                      decoration: BoxDecoration(
+                        color: isMe ? accentColor : messageColor,
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.1),
+                            blurRadius: 4,
+                            offset: Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Text(
+                        messageData['text'],
+                        style: TextStyle(
+                          color: isMe ? Colors.white : textColor,
+                        ),
+                      ),
+                    ),
+                  ),
+                  if (!isMe)
+                    Padding(
+                      padding: EdgeInsets.only(left: 2, bottom: 2),
+                      child: Text(
+                        formattedTime,
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: isDarkMode ? Colors.white54 : Colors.black54,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _sendMessage() async {
+    if (_messageController.text.trim().isEmpty) return;
+
+    final messageText = _messageController.text.trim();
+    final user = _auth.currentUser;
+    String senderName = user?.displayName ?? '알 수 없는 사용자';
+
+    // 사용자 프로필에서 이름 가져오기
+    try {
+      final userDoc =
+          await _firestore.collection('users').doc(_currentUserId).get();
+      if (userDoc.exists) {
+        final userData = userDoc.data();
+        senderName = userData?['fullname'] ?? senderName;
+      }
+    } catch (e) {
+      print('사용자 이름 조회 오류: $e');
+    }
+
+    // 메시지 전송 전에 텍스트 필드 초기화
+    _messageController.clear();
+
+    final timestamp = Timestamp.now();
+    final message = {
+      'text': messageText,
+      'sender_id': _currentUserId,
+      'sender_name': senderName,
+      'timestamp': timestamp,
+      'type': 'user',
+    };
+
+    try {
+      final docRef = await _firestore
+          .collection(widget.chatRoomCollection)
+          .doc(widget.chatRoomId)
+          .collection('messages')
+          .add(message);
+
+      // 마지막 메시지 업데이트
+      try {
+        await _firestore
+            .collection(widget.chatRoomCollection)
+            .doc(widget.chatRoomId)
+            .update({
+              'lastMessage': messageText,
+              'last_message': messageText,
+              'last_message_time': timestamp,
+              'timestamp': timestamp,
+            });
+        print('메시지 업데이트 성공: last_message = $messageText');
+      } catch (e) {
+        print('메시지 업데이트 실패: $e');
+      }
+
+      // 다른 멤버들에게 알림 전송
+      await _sendNotificationToOtherMembers(messageText);
+
+      // 메시지 전송 후 스크롤을 아래로 이동
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _scrollToBottom();
+        _hasScrolledToBottom = true;
+      });
+    } catch (e) {
+      print('Error sending message: $e');
+    }
   }
 
   void _setupRealtimeUpdates() {
@@ -1001,12 +1220,43 @@ class _ChatRoomPageState extends State<ChatRoomPage>
 
             setState(() {
               _messages.add(latestMessage);
+              // 새 메시지에 대한 애니메이션 설정
+              final messageId = latestMessage.id;
+              if (!_messageAnimations.containsKey(messageId)) {
+                final controller = AnimationController(
+                  duration: Duration(milliseconds: 300),
+                  vsync: this,
+                );
+
+                final animation = Tween<double>(
+                  begin: 50.0,
+                  end: 0.0,
+                ).animate(CurvedAnimation(
+                  parent: controller,
+                  curve: Curves.easeOut,
+                ));
+
+                _messageAnimations[messageId] = controller;
+                _messageSlideAnimations[messageId] = animation;
+                controller.forward();
+              }
             });
 
             // 새 메시지가 추가될 때 스크롤을 아래로 이동
-            _scrollToBottom();
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              _scrollToBottom();
+              _hasScrolledToBottom = true;
+            });
           }
         });
+  }
+
+  // 초기 스크롤을 아래로 이동시키는 전용 메서드
+  void _scrollToBottomImmediately() {
+    if (_scrollController.hasClients) {
+      _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+      _hasScrolledToBottom = true;
+    }
   }
 
   void _showExitDialog(BuildContext context) {

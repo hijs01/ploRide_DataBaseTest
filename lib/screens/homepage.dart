@@ -22,21 +22,43 @@ class _HomePageState extends State<HomePage> {
   int _selectedIndex = 0;
   Map<String, dynamic>? latestRideData;
   bool isLoading = true;
-  String userName = '사용자';
+  String _userName = '';
 
   @override
   void initState() {
     super.initState();
     _fetchLatestRideData();
-    _getUserEmail();
+    _getUserInfo();
   }
 
-  void _getUserEmail() {
+  Future<void> _getUserInfo() async {
     final currentUser = FirebaseAuth.instance.currentUser;
-    if (currentUser != null && currentUser.email != null) {
-      setState(() {
-        userName = currentUser.email!.split('@')[0];
-      });
+    if (currentUser != null) {
+      try {
+        final userDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(currentUser.uid)
+            .get();
+            
+        if (userDoc.exists) {
+          final userData = userDoc.data();
+          setState(() {
+            _userName = userData?['fullname'] ?? 
+                       userData?['name'] ?? 
+                       currentUser.email!.split('@')[0];
+          });
+          print('User fullname: $_userName'); // 디버깅을 위한 로그 추가
+        } else {
+          setState(() {
+            _userName = currentUser.email!.split('@')[0];
+          });
+        }
+      } catch (e) {
+        print('Error fetching user info: $e');
+        setState(() {
+          _userName = currentUser.email!.split('@')[0];
+        });
+      }
     }
   }
 
@@ -181,7 +203,7 @@ class _HomePageState extends State<HomePage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        '안녕하세요, $userName님',
+                        '안녕하세요, $_userName님',
                         style: TextStyle(
                           fontSize: 26,
                           fontWeight: FontWeight.bold,
@@ -322,7 +344,7 @@ class _HomePageState extends State<HomePage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        '안녕하세요, $userName님',
+                        '안녕하세요, $_userName님',
                         style: TextStyle(
                           fontSize: 26,
                           fontWeight: FontWeight.bold,
@@ -392,7 +414,7 @@ class _HomePageState extends State<HomePage> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            userName,
+                            _userName,
                             style: TextStyle(
                               fontSize: 20,
                               fontFamily: 'Brand-Bold',

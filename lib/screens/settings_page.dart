@@ -6,6 +6,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cabrider/screens/loginpage.dart';
 import 'package:cabrider/screens/history_page.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class SettingsPage extends StatefulWidget {
   static const String id = 'settings';
@@ -39,19 +40,38 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   // 사용자 정보 가져오기
-  void _getUserInfo() {
+  void _getUserInfo() async {
     User? currentUser = FirebaseAuth.instance.currentUser;
-    if (currentUser != null && currentUser.email != null) {
-      setState(() {
-        _userEmail = currentUser.email!;
-        _userName = _getUserNameFromEmail(_userEmail);
-      });
+    if (currentUser != null) {
+      try {
+        final userDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(currentUser.uid)
+            .get();
+            
+        if (userDoc.exists) {
+          final userData = userDoc.data();
+          setState(() {
+            _userEmail = currentUser.email ?? '';
+            _userName = userData?['fullname'] ?? 
+                       userData?['name'] ?? 
+                       currentUser.email!.split('@')[0];
+          });
+          print('User fullname: $_userName'); // 디버깅을 위한 로그 추가
+        } else {
+          setState(() {
+            _userEmail = currentUser.email ?? '';
+            _userName = currentUser.email!.split('@')[0];
+          });
+        }
+      } catch (e) {
+        print('Error fetching user info: $e');
+        setState(() {
+          _userEmail = currentUser.email ?? '';
+          _userName = currentUser.email!.split('@')[0];
+        });
+      }
     }
-  }
-
-  // 이메일에서 사용자 이름 추출
-  String _getUserNameFromEmail(String email) {
-    return email.split('@')[0];
   }
 
   void _onItemTapped(int index) {

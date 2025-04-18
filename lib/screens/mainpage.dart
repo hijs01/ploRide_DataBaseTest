@@ -20,7 +20,6 @@ import 'package:cabrider/helpers/helpermethods.dart';
 import 'package:cabrider/styles/styles.dart';
 import 'package:cabrider/widgets/BrandDivider.dart';
 import 'package:cabrider/screens/searchpage.dart';
-import 'package:cabrider/datamodels/directiondetails.dart';
 import 'package:cabrider/datamodels/address.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:animated_text_kit/animated_text_kit.dart';
@@ -28,6 +27,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:cabrider/data/psu_locations.dart'; // PSU 위치 데이터 임포트
+import 'package:cabrider/datamodels/directiondetails.dart';
 
 class MainPage extends StatefulWidget {
   final bool showDirections;
@@ -431,7 +431,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Text(
-                            currentUserInfo?.fullName ?? 'User',
+                            currentUserInfo?.fullname ?? 'User',
                             style: TextStyle(
                               fontSize: 20,
                               fontFamily: 'Brand-Bold',
@@ -1541,7 +1541,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
       return;
     }
     print('사용자 정보 확인:');
-    print('- 이름: ${currentUserInfo!.fullName}');
+    print('- 이름: ${currentUserInfo!.fullname}');
     print('- 전화번호: ${currentUserInfo!.phone}');
 
     if (tripDirectionDetails == null) {
@@ -1568,7 +1568,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
 
       Map<String, dynamic> rideMap = {
         'created_at': FieldValue.serverTimestamp(),
-        'rider_name': currentUserInfo!.fullName,
+        'rider_name': currentUserInfo!.fullname,
         'rider_phone': currentUserInfo!.phone,
         'pickup_address': pickup.placeName,
         'destination_address': destination.placeName,

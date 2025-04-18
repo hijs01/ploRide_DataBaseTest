@@ -292,11 +292,8 @@ class _ChatPageState extends State<ChatPage> {
       'name': chatRoomId.split('_').first.toUpperCase(), // ID의 첫 부분을 대문자로
       'origin': chatRoomCollection == 'psuToAirport' ? 'PSU' : '공항',
       'destination': chatRoomCollection == 'psuToAirport' ? '공항' : 'PSU',
-      'memberCount':
-          chatRoomData['members'] != null
-              ? (chatRoomData['members'] as List).length
-              : 0,
-      'maxMembers': chatRoomData['max_members'] ?? 4,
+      'memberCount': chatRoomData['member_count'] ?? 0,
+      'maxMembers': 4,
       'isConfirmed': chatRoomData['driver_accepted'] ?? false,
       'departureTime': chatRoomData['ride_date_timestamp'] ?? Timestamp.now(),
       'lastMessage': chatRoomData['last_message'] ?? '',
@@ -316,11 +313,8 @@ class _ChatPageState extends State<ChatPage> {
       final pickupInfo = chatRoomData['pickup_info'] as Map<String, dynamic>;
       final destInfo = chatRoomData['destination_info'] as Map<String, dynamic>;
 
-      String pickupAddress = pickupInfo['address'] as String? ?? '출발지';
-      String destAddress = destInfo['address'] as String? ?? '목적지';
-
-      chatRoomInfo['origin'] = pickupAddress;
-      chatRoomInfo['destination'] = destAddress;
+      chatRoomInfo['origin'] = pickupInfo['address'] as String? ?? '출발지';
+      chatRoomInfo['destination'] = destInfo['address'] as String? ?? '목적지';
     }
 
     return chatRoomInfo;

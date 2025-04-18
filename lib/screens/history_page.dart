@@ -19,47 +19,61 @@ class _HistoryPageState extends State<HistoryPage> {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   bool isLoading = true;
   int _selectedIndex = 1; // 히스토리 탭이 선택됨
+  bool _isRefreshing = false; // 새로고침 상태 추가
+  bool _isInitialized = false; // 초기화 상태 추적
 
   @override
   void initState() {
     super.initState();
+    _initializePage();
+  }
+
+  Future<void> _initializePage() async {
+    if (_isInitialized) return;
+    
     print('HistoryPage initialized');
-    _checkUserData();
-    _deleteTestData(); // 테스트 데이터 삭제
-    _checkAllRidesStatus(); // 모든 라이드 상태 확인
+    await _checkUserData();
+    await _deleteTestData();
+    await _checkAllRidesStatus();
+    
+    _isInitialized = true;
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // 초기화가 완료되지 않은 경우에만 상태 확인
+    if (!_isInitialized) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _initializePage();
+      });
+    }
   }
 
   Future<void> _checkUserData() async {
     final currentUser = _auth.currentUser;
-    print('Current user: ${currentUser?.uid}');
+    if (currentUser == null) return;
 
-    if (currentUser != null) {
-      // 사용자의 히스토리 데이터 확인
-      final historySnapshot =
-          await _firestore
-              .collection('users')
-              .doc(currentUser.uid)
-              .collection('history')
-              .get();
+    // 사용자의 히스토리 데이터 확인
+    final historySnapshot = await _firestore
+        .collection('users')
+        .doc(currentUser.uid)
+        .collection('history')
+        .get();
 
-      print('History count: ${historySnapshot.docs.length}');
+    // psuToAirport 데이터 확인
+    final psuToAirportSnapshot = await _firestore.collection('psuToAirport').get();
 
-      // psuToAirport 데이터 확인
-      final psuToAirportSnapshot =
-          await _firestore.collection('psuToAirport').get();
+    // 현재 사용자가 멤버로 포함된 문서 확인
+    final userTrips = psuToAirportSnapshot.docs.where((doc) {
+      final data = doc.data();
+      final members = data['members'] as List<dynamic>?;
+      return members?.contains(currentUser.uid) ?? false;
+    }).toList();
 
-      print('psuToAirport count: ${psuToAirportSnapshot.docs.length}');
-
-      // 현재 사용자가 멤버로 포함된 문서 확인
-      final userTrips =
-          psuToAirportSnapshot.docs.where((doc) {
-            final data = doc.data();
-            final members = data['members'] as List<dynamic>?;
-            return members?.contains(currentUser.uid) ?? false;
-          }).toList();
-
-      print('User trips count: ${userTrips.length}');
-    }
+    print('History count: ${historySnapshot.docs.length}');
+    print('psuToAirport count: ${psuToAirportSnapshot.docs.length}');
+    print('User trips count: ${userTrips.length}');
   }
 
   Future<void> _deleteTestData() async {
@@ -175,15 +189,6 @@ class _HistoryPageState extends State<HistoryPage> {
   }
 
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    // 화면에 나타날 때마다 자동으로 상태 확인
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _checkAllRidesStatus();
-    });
-  }
-
-  @override
   Widget build(BuildContext context) {
     final isDarkMode =
         MediaQuery.of(context).platformBrightness == Brightness.dark;
@@ -245,7 +250,28 @@ class _HistoryPageState extends State<HistoryPage> {
 
                   print('User trips count: ${userTrips.length}');
 
-                  if (userTrips.isEmpty) {
+                  // 조회 가능한 여정만 필터링
+                  final validTrips = userTrips.where((doc) {
+                    final data = doc.data() as Map<String, dynamic>;
+                    return data['status'] != null && 
+                           data['pickup'] != null && 
+                           data['destination'] != null &&
+                           data['timestamp'] != null;
+                  }).toList();
+
+                  // 중복 제거: 같은 출발지, 도착지, 시간을 가진 여정은 하나만 표시
+                  final uniqueTrips = <String, DocumentSnapshot>{};
+                  for (var trip in validTrips) {
+                    final data = trip.data() as Map<String, dynamic>;
+                    final key = '${data['pickup']}_${data['destination']}_${(data['timestamp'] as Timestamp).toDate().toString()}';
+                    if (!uniqueTrips.containsKey(key)) {
+                      uniqueTrips[key] = trip;
+                    }
+                  }
+
+                  final filteredTrips = uniqueTrips.values.toList();
+
+                  if (filteredTrips.isEmpty) {
                     return Center(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -275,10 +301,10 @@ class _HistoryPageState extends State<HistoryPage> {
                   }
 
                   return ListView.builder(
-                    itemCount: userTrips.length,
+                    itemCount: filteredTrips.length,
                     itemBuilder: (context, index) {
                       final tripData =
-                          userTrips[index].data() as Map<String, dynamic>;
+                          filteredTrips[index].data() as Map<String, dynamic>;
                       print(
                         'Building trip item $index: $tripData',
                       ); // 디버그 로그 추가
@@ -407,7 +433,7 @@ class _HistoryPageState extends State<HistoryPage> {
                                 tripData.containsKey('tripId')) {
                               _checkRideStatus(
                                 tripData,
-                                userTrips[index].reference,
+                                filteredTrips[index].reference,
                               );
                             }
                           },
