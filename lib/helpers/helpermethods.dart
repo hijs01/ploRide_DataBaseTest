@@ -46,7 +46,7 @@ class HelperMethods {
         print('사용자 데이터 존재함');
         currentUserInfo = User.fromFirestore(userDoc);
         print('사용자 정보 로드 완료:');
-        print('- 이름: ${currentUserInfo?.fullName}');
+        print('- 이름: ${currentUserInfo?.fullname}');
         print('- 이메일: ${currentUserInfo?.email}');
         print('- 전화번호: ${currentUserInfo?.phone}');
       } else {

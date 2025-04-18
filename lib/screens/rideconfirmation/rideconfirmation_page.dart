@@ -946,7 +946,7 @@ class _RideConfirmationPageState extends State<RideConfirmationPage>
       // 라이드 요청 데이터 생성 (채팅방 저장 전에 미리 준비)
       Map<String, dynamic> rideMap = {
         'created_at': FieldValue.serverTimestamp(),
-        'rider_name': currentUserInfo?.fullName ?? user.displayName ?? '이름 없음',
+        'rider_name': currentUserInfo?.fullname ?? user.displayName ?? '이름 없음',
         'rider_phone': currentUserInfo?.phone ?? '전화번호 없음',
         'rider_email': user.email,
         'pickup': pickupMap,
@@ -1139,7 +1139,7 @@ class _RideConfirmationPageState extends State<RideConfirmationPage>
             }
             // 적합한 채팅방을 찾은 경우, 해당 채팅방에 사용자 추가
             else {
-              print('기존 채팅방에 사용자 추가: $chatRoomId');
+              print('사용자를 기존 채팅방에 추가했습니다.');
 
               DocumentSnapshot chatRoomDoc = await chatRoomRef.get().timeout(
                 Duration(seconds: 5),

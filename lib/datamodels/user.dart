@@ -4,13 +4,13 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cabrider/globalvariable.dart';
 
 class User {
-  late String fullName;
+  late String fullname;
   late String email;
   late String phone;
   late String id;
 
   User({
-    required this.fullName,
+    required this.fullname,
     required this.email,
     required this.phone,
     required this.id,
@@ -36,13 +36,13 @@ class User {
     id = doc.id;
     Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
     phone = data['phone']?.toString() ?? '';
-    fullName = data['fullname']?.toString() ?? '';
+    fullname = data['fullname']?.toString() ?? '';
     email = data['email']?.toString() ?? '';
 
     print('Firestore에서 받은 데이터:');
     print('id: $id');
     print('phone: $phone');
-    print('fullName: $fullName');
+    print('fullname: $fullname');
     print('email: $email');
   }
 
