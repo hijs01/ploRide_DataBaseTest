@@ -72,6 +72,13 @@ class _ChatRoomPageState extends State<ChatRoomPage>
 
     // 스크롤 리스너 추가
     _scrollController.addListener(_onScroll);
+    
+    // 메시지 컨트롤러에 리스너 추가
+    _messageController.addListener(() {
+      if (mounted) {
+        setState(() {}); // 텍스트 필드 내용이 변경될 때마다 UI 업데이트
+      }
+    });
   }
 
   @override
@@ -80,7 +87,11 @@ class _ChatRoomPageState extends State<ChatRoomPage>
     // 키보드가 나타날 때 스크롤을 아래로 이동
     if (MediaQuery.of(context).viewInsets.bottom > 0) {
       // 키보드가 나타났을 때
-      _scrollToBottom();
+      Future.delayed(Duration(milliseconds: 100), () {
+        if (mounted) {
+          _scrollToBottom(animate: false);
+        }
+      });
     }
   }
 
@@ -157,9 +168,18 @@ class _ChatRoomPageState extends State<ChatRoomPage>
     return '알 수 없는 사용자';
   }
 
-  void _scrollToBottom() {
+  void _scrollToBottom({bool animate = true}) {
     if (_scrollController.hasClients) {
-      _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+      final maxScroll = _scrollController.position.maxScrollExtent;
+      if (animate) {
+        _scrollController.animateTo(
+          maxScroll,
+          duration: Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      } else {
+        _scrollController.jumpTo(maxScroll);
+      }
     }
   }
 
@@ -171,6 +191,8 @@ class _ChatRoomPageState extends State<ChatRoomPage>
   }
 
   Future<void> _loadInitialMessages() async {
+    if (!mounted) return;
+    
     try {
       final querySnapshot =
           await _firestore
@@ -180,6 +202,8 @@ class _ChatRoomPageState extends State<ChatRoomPage>
               .orderBy('timestamp', descending: true)
               .limit(_messageLimit)
               .get();
+
+      if (!mounted) return;
 
       if (querySnapshot.docs.isNotEmpty) {
         _lastDocument = querySnapshot.docs.last;
@@ -191,6 +215,8 @@ class _ChatRoomPageState extends State<ChatRoomPage>
         // 사용자 정보 일괄 로드
         await _loadUserNames(messages);
 
+        if (!mounted) return;
+
         setState(() {
           _messages = messages;
           _isLoading = false;
@@ -198,14 +224,23 @@ class _ChatRoomPageState extends State<ChatRoomPage>
 
         // 새 메시지가 추가될 때마다 스크롤을 아래로 이동
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          _scrollToBottom();
+          if (mounted) {
+            // 약간의 지연 후 스크롤 실행
+            Future.delayed(Duration(milliseconds: 100), () {
+              if (mounted) {
+                _scrollToBottom(animate: false);
+              }
+            });
+          }
         });
       }
     } catch (e) {
       print('Error loading initial messages: $e');
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -438,6 +473,10 @@ class _ChatRoomPageState extends State<ChatRoomPage>
   Future<void> _sendMessage() async {
     if (_messageController.text.trim().isEmpty) return;
 
+    setState(() {
+      _isSending = true; // 전송 중 상태 표시
+    });
+
     final messageText = _messageController.text.trim();
     final user = _auth.currentUser;
     String senderName = user?.displayName ?? '알 수 없는 사용자';
@@ -499,6 +538,10 @@ class _ChatRoomPageState extends State<ChatRoomPage>
       });
     } catch (e) {
       print('Error sending message: $e');
+    } finally {
+      setState(() {
+        _isSending = false; // 전송 완료 상태 표시
+      });
     }
   }
 
@@ -507,166 +550,225 @@ class _ChatRoomPageState extends State<ChatRoomPage>
     final isDarkMode =
         MediaQuery.of(context).platformBrightness == Brightness.dark;
     final textColor = isDarkMode ? Colors.white : Colors.black;
-    final backgroundColor = isDarkMode ? Colors.black : Colors.white;
-    final messageColor = isDarkMode ? Color(0xFF1E1E1E) : Colors.white;
-    final accentColor = Color(0xFF3F51B5);
-    final systemMessageColor = isDarkMode ? Colors.grey[800] : Colors.grey[300];
+    final backgroundColor = isDarkMode ? Color(0xFF000000) : Color(0xFFF2F2F7);
+    final messageColor = isDarkMode ? Color(0xFF2C2C2E) : Colors.white;
+    final myMessageColor = isDarkMode ? Color(0xFF0055CC) : Color(0xFF0055CC);
+    final systemMessageColor = isDarkMode ? Color(0xFF1C1C1E) : Color(0xFFE5E5EA);
+    final inputBackgroundColor = isDarkMode ? Color(0xFF1C1C1E) : Colors.white;
+    final accentColor = isDarkMode ? Color(0xFF0055CC) : Color(0xFF0055CC);
+    final sendButtonColor = isDarkMode ? Color(0xFF007AFF) : Color(0xFF007AFF);
 
     return Scaffold(
       key: _scaffoldKey,
       backgroundColor: backgroundColor,
       resizeToAvoidBottomInset: true,
       appBar: AppBar(
-        backgroundColor: accentColor,
+        backgroundColor: isDarkMode ? Colors.black : Colors.white,
         title: _buildAppBarTitle(),
         automaticallyImplyLeading: true,
+        elevation: 0,
+        iconTheme: IconThemeData(
+          color: isDarkMode ? Colors.white : Colors.black,
+        ),
         actions: [
           IconButton(
             icon: Icon(Icons.menu),
-            onPressed: () => _scaffoldKey.currentState?.openEndDrawer(),
+            onPressed: () {
+              // Drawer를 열기 전에 키보드를 닫습니다
+              FocusScope.of(context).unfocus();
+              _scaffoldKey.currentState?.openEndDrawer();
+            },
           ),
         ],
       ),
       endDrawer: Drawer(
-        child: Column(
-          children: [
-            AppBar(title: Text('채팅방 정보'), automaticallyImplyLeading: false),
-            Expanded(
-              child: StreamBuilder<DocumentSnapshot>(
-                stream:
-                    _firestore
-                        .collection(widget.chatRoomCollection)
-                        .doc(widget.chatRoomId)
-                        .snapshots(),
-                builder: (context, snapshot) {
-                  if (snapshot.hasError) {
-                    print('StreamBuilder error: ${snapshot.error}');
-                    return Center(
-                      child: Text(
-                        '채팅방 정보를 불러오는 중 오류가 발생했습니다.',
-                        style: TextStyle(color: Colors.grey),
-                      ),
-                    );
-                  }
-
-                  if (!snapshot.hasData) {
-                    return Center(child: CircularProgressIndicator());
-                  }
-
-                  try {
-                    final data = snapshot.data!.data() as Map<String, dynamic>;
-                    final users = data['members'] as List<dynamic>? ?? [];
-                    final driver = data['driver_id'] as String? ?? '';
-
-                    return Column(
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.all(16.0),
-                          child: Text(
-                            '참여자 목록',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
+        child: GestureDetector(
+          onTap: () {
+            // Drawer 내부를 터치했을 때 키보드를 닫습니다
+            FocusScope.of(context).unfocus();
+          },
+          child: Container(
+            color: isDarkMode ? Color(0xFF1C1C1E) : Color(0xFFF2F2F7),
+            child: Column(
+              children: [
+                AppBar(
+                  title: Text(
+                    '채팅방 정보',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                  automaticallyImplyLeading: false,
+                  backgroundColor: isDarkMode ? Color(0xFF1C1C1E) : Color(0xFFF2F2F7),
+                  elevation: 0,
+                ),
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () {
+                      FocusScope.of(context).unfocus();
+                    },
+                    child: StreamBuilder<DocumentSnapshot>(
+                      stream:
+                          _firestore
+                              .collection(widget.chatRoomCollection)
+                              .doc(widget.chatRoomId)
+                              .snapshots(),
+                      builder: (context, snapshot) {
+                        if (snapshot.hasError) {
+                          print('StreamBuilder error: ${snapshot.error}');
+                          return Center(
+                            child: Text(
+                              '채팅방 정보를 불러오는 중 오류가 발생했습니다.',
+                              style: TextStyle(color: Colors.grey),
                             ),
-                          ),
-                        ),
-                        FutureBuilder<String>(
-                          future: _getUserName(driver),
-                          builder: (context, snapshot) {
-                            return ListTile(
-                              leading: CircleAvatar(child: Icon(Icons.person)),
-                              title: Text('드라이버'),
-                              subtitle: Text(snapshot.data ?? '로딩 중...'),
-                            );
-                          },
-                        ),
-                        Divider(),
-                        Expanded(
-                          child: ListView.builder(
-                            itemCount: users.length,
-                            itemBuilder: (context, index) {
-                              return FutureBuilder<String>(
-                                future: _getUserName(users[index]),
+                          );
+                        }
+
+                        if (!snapshot.hasData) {
+                          return Center(child: CircularProgressIndicator());
+                        }
+
+                        try {
+                          final data = snapshot.data!.data() as Map<String, dynamic>;
+                          final users = data['members'] as List<dynamic>? ?? [];
+                          final driver = data['driver_id'] as String? ?? '';
+
+                          return Column(
+                            children: [
+                              Padding(
+                                padding: const EdgeInsets.all(16.0),
+                                child: Text(
+                                  '참여자 목록',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                              FutureBuilder<String>(
+                                future: _getUserName(driver),
                                 builder: (context, snapshot) {
                                   return ListTile(
-                                    leading: CircleAvatar(
-                                      child: Icon(Icons.person),
+                                    leading: CircleAvatar(child: Icon(Icons.person)),
+                                    title: Text(
+                                      '드라이버',
+                                      style: TextStyle(color: Colors.white),
                                     ),
-                                    title: Text('승객 ${index + 1}'),
-                                    subtitle: Text(snapshot.data ?? '로딩 중...'),
+                                    subtitle: Text(
+                                      snapshot.data ?? '로딩 중...',
+                                      style: TextStyle(color: Colors.white70),
+                                    ),
                                   );
                                 },
-                              );
-                            },
-                          ),
-                        ),
-                        // 예상 가격 표시
-                        Container(
-                          padding: EdgeInsets.all(16.0),
-                          decoration: BoxDecoration(
-                            color: Colors.grey[100],
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                '예상 가격',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
+                              ),
+                              Divider(color: Colors.white24),
+                              Expanded(
+                                child: ListView.builder(
+                                  itemCount: users.length,
+                                  itemBuilder: (context, index) {
+                                    return FutureBuilder<String>(
+                                      future: _getUserName(users[index]),
+                                      builder: (context, snapshot) {
+                                        return ListTile(
+                                          leading: CircleAvatar(
+                                            child: Icon(Icons.person),
+                                          ),
+                                          title: Text(
+                                            '승객 ${index + 1}',
+                                            style: TextStyle(color: Colors.white),
+                                          ),
+                                          subtitle: Text(
+                                            snapshot.data ?? '로딩 중...',
+                                            style: TextStyle(color: Colors.white70),
+                                          ),
+                                        );
+                                      },
+                                    );
+                                  },
                                 ),
                               ),
-                              SizedBox(height: 8),
-                              Text(
-                                users.length <= 2
-                                    ? '\$500'
-                                    : users.length == 3
-                                    ? '\$440'
-                                    : '\$500',
-                                style: TextStyle(
-                                  fontSize: 24,
-                                  fontWeight: FontWeight.bold,
-                                  color: accentColor,
+                              // 예상 가격 표시
+                              Container(
+                                padding: EdgeInsets.all(16.0),
+                                decoration: BoxDecoration(
+                                  color: isDarkMode ? Color(0xFF1C1C1E) : Color(0xFFF2F2F7),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      '예상 가격',
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                    SizedBox(height: 8),
+                                    Text(
+                                      users.length <= 2
+                                          ? '\$500'
+                                          : users.length == 3
+                                          ? '\$440'
+                                          : '\$500',
+                                      style: TextStyle(
+                                        fontSize: 24,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                    SizedBox(height: 4),
+                                    Text(
+                                      '${users.length}명 기준',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        color: Colors.white70,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
-                              SizedBox(height: 4),
-                              Text(
-                                '${users.length}명 기준',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: Colors.grey[600],
+                              SizedBox(height: 16),
+                              Padding(
+                                padding: const EdgeInsets.all(16.0),
+                                child: ElevatedButton(
+                                  onPressed: () => _showExitDialog(context),
+                                  style: ElevatedButton.styleFrom(
+                                    minimumSize: Size(double.infinity, 50),
+                                    backgroundColor: Colors.red,
+                                    foregroundColor: Colors.white,
+                                    elevation: 0,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                  ),
+                                  child: Text(
+                                    '채팅방 나가기',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
                                 ),
                               ),
                             ],
-                          ),
-                        ),
-                        SizedBox(height: 16),
-                        Padding(
-                          padding: const EdgeInsets.all(16.0),
-                          child: ElevatedButton(
-                            onPressed: () => _showExitDialog(context),
-                            style: ElevatedButton.styleFrom(
-                              minimumSize: Size(double.infinity, 50),
+                          );
+                        } catch (e) {
+                          print('Error loading chat room data: $e');
+                          return Center(
+                            child: Text(
+                              '채팅방 정보를 불러오는 중 오류가 발생했습니다.',
+                              style: TextStyle(color: Colors.grey),
                             ),
-                            child: Text('채팅방 나가기'),
-                          ),
-                        ),
-                      ],
-                    );
-                  } catch (e) {
-                    print('Error loading chat room data: $e');
-                    return Center(
-                      child: Text(
-                        '채팅방 정보를 불러오는 중 오류가 발생했습니다.',
-                        style: TextStyle(color: Colors.grey),
-                      ),
-                    );
-                  }
-                },
-              ),
+                          );
+                        }
+                      },
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
       body: SafeArea(
@@ -713,8 +815,7 @@ class _ChatRoomPageState extends State<ChatRoomPage>
                           child: Text(
                             messageData['text'] ?? '',
                             style: TextStyle(
-                              color:
-                                  isDarkMode ? Colors.white70 : Colors.black87,
+                              color: isDarkMode ? Colors.white70 : Colors.black87,
                               fontSize: 12,
                             ),
                           ),
@@ -724,9 +825,7 @@ class _ChatRoomPageState extends State<ChatRoomPage>
 
                     return Column(
                       crossAxisAlignment:
-                          isMe
-                              ? CrossAxisAlignment.end
-                              : CrossAxisAlignment.start,
+                          isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
                       children: [
                         if (!isMe)
                           Padding(
@@ -739,10 +838,8 @@ class _ChatRoomPageState extends State<ChatRoomPage>
                               messageData['sender_name'] ?? '알 수 없는 사용자',
                               style: TextStyle(
                                 fontSize: 12,
-                                color:
-                                    isDarkMode
-                                        ? Colors.white70
-                                        : Colors.black54,
+                                color: isDarkMode ? Colors.white70 : Colors.black54,
+                                fontWeight: FontWeight.w500,
                               ),
                               textAlign: TextAlign.left,
                             ),
@@ -755,9 +852,7 @@ class _ChatRoomPageState extends State<ChatRoomPage>
                           ),
                           child: Row(
                             mainAxisAlignment:
-                                isMe
-                                    ? MainAxisAlignment.end
-                                    : MainAxisAlignment.start,
+                                isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
                             crossAxisAlignment: CrossAxisAlignment.end,
                             children: [
                               if (!isMe)
@@ -765,7 +860,7 @@ class _ChatRoomPageState extends State<ChatRoomPage>
                                   margin: EdgeInsets.only(right: 4),
                                   child: CircleAvatar(
                                     radius: 16,
-                                    backgroundColor: Colors.grey[400],
+                                    backgroundColor: isDarkMode ? Color(0xFF3A3A3C) : Color(0xFFE5E5EA),
                                     child: FittedBox(
                                       fit: BoxFit.scaleDown,
                                       child: Center(
@@ -776,7 +871,7 @@ class _ChatRoomPageState extends State<ChatRoomPage>
                                                 .substring(0, 1)
                                                 .toUpperCase(),
                                             style: TextStyle(
-                                              color: Colors.white,
+                                              color: isDarkMode ? Colors.white : Colors.black,
                                               fontSize: 14,
                                               fontWeight: FontWeight.w600,
                                               height: 1,
@@ -795,10 +890,7 @@ class _ChatRoomPageState extends State<ChatRoomPage>
                                     formattedTime,
                                     style: TextStyle(
                                       fontSize: 10,
-                                      color:
-                                          isDarkMode
-                                              ? Colors.white54
-                                              : Colors.black54,
+                                      color: isDarkMode ? Colors.white54 : Colors.black54,
                                     ),
                                   ),
                                 ),
@@ -815,13 +907,20 @@ class _ChatRoomPageState extends State<ChatRoomPage>
                                     vertical: 10,
                                   ),
                                   decoration: BoxDecoration(
-                                    color: isMe ? accentColor : messageColor,
-                                    borderRadius: BorderRadius.circular(20),
+                                    color: isMe ? myMessageColor : messageColor,
+                                    borderRadius: BorderRadius.only(
+                                      topLeft: Radius.circular(16),
+                                      topRight: Radius.circular(16),
+                                      bottomLeft: Radius.circular(isMe ? 16 : 4),
+                                      bottomRight: Radius.circular(isMe ? 4 : 16),
+                                    ),
                                     boxShadow: [
                                       BoxShadow(
-                                        color: Colors.black.withOpacity(0.1),
+                                        color: isDarkMode 
+                                            ? Colors.black.withOpacity(0.2) 
+                                            : Colors.black.withOpacity(0.05),
                                         blurRadius: 4,
-                                        offset: Offset(0, 2),
+                                        offset: Offset(0, 1),
                                       ),
                                     ],
                                   ),
@@ -829,6 +928,7 @@ class _ChatRoomPageState extends State<ChatRoomPage>
                                     messageData['text'],
                                     style: TextStyle(
                                       color: isMe ? Colors.white : textColor,
+                                      fontSize: 15,
                                     ),
                                   ),
                                 ),
@@ -840,10 +940,7 @@ class _ChatRoomPageState extends State<ChatRoomPage>
                                     formattedTime,
                                     style: TextStyle(
                                       fontSize: 10,
-                                      color:
-                                          isDarkMode
-                                              ? Colors.white54
-                                              : Colors.black54,
+                                      color: isDarkMode ? Colors.white54 : Colors.black54,
                                     ),
                                   ),
                                 ),
@@ -859,52 +956,71 @@ class _ChatRoomPageState extends State<ChatRoomPage>
             Container(
               padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
-                color: isDarkMode ? Color(0xFF1E1E1E) : Colors.white,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
-                    blurRadius: 4,
-                    offset: Offset(0, -2),
+                color: inputBackgroundColor,
+                border: Border(
+                  top: BorderSide(
+                    color: isDarkMode ? Color(0xFF2C2C2E) : Color(0xFFE5E5EA),
+                    width: 0.5,
                   ),
-                ],
+                ),
               ),
               child: Row(
                 children: [
                   Expanded(
-                    child: TextField(
-                      controller: _messageController,
-                      focusNode: _focusNode,
-                      decoration: InputDecoration(
-                        hintText: '메시지를 입력하세요...',
-                        hintStyle: TextStyle(
-                          color: isDarkMode ? Colors.white70 : Colors.grey[600],
+                    child: Container(
+                      margin: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: isDarkMode ? Color(0xFF2C2C2E) : Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: isDarkMode ? Color(0xFF3A3A3C) : Color(0xFFE5E5EA),
+                          width: 0.5,
                         ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(25),
-                          borderSide: BorderSide.none,
-                        ),
-                        filled: true,
-                        fillColor:
-                            isDarkMode ? Colors.grey[800] : Colors.grey[200],
-                        contentPadding: EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 4,
-                        ),
-                        isDense: true,
+                        boxShadow: [
+                          BoxShadow(
+                            color: isDarkMode 
+                                ? Colors.black.withOpacity(0.1) 
+                                : Colors.black.withOpacity(0.05),
+                            blurRadius: 2,
+                            offset: Offset(0, 1),
+                          ),
+                        ],
                       ),
-                      style: TextStyle(color: textColor),
-                      onTap: () {
-                        // 텍스트 필드 터치 시 즉시 스크롤을 아래로 이동
-                        _scrollToBottom();
-                      },
+                      child: TextField(
+                        controller: _messageController,
+                        focusNode: _focusNode,
+                        decoration: InputDecoration(
+                          hintText: '메시지를 입력하세요',
+                          hintStyle: TextStyle(
+                            color: isDarkMode ? Colors.white60 : Colors.black38,
+                          ),
+                          border: InputBorder.none,
+                          contentPadding: EdgeInsets.symmetric(vertical: 4),
+                          isDense: true,
+                        ),
+                        style: TextStyle(
+                          color: textColor,
+                          fontSize: 15,
+                        ),
+                        onSubmitted: (_) => _sendMessage(),
+                        textInputAction: TextInputAction.send,
+                      ),
                     ),
                   ),
-                  SizedBox(width: 8),
-                  CircleAvatar(
-                    backgroundColor: accentColor,
+                  Container(
+                    margin: EdgeInsets.only(right: 8),
                     child: IconButton(
-                      icon: Icon(Icons.send, color: Colors.white),
-                      onPressed: _sendMessage,
+                      icon: Icon(
+                        Icons.send_rounded,
+                        color: _messageController.text.trim().isEmpty
+                            ? (isDarkMode ? Colors.white38 : Colors.black38)
+                            : sendButtonColor,
+                        size: 24,
+                      ),
+                      onPressed: _messageController.text.trim().isEmpty
+                          ? null
+                          : _sendMessage,
                     ),
                   ),
                 ],
@@ -996,6 +1112,8 @@ class _ChatRoomPageState extends State<ChatRoomPage>
   }
 
   Widget _buildAppBarTitle() {
+    final isDarkMode = MediaQuery.of(context).platformBrightness == Brightness.dark;
+    
     // 채팅방 이름에서 출발지와 목적지를 추출
     String departure = '';
     String destination = '';
@@ -1023,26 +1141,82 @@ class _ChatRoomPageState extends State<ChatRoomPage>
       }
     }
 
+    // PSU 관련 주소 처리
+    if (departure.toLowerCase().contains('penn state') || 
+        departure.toLowerCase().contains('psu') ||
+        departure.toLowerCase().contains('pittsburgh') ||
+        departure.toLowerCase().contains('pollock')) {
+      if (departure.contains('-')) {
+        departure = departure.split('-')[1].trim();
+      }
+    }
+    
+    if (destination.toLowerCase().contains('penn state') || 
+        destination.toLowerCase().contains('psu') ||
+        destination.toLowerCase().contains('pittsburgh') ||
+        destination.toLowerCase().contains('pollock')) {
+      if (destination.contains('-')) {
+        destination = destination.split('-')[1].trim();
+      }
+    }
+
+    // 공항 코드 처리
+    if (departure.toLowerCase().contains('airport') || 
+        departure.toLowerCase().contains('newark') ||
+        departure.toLowerCase().contains('jfk') ||
+        departure.toLowerCase().contains('lga')) {
+      if (departure.contains('(') && departure.contains(')')) {
+        departure = departure.substring(
+          departure.indexOf('(') + 1,
+          departure.indexOf(')')
+        ).trim();
+      }
+    }
+    
+    if (destination.toLowerCase().contains('airport') || 
+        destination.toLowerCase().contains('newark') ||
+        destination.toLowerCase().contains('jfk') ||
+        destination.toLowerCase().contains('lga')) {
+      if (destination.contains('(') && destination.contains(')')) {
+        destination = destination.substring(
+          destination.indexOf('(') + 1,
+          destination.indexOf(')')
+        ).trim();
+      }
+    }
+
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         Flexible(
           child: Text(
             departure,
-            style: TextStyle(color: Colors.white, fontSize: 14),
-            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: isDarkMode ? Colors.white : Colors.black,
+              fontSize: 16,
+              fontWeight: FontWeight.w500,
+            ),
+            overflow: TextOverflow.visible,
             maxLines: 1,
           ),
         ),
         Padding(
           padding: EdgeInsets.symmetric(horizontal: 4),
-          child: Icon(Icons.arrow_forward, color: Colors.white, size: 16),
+          child: Icon(
+            Icons.arrow_forward,
+            color: isDarkMode ? Colors.white : Colors.black,
+            size: 16,
+          ),
         ),
         Flexible(
           child: Text(
             destination,
-            style: TextStyle(color: Colors.white, fontSize: 14),
-            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: isDarkMode ? Colors.white : Colors.black,
+              fontSize: 16,
+              fontWeight: FontWeight.w500,
+            ),
+            overflow: TextOverflow.visible,
             maxLines: 1,
           ),
         ),
@@ -1059,6 +1233,8 @@ class _ChatRoomPageState extends State<ChatRoomPage>
         .limit(1)
         .snapshots()
         .listen((snapshot) async {
+          if (!mounted) return;
+          
           if (snapshot.docs.isNotEmpty) {
             final latestMessage = snapshot.docs.first;
             final latestMessageData = latestMessage.data();
@@ -1076,12 +1252,14 @@ class _ChatRoomPageState extends State<ChatRoomPage>
               final newMessage = latestMessage;
               await _loadUserNames([newMessage]);
 
+              if (!mounted) return;
+
               setState(() {
                 _messages.add(newMessage);
               });
 
               // 새 메시지가 추가될 때 스크롤을 아래로 이동
-              _scrollToBottom();
+              _scrollToBottom(animate: true);
             }
           }
         });

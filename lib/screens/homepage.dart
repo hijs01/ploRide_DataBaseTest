@@ -29,12 +29,31 @@ class _HomePageState extends State<HomePage> {
   }
 
   // 사용자 정보 가져오기 함수 추가
-  void _getUserInfo() {
+  void _getUserInfo() async {
     final currentUser = FirebaseAuth.instance.currentUser;
-    if (currentUser != null && currentUser.email != null) {
-      setState(() {
-        _userName = currentUser.email!.split('@')[0]; // 이메일에서 @ 앞부분 추출
-      });
+    if (currentUser != null) {
+      try {
+        final userDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(currentUser.uid)
+            .get();
+
+        if (userDoc.exists) {
+          final userData = userDoc.data();
+          setState(() {
+            _userName = userData?['fullname'] ?? currentUser.email!.split('@')[0];
+          });
+        } else {
+          setState(() {
+            _userName = currentUser.email!.split('@')[0];
+          });
+        }
+      } catch (e) {
+        print('사용자 정보 가져오기 오류: $e');
+        setState(() {
+          _userName = currentUser.email!.split('@')[0];
+        });
+      }
     }
   }
 
@@ -353,7 +372,7 @@ class _HomePageState extends State<HomePage> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'User Name',
+                            _userName,
                             style: TextStyle(
                               fontSize: 20,
                               fontFamily: 'Brand-Bold',

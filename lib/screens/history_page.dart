@@ -205,6 +205,7 @@ class _HistoryPageState extends State<HistoryPage> {
           fontSize: 20,
           fontWeight: FontWeight.bold,
         ),
+
         actions: [
           // 새로고침 버튼 추가
           _isRefreshing
@@ -240,6 +241,7 @@ class _HistoryPageState extends State<HistoryPage> {
                     color: isDarkMode ? Colors.white : Colors.black,
                   ),
                 ),
+
               )
               : StreamBuilder<QuerySnapshot>(
                 stream:
@@ -318,6 +320,11 @@ class _HistoryPageState extends State<HistoryPage> {
                       print(
                         'Trip details - Pickup: $pickup, Destination: $destination, Status: $status',
                       ); // 디버그 로그 추가
+
+                      // 히스토리 데이터는 한 번만 저장
+                      // if (index == 0) {
+                      //   _saveToHistory(tripData);
+                      // }
 
                       return Container(
                         margin: EdgeInsets.symmetric(
@@ -546,13 +553,13 @@ class _HistoryPageState extends State<HistoryPage> {
       await _checkAllRidesStatus();
 
       // 새로고침 성공 메시지
-      // ScaffoldMessenger.of(context).showSnackBar(
-      //   SnackBar(
-      //     content: Text('이용 내역이 업데이트되었습니다'),
-      //     backgroundColor: Colors.green,
-      //     duration: Duration(seconds: 2),
-      //   ),
-      // );
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('이용 내역이 업데이트되었습니다'),
+          backgroundColor: Colors.green,
+          duration: Duration(seconds: 2),
+        ),
+      );
     } catch (e) {
       print('새로고침 중 오류 발생: $e');
 

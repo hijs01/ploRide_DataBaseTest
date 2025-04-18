@@ -7,6 +7,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cabrider/screens/loginpage.dart';
 import 'package:cabrider/screens/history_page.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class SettingsPage extends StatefulWidget {
   static const String id = 'settings';
@@ -47,19 +48,35 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   // 사용자 정보 가져오기
-  void _getUserInfo() {
+  void _getUserInfo() async {
     User? currentUser = FirebaseAuth.instance.currentUser;
-    if (currentUser != null && currentUser.email != null) {
-      setState(() {
-        _userEmail = currentUser.email!;
-        _userName = _getUserNameFromEmail(_userEmail);
-      });
-    }
-  }
+    if (currentUser != null) {
+      try {
+        final userDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(currentUser.uid)
+            .get();
 
-  // 이메일에서 사용자 이름 추출
-  String _getUserNameFromEmail(String email) {
-    return email.split('@')[0];
+        if (userDoc.exists) {
+          final userData = userDoc.data();
+          setState(() {
+            _userEmail = currentUser.email ?? '';
+            _userName = userData?['fullname'] ?? currentUser.email!.split('@')[0];
+          });
+        } else {
+          setState(() {
+            _userEmail = currentUser.email ?? '';
+            _userName = currentUser.email!.split('@')[0];
+          });
+        }
+      } catch (e) {
+        print('사용자 정보 가져오기 오류: $e');
+        setState(() {
+          _userEmail = currentUser.email ?? '';
+          _userName = currentUser.email!.split('@')[0];
+        });
+      }
+    }
   }
 
   // 개발자 정보 다이얼로그 표시
@@ -394,15 +411,53 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
           ),
 
-          // 기타 섹션
+
+          // 지원 섹션
           _buildSectionCard(
-            title: '기타',
-            icon: Icons.more_horiz,
+            title: '지원',
+            icon: Icons.help_outline,
             isDarkMode: isDarkMode,
             backgroundColor: cardColor,
             shadowColor: shadowColor,
             children: [
               _buildSettingItem(
+                icon: Icons.help,
+                title: '도움말',
+                subtitle: '자주 묻는 질문 및 도움말',
+                isDarkMode: isDarkMode,
+                onTap: () {},
+                trailing: Icon(
+                  Icons.arrow_forward_ios,
+                  size: 16,
+                  color: isDarkMode ? Colors.grey : Colors.grey[600],
+                ),
+              ),
+              _buildSettingItem(
+                icon: Icons.support_agent,
+                title: '고객 지원',
+                subtitle: 'ploride.dev@gmail.com',
+                isDarkMode: isDarkMode,
+                onTap: () {},
+                trailing: Icon(
+                  Icons.arrow_forward_ios,
+                  size: 16,
+                  color: isDarkMode ? Colors.grey : Colors.grey[600],
+                ),
+              ),
+            ],
+          ),
+
+          // 기타 섹션 제거하고 개발자 정보 섹션 추가
+
+          _buildSectionCard(
+            title: '기타',
+            icon: Icons.code,
+            isDarkMode: isDarkMode,
+            backgroundColor: cardColor,
+            shadowColor: shadowColor,
+            children: [
+              _buildSettingItem(
+
                 icon: Icons.info,
                 title: 'PLO 개발자 정보',
                 subtitle: '개발팀에 대한 정보를 확인하세요',
@@ -418,6 +473,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 icon: Icons.support_agent,
                 title: '고객 지원',
                 subtitle: '터치해서 PLO 인스타로 문의하기',
+
                 isDarkMode: isDarkMode,
                 onTap: _launchInstagram,
                 trailing: Icon(
