@@ -681,10 +681,11 @@ class _HomeContentState extends State<HomeContent> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Expanded(
-                          child: Text(
-                            _formatDateTime(_reservedTrip!['timestamp']),
-                            style: TextStyle(color: subTextColor, fontSize: 13),
+                        Text(
+                          _formatDateTime(_reservedTrip!['ride_date']),
+                          style: TextStyle(
+                            color: textColor.withOpacity(0.7),
+                            fontSize: 12,
                           ),
                         ),
                         if (_reservedTrip!.containsKey('status'))
