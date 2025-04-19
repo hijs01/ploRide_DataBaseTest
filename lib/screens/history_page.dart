@@ -290,12 +290,14 @@ class _HistoryPageState extends State<HistoryPage> {
                     itemCount: _psuToAirportTrips.length,
                     itemBuilder: (context, index) {
                       final trip = _psuToAirportTrips[index];
+                      final driverAccepted = trip['driver_accepted'] ?? false;
+                      final status = driverAccepted ? '확정됨' : '대기중';
                       return _buildTripCard(
                         context,
                         trip['pickup_info']['address'] ?? 'PSU',
                         trip['destination_info']['address'] ?? 'Airport',
                         trip['ride_date']?.toDate(),
-                        trip['status'] ?? 'pending',
+                        status,
                         cardColor,
                         textColor,
                       );
@@ -321,12 +323,14 @@ class _HistoryPageState extends State<HistoryPage> {
                     itemCount: _airportToPsuTrips.length,
                     itemBuilder: (context, index) {
                       final trip = _airportToPsuTrips[index];
+                      final driverAccepted = trip['driver_accepted'] ?? false;
+                      final status = driverAccepted ? '확정됨' : '대기중';
                       return _buildTripCard(
                         context,
                         trip['pickup_info']['address'] ?? 'Airport',
                         trip['destination_info']['address'] ?? 'PSU',
                         trip['ride_date']?.toDate(),
-                        trip['status'] ?? 'pending',
+                        status,
                         cardColor,
                         textColor,
                       );
@@ -366,6 +370,9 @@ class _HistoryPageState extends State<HistoryPage> {
     Color cardColor,
     Color textColor,
   ) {
+    final driverAccepted = status == '확정됨';
+    final updatedStatus = driverAccepted ? '확정됨' : '대기중';
+
     return Container(
       margin: EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
@@ -438,14 +445,14 @@ class _HistoryPageState extends State<HistoryPage> {
                 Container(
                   padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: _getStatusColor(status).withOpacity(0.1),
+                    color: _getStatusColor(updatedStatus).withOpacity(0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
-                    _getStatusText(status),
+                    updatedStatus,
                     style: TextStyle(
                       fontSize: 12,
-                      color: _getStatusColor(status),
+                      color: _getStatusColor(updatedStatus),
                       fontWeight: FontWeight.w500,
                     ),
                   ),
@@ -458,30 +465,26 @@ class _HistoryPageState extends State<HistoryPage> {
     );
   }
 
-  Color _getStatusColor(String status) {
-    switch (status.toLowerCase()) {
-      case 'completed':
-        return Colors.green;
-      case 'pending':
-        return Colors.orange;
-      case 'cancelled':
-        return Colors.red;
-      default:
-        return Colors.grey;
+  String _getStatusText(String status) {
+    if (status == '확정됨') {
+      return '확정됨';
+    } else if (status == '대기중') {
+      return '대기중';
+    } else if (status == '드라이버의 수락을 기다리는 중') {
+      return '대기중';
     }
+    return status;
   }
 
-  String _getStatusText(String status) {
-    switch (status.toLowerCase()) {
-      case 'completed':
-        return '완료';
-      case 'pending':
-        return '대기중';
-      case 'cancelled':
-        return '취소됨';
-      default:
-        return '알 수 없음';
+  Color _getStatusColor(String status) {
+    if (status == '확정됨') {
+      return Colors.green;
+    } else if (status == '대기중') {
+      return Colors.orange;
+    } else if (status == '드라이버의 수락을 기다리는 중') {
+      return Colors.orange;
     }
+    return Colors.grey;
   }
 
   // 추가: 채팅방 상태를 확인하여 히스토리 상태 업데이트
@@ -491,47 +494,37 @@ class _HistoryPageState extends State<HistoryPage> {
   ) async {
     try {
       final tripId = tripData['tripId'];
-      if (tripId == null || tripId.isEmpty) {
-        print('tripId가 비어있습니다');
+      final collection = tripData['collection'];
+
+      if (tripId == null || collection == null) {
+        print('tripId 또는 collection이 비어있습니다');
         return;
       }
 
       print('채팅방 상태 확인 중: $tripId');
 
       // 해당 tripId가 속한 채팅방 컬렉션 찾기
-      final collections = ['psuToAirport', 'airportToPsu', 'generalRides'];
+      final chatRoomDoc = await _firestore.collection(collection).doc(tripId).get();
 
-      for (var collection in collections) {
-        try {
-          final chatDoc =
-              await _firestore.collection(collection).doc(tripId).get();
+      if (chatRoomDoc.exists) {
+        final chatRoomData = chatRoomDoc.data() as Map<String, dynamic>;
+        final driverAccepted = chatRoomData['driver_accepted'] ?? false;
+        final status = driverAccepted ? '확정됨' : '대기중';
 
-          if (chatDoc.exists) {
-            final chatData = chatDoc.data() as Map<String, dynamic>;
-            final bool driverAccepted = chatData['driver_accepted'] ?? false;
+        print('채팅방 찾음: driverAccepted=$driverAccepted');
 
-            print('채팅방 찾음 ($collection): driverAccepted=$driverAccepted');
+        await historyRef.update({'status': status});
 
-            if (driverAccepted) {
-              // 히스토리 상태 업데이트
-              await historyRef.update({'status': '확정됨'});
-
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('라이드 상태가 업데이트되었습니다: 확정됨'),
-                  backgroundColor: Colors.green,
-                  duration: Duration(seconds: 2),
-                ),
-              );
-              return;
-            }
-          }
-        } catch (e) {
-          print('$collection 컬렉션 확인 중 오류: $e');
-        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('라이드 상태가 업데이트되었습니다: $status'),
+            backgroundColor: _getStatusColor(status),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      } else {
+        print('해당 채팅방을 찾을 수 없거나 드라이버가 아직 수락하지 않았습니다.');
       }
-
-      print('해당 채팅방을 찾을 수 없거나 드라이버가 아직 수락하지 않았습니다.');
     } catch (e) {
       print('채팅방 상태 확인 중 오류: $e');
     }

@@ -978,7 +978,7 @@ class _RideConfirmationPageState extends State<RideConfirmationPage>
             QuerySnapshot existingChatRooms = await FirebaseFirestore.instance
                 .collection(chatRoomCollection)
                 .where('location_identifier', isEqualTo: locationIdentifier)
-                .where('date_str', isEqualTo: formattedDate)
+                .where('date_str', isEqualTo: formattedDate)  // 같은 날짜의 채팅방만 검색
                 .get()
                 .timeout(Duration(seconds: 5));
 
@@ -986,45 +986,34 @@ class _RideConfirmationPageState extends State<RideConfirmationPage>
 
             // 비슷한 시간대(±1시간)의 채팅방 찾기
             bool foundMatchingRoom = false;
-            chatRoomRef =
-                FirebaseFirestore.instance
-                    .collection(chatRoomCollection)
-                    .doc(); // 초기 빈 참조로 초기화
+            chatRoomRef = FirebaseFirestore.instance
+                .collection(chatRoomCollection)
+                .doc(); // 초기 빈 참조로 초기화
 
             // 기존 채팅방 중에서 시간이 맞고 인원 여유가 있는 채팅방 찾기
             if (existingChatRooms.docs.isNotEmpty) {
               for (var doc in existingChatRooms.docs) {
-                Map<String, dynamic> roomData =
-                    doc.data() as Map<String, dynamic>;
+                Map<String, dynamic> roomData = doc.data() as Map<String, dynamic>;
 
                 // 채팅방의 탑승 시간 확인
                 if (roomData.containsKey('ride_date_timestamp')) {
-                  Timestamp rideTimestamp =
-                      roomData['ride_date_timestamp'] as Timestamp;
+                  Timestamp rideTimestamp = roomData['ride_date_timestamp'] as Timestamp;
                   DateTime roomRideDateTime = rideTimestamp.toDate();
 
                   // 시간 차이 계산 (절대값)
-                  Duration timeDifference =
-                      roomRideDateTime.difference(rideDateTime).abs();
+                  Duration timeDifference = roomRideDateTime.difference(rideDateTime).abs();
 
                   // 채팅방 멤버 수 확인
                   List<dynamic> members = roomData['members'] ?? [];
 
                   // 시간 차이가 1시간 이내이고, 멤버 수가 4명 미만인 경우
-                  if (timeDifference.inHours <= 1) {
-                    if (members.length >= 4) {
-                      print('채팅방이 가득 찼습니다. 새로운 채팅방을 생성합니다.');
-                      continue; // 다음 채팅방을 확인
-                    }
-                    
+                  if (timeDifference.inHours <= 1 && members.length < 4) {
                     chatRoomId = doc.id;
                     chatRoomRef = FirebaseFirestore.instance
                         .collection(chatRoomCollection)
                         .doc(chatRoomId);
 
-                    print(
-                      '비슷한 시간대의 채팅방을 찾았습니다: $chatRoomId (시간 차이: ${timeDifference.inMinutes}분)',
-                    );
+                    print('비슷한 시간대의 채팅방을 찾았습니다: $chatRoomId (시간 차이: ${timeDifference.inMinutes}분)');
                     foundMatchingRoom = true;
                     break;
                   }
