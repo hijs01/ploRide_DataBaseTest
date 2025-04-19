@@ -1094,7 +1094,13 @@ class _RideConfirmationPageState extends State<RideConfirmationPage>
               // 새 채팅방 번호 결정 (기존 채팅방 중 가장 큰 번호 + 1)
               int maxRoomNumber = 0;
 
-              for (var doc in existingChatRooms.docs) {
+              // 모든 채팅방을 조회하여 가장 큰 번호 찾기
+              QuerySnapshot allChatRooms = await FirebaseFirestore.instance
+                  .collection(chatRoomCollection)
+                  .where('location_identifier', isEqualTo: locationIdentifier)
+                  .get();
+
+              for (var doc in allChatRooms.docs) {
                 String docId = doc.id;
                 List<String> parts = docId.split('_');
                 if (parts.length > 1) {
