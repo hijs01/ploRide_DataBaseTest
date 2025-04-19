@@ -44,11 +44,8 @@ class LeftToRightPageRoute<T> extends PageRouteBuilder<T> {
 class SearchPage extends StatefulWidget {
   static const String id = 'search';
   final Function(int)? onLuggageCountChanged;
-  
-  const SearchPage({
-    Key? key,
-    this.onLuggageCountChanged,
-  }) : super(key: key);
+
+  const SearchPage({super.key, this.onLuggageCountChanged});
 
   @override
   _SearchPageState createState() => _SearchPageState();
@@ -64,6 +61,7 @@ class _SearchPageState extends State<SearchPage> {
 
   bool focused = false;
   int luggageCount = 1; // 캐리어 개수 기본값
+  int companionCount = 0; // 같이 타는 친구 수 기본값
 
   var destinationPredictionList = <Prediction>[];
 
@@ -75,6 +73,8 @@ class _SearchPageState extends State<SearchPage> {
 
   // 출발 위치 타입을 저장하는 변수 추가
   String pickupLocationType = ''; // 'psu' 또는 'airport'
+
+  bool isGroupRide = false; // 추가된 변수
 
   @override
   void initState() {
@@ -175,6 +175,10 @@ class _SearchPageState extends State<SearchPage> {
       context,
       listen: false,
     ).updateRideDateTime(selectedDate!, selectedTime!);
+    Provider.of<AppData>(
+      context,
+      listen: false,
+    ).updateCompanionCount(companionCount);
 
     // RideConfirmationPage로 이동
     Navigator.pushNamed(context, 'rideconfirmation');
@@ -206,7 +210,9 @@ class _SearchPageState extends State<SearchPage> {
                       surface: Color(0xFF121212),
                       onSurface: Colors.white,
                     ),
-                    dialogBackgroundColor: Color(0xFF121212),
+                    dialogTheme: DialogThemeData(
+                      backgroundColor: Color(0xFF121212),
+                    ),
                   )
                   : ThemeData.light().copyWith(
                     colorScheme: ColorScheme.light(
@@ -214,7 +220,7 @@ class _SearchPageState extends State<SearchPage> {
                       onPrimary: Colors.white,
                       onSurface: Colors.black,
                     ),
-                    dialogBackgroundColor: Colors.white,
+                    dialogTheme: DialogThemeData(backgroundColor: Colors.white),
                   ),
           child: child ?? Container(),
         );
@@ -253,7 +259,6 @@ class _SearchPageState extends State<SearchPage> {
                       surface: Color(0xFF121212),
                       onSurface: Colors.white,
                     ),
-                    dialogBackgroundColor: Color(0xFF121212),
                     timePickerTheme: TimePickerThemeData(
                       backgroundColor: Color(0xFF121212),
                       hourMinuteColor: primaryColor.withOpacity(0.1),
@@ -262,6 +267,9 @@ class _SearchPageState extends State<SearchPage> {
                       dialBackgroundColor: Color(0xFF212121),
                       dialHandColor: primaryColor,
                       dialTextColor: Colors.white,
+                    ),
+                    dialogTheme: DialogThemeData(
+                      backgroundColor: Color(0xFF121212),
                     ),
                   )
                   : ThemeData.light().copyWith(
@@ -433,6 +441,115 @@ class _SearchPageState extends State<SearchPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: <Widget>[
+                      // Solo/Group Ride 토글 버튼 추가
+                      Container(
+                        margin: EdgeInsets.only(bottom: 16),
+                        decoration: BoxDecoration(
+                          color:
+                              isDarkMode ? Color(0xFF202020) : Colors.grey[100],
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color:
+                                isDarkMode
+                                    ? Colors.grey[800]!
+                                    : Colors.grey[300]!,
+                            width: 1,
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: GestureDetector(
+                                onTap: () {
+                                  setState(() {
+                                    isGroupRide = false;
+                                    companionCount =
+                                        0; // Solo Ride 선택 시 동반자 수 0으로 초기화
+                                    luggageCount =
+                                        1; // Solo Ride 선택 시 캐리어 개수 초기화
+                                  });
+                                },
+                                child: Container(
+                                  height: 48,
+                                  decoration: BoxDecoration(
+                                    color:
+                                        !isGroupRide
+                                            ? primaryColor
+                                            : (isDarkMode
+                                                ? Color(0xFF202020)
+                                                : Colors.grey[100]),
+                                    borderRadius: BorderRadius.horizontal(
+                                      left: Radius.circular(11),
+                                    ),
+                                  ),
+                                  child: Center(
+                                    child: Text(
+                                      'Solo Ride',
+                                      style: TextStyle(
+                                        color:
+                                            !isGroupRide
+                                                ? Colors.white
+                                                : (isDarkMode
+                                                    ? Colors.grey[400]
+                                                    : Colors.grey[600]),
+                                        fontWeight:
+                                            !isGroupRide
+                                                ? FontWeight.bold
+                                                : FontWeight.normal,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            Expanded(
+                              child: GestureDetector(
+                                onTap: () {
+                                  setState(() {
+                                    isGroupRide = true;
+                                    companionCount =
+                                        1; // Group Ride 선택 시 기본값 2명(본인+1)으로 설정
+                                    luggageCount =
+                                        1; // Group Ride 선택 시 캐리어 개수 초기화
+                                  });
+                                },
+                                child: Container(
+                                  height: 48,
+                                  decoration: BoxDecoration(
+                                    color:
+                                        isGroupRide
+                                            ? primaryColor
+                                            : (isDarkMode
+                                                ? Color(0xFF202020)
+                                                : Colors.grey[100]),
+                                    borderRadius: BorderRadius.horizontal(
+                                      right: Radius.circular(11),
+                                    ),
+                                  ),
+                                  child: Center(
+                                    child: Text(
+                                      'Group Ride',
+                                      style: TextStyle(
+                                        color:
+                                            isGroupRide
+                                                ? Colors.white
+                                                : (isDarkMode
+                                                    ? Colors.grey[400]
+                                                    : Colors.grey[600]),
+                                        fontWeight:
+                                            isGroupRide
+                                                ? FontWeight.bold
+                                                : FontWeight.normal,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
                       // 출발지 입력
                       Container(
                         margin: EdgeInsets.only(bottom: 16),
@@ -688,123 +805,279 @@ class _SearchPageState extends State<SearchPage> {
                         ],
                       ),
 
-                      // 캐리어 개수 선택
-                      Container(
-                        margin: EdgeInsets.only(bottom: 10),
-                        decoration: BoxDecoration(
-                          color:
-                              isDarkMode ? Color(0xFF202020) : Colors.grey[100],
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
+                      // 캐리어 개수 선택 (Solo Ride에서만 표시)
+                      if (!isGroupRide)
+                        Container(
+                          margin: EdgeInsets.only(bottom: 10),
+                          decoration: BoxDecoration(
                             color:
                                 isDarkMode
-                                    ? Colors.grey[800]!
-                                    : Colors.grey[300]!,
-                            width: 1,
+                                    ? Color(0xFF202020)
+                                    : Colors.grey[100],
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color:
+                                  isDarkMode
+                                      ? Colors.grey[800]!
+                                      : Colors.grey[300]!,
+                              width: 1,
+                            ),
                           ),
-                        ),
-                        child: Row(
-                          children: [
-                            Container(
-                              padding: EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: primaryColor.withOpacity(0.1),
-                                borderRadius: BorderRadius.horizontal(
-                                  left: Radius.circular(12),
-                                ),
-                              ),
-                              child: Icon(
-                                Icons.luggage_rounded,
-                                color: primaryColor,
-                                size: 24,
-                              ),
-                            ),
-                            SizedBox(width: 16),
-                            Text(
-                              '캐리어 개수',
-                              style: TextStyle(fontSize: 16, color: textColor),
-                            ),
-                            Spacer(),
-                            Row(
-                              children: [
-                                Material(
-                                  color: Colors.transparent,
-                                  child: InkWell(
-                                    onTap: () {
-                                      if (luggageCount > 0) {
-                                        _updateLuggageCount(luggageCount - 1);
-                                      }
-                                    },
-                                    borderRadius: BorderRadius.circular(20),
-                                    child: Container(
-                                      width: 32,
-                                      height: 32,
-                                      decoration: BoxDecoration(
-                                        shape: BoxShape.circle,
-                                        color:
-                                            isDarkMode
-                                                ? Colors.grey[800]
-                                                : Colors.grey[200],
-                                      ),
-                                      child: Icon(
-                                        Icons.remove,
-                                        color:
-                                            isDarkMode
-                                                ? Colors.white
-                                                : Colors.black,
-                                        size: 18,
-                                      ),
-                                    ),
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: primaryColor.withOpacity(0.1),
+                                  borderRadius: BorderRadius.horizontal(
+                                    left: Radius.circular(12),
                                   ),
                                 ),
-                                Container(
-                                  width: 40,
-                                  alignment: Alignment.center,
-                                  child: Text(
+                                child: Icon(
+                                  Icons.luggage_rounded,
+                                  color: primaryColor,
+                                  size: 24,
+                                ),
+                              ),
+                              SizedBox(width: 16),
+                              Text(
+                                '총 캐리어 개수',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  color: textColor,
+                                ),
+                              ),
+                              Spacer(),
+                              Row(
+                                children: [
+                                  IconButton(
+                                    icon: Icon(Icons.remove, color: textColor),
+                                    onPressed: () {
+                                      setState(() {
+                                        if (luggageCount > 0) {
+                                          luggageCount--;
+                                        }
+                                      });
+                                    },
+                                  ),
+                                  Text(
                                     '$luggageCount',
                                     style: TextStyle(
-                                      fontSize: 18,
+                                      fontSize: 16,
                                       fontWeight: FontWeight.bold,
                                       color: textColor,
                                     ),
                                   ),
-                                ),
-                                Material(
-                                  color: Colors.transparent,
-                                  child: InkWell(
-                                    onTap: () {
-                                      if (luggageCount < 5) {
-                                        _updateLuggageCount(luggageCount + 1);
-                                      }
+                                  IconButton(
+                                    icon: Icon(Icons.add, color: textColor),
+                                    onPressed: () {
+                                      setState(() {
+                                        if (luggageCount < 2) {
+                                          // Solo Ride일 때는 최대 2개
+                                          luggageCount++;
+                                        } else {
+                                          // 최대 개수 도달 시 알림
+                                          ScaffoldMessenger.of(
+                                            context,
+                                          ).showSnackBar(
+                                            SnackBar(
+                                              content: Text(
+                                                '인당 최대 2개의 캐리어만 허용됩니다.',
+                                              ),
+                                              duration: Duration(seconds: 2),
+                                            ),
+                                          );
+                                        }
+                                      });
                                     },
-                                    borderRadius: BorderRadius.circular(20),
-                                    child: Container(
-                                      width: 32,
-                                      height: 32,
-                                      decoration: BoxDecoration(
-                                        shape: BoxShape.circle,
-                                        color:
-                                            isDarkMode
-                                                ? Colors.grey[800]
-                                                : Colors.grey[200],
-                                      ),
-                                      child: Icon(
-                                        Icons.add,
-                                        color:
-                                            isDarkMode
-                                                ? Colors.white
-                                                : Colors.black,
-                                        size: 18,
-                                      ),
-                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+
+                      // 동반자 선택 (Group Ride일 때만 표시)
+                      if (isGroupRide) ...[
+                        // 총 인원수 (동반자 포함) 박스
+                        Container(
+                          margin: EdgeInsets.only(bottom: 10),
+                          decoration: BoxDecoration(
+                            color:
+                                isDarkMode
+                                    ? Color(0xFF202020)
+                                    : Colors.grey[100],
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color:
+                                  isDarkMode
+                                      ? Colors.grey[800]!
+                                      : Colors.grey[300]!,
+                              width: 1,
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: primaryColor.withOpacity(0.1),
+                                  borderRadius: BorderRadius.horizontal(
+                                    left: Radius.circular(12),
                                   ),
                                 ),
-                                SizedBox(width: 16),
-                              ],
-                            ),
-                          ],
+                                child: Icon(
+                                  Icons.people_rounded,
+                                  color: primaryColor,
+                                  size: 24,
+                                ),
+                              ),
+                              SizedBox(width: 16),
+                              Text(
+                                '총 인원수 (동반자 포함)',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  color: textColor,
+                                ),
+                              ),
+                              Spacer(),
+                              Row(
+                                children: [
+                                  IconButton(
+                                    icon: Icon(Icons.remove, color: textColor),
+                                    onPressed: () {
+                                      setState(() {
+                                        if (companionCount > 1) {
+                                          // 최소 2명(본인+1)
+                                          companionCount--;
+                                          // 총 인원수가 줄어들 때 캐리어 개수도 자동 조정
+                                          int maxLuggage =
+                                              (companionCount + 1) * 2;
+                                          if (luggageCount > maxLuggage) {
+                                            luggageCount = maxLuggage;
+                                          }
+                                        }
+                                      });
+                                    },
+                                  ),
+                                  Text(
+                                    '${companionCount + 1}명', // 본인 포함 총 인원수
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: textColor,
+                                    ),
+                                  ),
+                                  IconButton(
+                                    icon: Icon(Icons.add, color: textColor),
+                                    onPressed: () {
+                                      setState(() {
+                                        if (companionCount < 3) {
+                                          // 본인 포함 최대 4명
+                                          companionCount++;
+                                        }
+                                      });
+                                    },
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
+
+                        // 총 캐리어 개수 박스 (Group Ride)
+                        Container(
+                          margin: EdgeInsets.only(bottom: 10),
+                          decoration: BoxDecoration(
+                            color:
+                                isDarkMode
+                                    ? Color(0xFF202020)
+                                    : Colors.grey[100],
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color:
+                                  isDarkMode
+                                      ? Colors.grey[800]!
+                                      : Colors.grey[300]!,
+                              width: 1,
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: primaryColor.withOpacity(0.1),
+                                  borderRadius: BorderRadius.horizontal(
+                                    left: Radius.circular(12),
+                                  ),
+                                ),
+                                child: Icon(
+                                  Icons.luggage_rounded,
+                                  color: primaryColor,
+                                  size: 24,
+                                ),
+                              ),
+                              SizedBox(width: 16),
+                              Text(
+                                '총 캐리어 개수',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  color: textColor,
+                                ),
+                              ),
+                              Spacer(),
+                              Row(
+                                children: [
+                                  IconButton(
+                                    icon: Icon(Icons.remove, color: textColor),
+                                    onPressed: () {
+                                      setState(() {
+                                        if (luggageCount > 0) {
+                                          luggageCount--;
+                                        }
+                                      });
+                                    },
+                                  ),
+                                  Text(
+                                    '$luggageCount',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: textColor,
+                                    ),
+                                  ),
+                                  IconButton(
+                                    icon: Icon(Icons.add, color: textColor),
+                                    onPressed: () {
+                                      setState(() {
+                                        // 총 인원수에 따른 최대 캐리어 개수 계산 (인당 2개)
+                                        int maxLuggage =
+                                            (companionCount + 1) * 2;
+                                        if (luggageCount < maxLuggage) {
+                                          luggageCount++;
+                                        } else {
+                                          // 최대 개수 도달 시 알림
+                                          ScaffoldMessenger.of(
+                                            context,
+                                          ).showSnackBar(
+                                            SnackBar(
+                                              content: Text(
+                                                '인당 최대 2개의 캐리어만 허용됩니다.',
+                                              ),
+                                              duration: Duration(seconds: 2),
+                                            ),
+                                          );
+                                        }
+                                      });
+                                    },
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),

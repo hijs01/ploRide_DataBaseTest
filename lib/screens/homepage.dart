@@ -15,7 +15,7 @@ import 'package:intl/intl.dart';
 class HomePage extends StatefulWidget {
   static const String id = 'home';
 
-  const HomePage({Key? key}) : super(key: key);
+  const HomePage({super.key});
 
   @override
   State<HomePage> createState() => _HomePageState();
@@ -42,7 +42,7 @@ class _HomePageState extends State<HomePage> {
     try {
       final prefs = await SharedPreferences.getInstance();
       final String? shownPopupsJson = prefs.getString('shown_popups');
-      
+
       if (shownPopupsJson != null) {
         final List<dynamic> decodedList = json.decode(shownPopupsJson);
         setState(() {
@@ -50,7 +50,7 @@ class _HomePageState extends State<HomePage> {
         });
         print('로드된 팝업 목록: $_shownPopups');
       }
-      
+
       // 팝업 목록을 로드한 후에 리스너 설정
       if (mounted) {
         setupChatRoomListener();
@@ -94,14 +94,22 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _getUserInfo() async {
-    final user = _auth.currentUser;
-    if (user != null) {
-      final userDoc = await _firestore.collection('users').doc(user.uid).get();
-      if (userDoc.exists) {
-        setState(() {
-          _username = userDoc.data()?['username'] ?? '';
-        });
+    try {
+      final user = _auth.currentUser;
+      if (user != null) {
+        final userDoc =
+            await _firestore.collection('users').doc(user.uid).get();
+        if (userDoc.exists) {
+          setState(() {
+            _username = userDoc.data()?['fullname'] ?? '게스트';
+          });
+        }
       }
+    } catch (e) {
+      print('사용자 정보 로드 중 오류: $e');
+      setState(() {
+        _username = '게스트';
+      });
     }
   }
 
@@ -128,23 +136,25 @@ class _HomePageState extends State<HomePage> {
         String chatRoomId = chatRoomData['chat_room_id'] ?? '';
 
         // psuToAirport나 airportToPsu 컬렉션인 경우에만 리스너 설정
-        if ((chatRoomCollection == 'psuToAirport' || chatRoomCollection == 'airportToPsu') &&
+        if ((chatRoomCollection == 'psuToAirport' ||
+                chatRoomCollection == 'airportToPsu') &&
             chatRoomId.isNotEmpty) {
-          
           // 원본 채팅방 문서 확인
-          DocumentSnapshot chatRoomDoc = await FirebaseFirestore.instance
-              .collection(chatRoomCollection)
-              .doc(chatRoomId)
-              .get();
+          DocumentSnapshot chatRoomDoc =
+              await FirebaseFirestore.instance
+                  .collection(chatRoomCollection)
+                  .doc(chatRoomId)
+                  .get();
 
           if (chatRoomDoc.exists) {
-            Map<String, dynamic> data = chatRoomDoc.data() as Map<String, dynamic>;
+            Map<String, dynamic> data =
+                chatRoomDoc.data() as Map<String, dynamic>;
             List<dynamic> members = data['members'] ?? [];
-            
+
             // 사용자가 실제로 채팅방의 멤버인 경우에만 리스너 설정
             if (members.contains(user.uid)) {
               print('채팅방 리스너 설정: $chatRoomCollection/$chatRoomId');
-              
+
               // 원본 채팅방 문서 리스너 설정
               FirebaseFirestore.instance
                   .collection(chatRoomCollection)
@@ -160,31 +170,32 @@ class _HomePageState extends State<HomePage> {
                         bool chatActivated = data['chat_activated'] ?? false;
                         List<dynamic> members = data['members'] ?? [];
 
-                        print('채팅방 상태 업데이트: driver_accepted=$driverAccepted, chat_activated=$chatActivated');
+                        print(
+                          '채팅방 상태 업데이트: driver_accepted=$driverAccepted, chat_activated=$chatActivated',
+                        );
 
                         // driver_accepted가 true이고 사용자가 채팅방 멤버인 경우에만 팝업 표시
                         // 추가 조건: 앱이 시작된 후 일정 시간이 지났는지 확인 (즉시 팝업 방지)
-                        if (driverAccepted == true && 
-                            mounted && 
+                        if (driverAccepted == true &&
+                            mounted &&
                             !_shownPopups.contains(chatRoomId) &&
                             members.contains(user.uid)) {
-                          
                           // 앱 시작 후 일정 시간 지연 (즉시 팝업 방지)
                           await Future.delayed(Duration(seconds: 2));
-                          
+
                           // 지연 후에도 여전히 조건이 충족되는지 확인
                           if (!mounted || _shownPopups.contains(chatRoomId)) {
                             return;
                           }
-                          
+
                           print('드라이버 수락 감지: 팝업 표시');
-                          
+
                           // 팝업 표시 후 Set에 추가하고 저장
                           setState(() {
                             _shownPopups.add(chatRoomId);
                           });
                           _saveShownPopups(); // SharedPreferences에 저장
-                          
+
                           // UI 업데이트를 위해 setState 사용
                           setState(() {
                             // 팝업 표시
@@ -196,7 +207,8 @@ class _HomePageState extends State<HomePage> {
                                   title: Text('매칭 완료!'),
                                   content: Column(
                                     mainAxisSize: MainAxisSize.min,
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Text('드라이버와 매칭이 완료되었습니다.'),
                                       SizedBox(height: 12),
@@ -205,20 +217,30 @@ class _HomePageState extends State<HomePage> {
                                         padding: EdgeInsets.all(12),
                                         decoration: BoxDecoration(
                                           color: Colors.grey[100],
-                                          borderRadius: BorderRadius.circular(8),
+                                          borderRadius: BorderRadius.circular(
+                                            8,
+                                          ),
                                         ),
                                         child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
                                           children: [
                                             // 출발지
                                             Row(
                                               children: [
-                                                Icon(Icons.location_on, color: Colors.green, size: 16),
+                                                Icon(
+                                                  Icons.location_on,
+                                                  color: Colors.green,
+                                                  size: 16,
+                                                ),
                                                 SizedBox(width: 8),
                                                 Expanded(
                                                   child: Text(
-                                                    data['pickup_info']?['address'] ?? '출발지 정보 없음',
-                                                    style: TextStyle(fontSize: 14),
+                                                    data['pickup_info']?['address'] ??
+                                                        '출발지 정보 없음',
+                                                    style: TextStyle(
+                                                      fontSize: 14,
+                                                    ),
                                                   ),
                                                 ),
                                               ],
@@ -227,12 +249,19 @@ class _HomePageState extends State<HomePage> {
                                             // 도착지
                                             Row(
                                               children: [
-                                                Icon(Icons.location_on, color: Colors.red, size: 16),
+                                                Icon(
+                                                  Icons.location_on,
+                                                  color: Colors.red,
+                                                  size: 16,
+                                                ),
                                                 SizedBox(width: 8),
                                                 Expanded(
                                                   child: Text(
-                                                    data['destination_info']?['address'] ?? '도착지 정보 없음',
-                                                    style: TextStyle(fontSize: 14),
+                                                    data['destination_info']?['address'] ??
+                                                        '도착지 정보 없음',
+                                                    style: TextStyle(
+                                                      fontSize: 14,
+                                                    ),
                                                   ),
                                                 ),
                                               ],
@@ -241,13 +270,25 @@ class _HomePageState extends State<HomePage> {
                                             // 날짜
                                             Row(
                                               children: [
-                                                Icon(Icons.calendar_today, color: Colors.blue, size: 16),
+                                                Icon(
+                                                  Icons.calendar_today,
+                                                  color: Colors.blue,
+                                                  size: 16,
+                                                ),
                                                 SizedBox(width: 8),
                                                 Text(
                                                   data['ride_date'] != null
-                                                      ? DateFormat('yyyy년 MM월 dd일').format((data['ride_date'] as Timestamp).toDate())
+                                                      ? DateFormat(
+                                                        'yyyy년 MM월 dd일',
+                                                      ).format(
+                                                        (data['ride_date']
+                                                                as Timestamp)
+                                                            .toDate(),
+                                                      )
                                                       : '날짜 정보 없음',
-                                                  style: TextStyle(fontSize: 14),
+                                                  style: TextStyle(
+                                                    fontSize: 14,
+                                                  ),
                                                 ),
                                               ],
                                             ),
@@ -268,26 +309,32 @@ class _HomePageState extends State<HomePage> {
                                     ElevatedButton(
                                       onPressed: () async {
                                         Navigator.pop(context); // 다이얼로그 닫기
-                                        
+
                                         // 채팅방 정보 가져오기
-                                        DocumentSnapshot chatRoomDoc = await FirebaseFirestore.instance
-                                            .collection(chatRoomCollection)
-                                            .doc(chatRoomId)
-                                            .get();
-                                            
+                                        DocumentSnapshot chatRoomDoc =
+                                            await FirebaseFirestore.instance
+                                                .collection(chatRoomCollection)
+                                                .doc(chatRoomId)
+                                                .get();
+
                                         if (chatRoomDoc.exists) {
-                                          Map<String, dynamic> data = chatRoomDoc.data() as Map<String, dynamic>;
-                                          String chatRoomName = data['chat_room_name'] ?? '채팅방';
-                                          
+                                          Map<String, dynamic> data =
+                                              chatRoomDoc.data()
+                                                  as Map<String, dynamic>;
+                                          String chatRoomName =
+                                              data['chat_room_name'] ?? '채팅방';
+
                                           // 채팅방으로 이동
                                           Navigator.push(
                                             context,
                                             MaterialPageRoute(
-                                              builder: (context) => ChatRoomPage(
-                                                chatRoomId: chatRoomId,
-                                                chatRoomName: chatRoomName,
-                                                chatRoomCollection: chatRoomCollection,
-                                              ),
+                                              builder:
+                                                  (context) => ChatRoomPage(
+                                                    chatRoomId: chatRoomId,
+                                                    chatRoomName: chatRoomName,
+                                                    chatRoomCollection:
+                                                        chatRoomCollection,
+                                                  ),
                                             ),
                                           );
                                         }
@@ -332,10 +379,8 @@ class _HomePageState extends State<HomePage> {
                             // 각 멤버의 채팅방 정보 업데이트
                             for (String memberId in members) {
                               String memberSafeDocId =
-                                  "${chatRoomCollection}_$chatRoomId".replaceAll(
-                                    '/',
-                                    '_',
-                                  );
+                                  "${chatRoomCollection}_$chatRoomId"
+                                      .replaceAll('/', '_');
 
                               await FirebaseFirestore.instance
                                   .collection('users')
@@ -357,7 +402,8 @@ class _HomePageState extends State<HomePage> {
                                     .collection('messages')
                                     .where(
                                       'text',
-                                      isEqualTo: '드라이버가 요청을 수락했습니다. 채팅방이 활성화되었습니다.',
+                                      isEqualTo:
+                                          '드라이버가 요청을 수락했습니다. 채팅방이 활성화되었습니다.',
                                     )
                                     .get();
 
@@ -691,7 +737,7 @@ class _HomePageState extends State<HomePage> {
           child: ListView(
             padding: EdgeInsets.zero,
             children: [
-              Container(
+              SizedBox(
                 height: 160,
                 child: DrawerHeader(
                   decoration: BoxDecoration(
@@ -844,7 +890,7 @@ class _HomePageState extends State<HomePage> {
 class HomeContent extends StatefulWidget {
   final bool isDarkMode;
 
-  const HomeContent({Key? key, required this.isDarkMode}) : super(key: key);
+  const HomeContent({super.key, required this.isDarkMode});
 
   @override
   State<HomeContent> createState() => _HomeContentState();
@@ -963,7 +1009,7 @@ class _HomeContentState extends State<HomeContent> {
                     SizedBox(height: 12),
                     Row(
                       children: [
-                        Container(
+                        SizedBox(
                           width: 40,
                           child: Column(
                             children: [

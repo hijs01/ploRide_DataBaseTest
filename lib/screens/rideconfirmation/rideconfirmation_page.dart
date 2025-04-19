@@ -343,7 +343,7 @@ class _RideConfirmationPageState extends State<RideConfirmationPage>
                   ),
                 ),
 
-                // 날짜, 시간, 캐리어 개수 그리드
+                // 날짜, 시간, 캐리어 개수, 같이 타는 친구 수 그리드
                 Container(
                   margin: EdgeInsets.only(bottom: 8),
                   child: Row(
@@ -376,6 +376,17 @@ class _RideConfirmationPageState extends State<RideConfirmationPage>
                         Icons.luggage,
                         '캐리어',
                         '${appData.luggageCount}개',
+                        primaryColor,
+                        textColor,
+                        subtitleColor,
+                        cardColor,
+                      ),
+                      SizedBox(width: 8),
+                      _buildInfoCard(
+                        context,
+                        Icons.people_rounded,
+                        '총 인원',
+                        '${appData.companionCount + 1}명',
                         primaryColor,
                         textColor,
                         subtitleColor,
@@ -964,7 +975,7 @@ class _RideConfirmationPageState extends State<RideConfirmationPage>
             QuerySnapshot existingChatRooms = await FirebaseFirestore.instance
                 .collection(chatRoomCollection)
                 .where('location_identifier', isEqualTo: locationIdentifier)
-                .where('date_str', isEqualTo: formattedDate)  // 같은 날짜의 채팅방만 검색
+                .where('date_str', isEqualTo: formattedDate) // 같은 날짜의 채팅방만 검색
                 .get()
                 .timeout(Duration(seconds: 5));
 
@@ -972,22 +983,26 @@ class _RideConfirmationPageState extends State<RideConfirmationPage>
 
             // 비슷한 시간대(±1시간)의 채팅방 찾기
             bool foundMatchingRoom = false;
-            chatRoomRef = FirebaseFirestore.instance
-                .collection(chatRoomCollection)
-                .doc(); // 초기 빈 참조로 초기화
+            chatRoomRef =
+                FirebaseFirestore.instance
+                    .collection(chatRoomCollection)
+                    .doc(); // 초기 빈 참조로 초기화
 
             // 기존 채팅방 중에서 시간이 맞고 인원 여유가 있는 채팅방 찾기
             if (existingChatRooms.docs.isNotEmpty) {
               for (var doc in existingChatRooms.docs) {
-                Map<String, dynamic> roomData = doc.data() as Map<String, dynamic>;
+                Map<String, dynamic> roomData =
+                    doc.data() as Map<String, dynamic>;
 
                 // 채팅방의 탑승 시간 확인
                 if (roomData.containsKey('ride_date_timestamp')) {
-                  Timestamp rideTimestamp = roomData['ride_date_timestamp'] as Timestamp;
+                  Timestamp rideTimestamp =
+                      roomData['ride_date_timestamp'] as Timestamp;
                   DateTime roomRideDateTime = rideTimestamp.toDate();
 
                   // 시간 차이 계산 (절대값)
-                  Duration timeDifference = roomRideDateTime.difference(rideDateTime).abs();
+                  Duration timeDifference =
+                      roomRideDateTime.difference(rideDateTime).abs();
 
                   // 채팅방 멤버 수 확인
                   List<dynamic> members = roomData['members'] ?? [];
@@ -999,10 +1014,13 @@ class _RideConfirmationPageState extends State<RideConfirmationPage>
                         .collection(chatRoomCollection)
                         .doc(chatRoomId);
 
-                    print('비슷한 시간대의 채팅방을 찾았습니다: $chatRoomId (시간 차이: ${timeDifference.inMinutes}분)');
+                    print(
+                      '비슷한 시간대의 채팅방을 찾았습니다: $chatRoomId (시간 차이: ${timeDifference.inMinutes}분)',
+                    );
                     foundMatchingRoom = true;
                     break;
-                  } else if (timeDifference.inHours <= 1 && members.length >= 4) {
+                  } else if (timeDifference.inHours <= 1 &&
+                      members.length >= 4) {
                     print('채팅방이 가득 찼습니다. 새로운 채팅방을 생성합니다.');
                     continue; // 다음 채팅방을 확인
                   }
@@ -1024,34 +1042,59 @@ class _RideConfirmationPageState extends State<RideConfirmationPage>
               // 사용자가 이미 채팅방에 있는지 확인
               if (!members.contains(user.uid)) {
                 // 사용자 정보 가져오기
-                DocumentSnapshot userDoc = await FirebaseFirestore.instance
-                    .collection('users')
-                    .doc(user.uid)
-                    .get();
+                DocumentSnapshot userDoc =
+                    await FirebaseFirestore.instance
+                        .collection('users')
+                        .doc(user.uid)
+                        .get();
 
                 String userName = '알 수 없음';
                 if (userDoc.exists) {
-                  Map<String, dynamic> userData = userDoc.data() as Map<String, dynamic>;
+                  Map<String, dynamic> userData =
+                      userDoc.data() as Map<String, dynamic>;
                   userName = userData['fullname'] ?? '알 수 없음';
                 }
 
                 // 채팅방 멤버 목록에 사용자 추가 (기존 멤버 유지)
                 members.add(user.uid);
 
+                // 새로운 user_companion_counts 맵 생성
+                Map<String, int> updatedCompanionCounts = Map<String, int>.from(
+                  chatRoomData['user_companion_counts'] ?? {},
+                );
+                updatedCompanionCounts[user.uid] = appData.companionCount;
+
+                // 총 멤버 수 계산 (실제 멤버 + 모든 동반자)
+                int totalCompanions = updatedCompanionCounts.values.fold(
+                  0,
+                  (sum, count) => sum + count,
+                );
+                int totalMembers = members.length + totalCompanions;
+
                 // 업데이트할 데이터 준비
                 Map<String, dynamic> updateData = {
                   'members': members,
-                  'member_count': members.length,
+                  'member_count': totalMembers,
                   'last_message': '$userName님이 그룹에 참여했습니다.',
                   'last_message_time': FieldValue.serverTimestamp(),
                   'luggage_count_total': FieldValue.increment(luggageCount),
-                  'user_luggage_counts.${user.uid}': luggageCount,
+                  'user_luggage_counts': {
+                    ...chatRoomData['user_luggage_counts'] ?? {},
+                    user.uid: luggageCount,
+                  },
+                  'user_companion_counts': updatedCompanionCounts,
                 };
 
-                // 1명이 모이면 드라이버 앱에 표시 가능하도록 설정
-                if (members.length >= 1) {
-                  updateData['available_for_driver'] = true;
-                  print('1명이 모였습니다. 드라이버 앱에 표시됩니다.');
+                // 총 인원이 4명을 초과하면 새로운 채팅방 생성
+                if (totalMembers > 4) {
+                  print('총 $totalMembers명으로 인원 초과. 새로운 채팅방을 생성합니다.');
+                  foundMatchingRoom = false; // 새로운 채팅방 생성 트리거
+                } else {
+                  // available_for_driver는 totalMembers가 정확히 4명일 때만 true
+                  updateData['available_for_driver'] = (totalMembers == 4);
+                  if (totalMembers == 4) {
+                    print('총 $totalMembers명이 모였습니다. 드라이버 앱에 표시됩니다.');
+                  }
                 }
 
                 // 채팅방 업데이트
@@ -1081,10 +1124,14 @@ class _RideConfirmationPageState extends State<RideConfirmationPage>
               int maxRoomNumber = 0;
 
               // 모든 채팅방을 조회하여 가장 큰 번호 찾기
-              QuerySnapshot allChatRooms = await FirebaseFirestore.instance
-                  .collection(chatRoomCollection)
-                  .where('location_identifier', isEqualTo: locationIdentifier)
-                  .get();
+              QuerySnapshot allChatRooms =
+                  await FirebaseFirestore.instance
+                      .collection(chatRoomCollection)
+                      .where(
+                        'location_identifier',
+                        isEqualTo: locationIdentifier,
+                      )
+                      .get();
 
               for (var doc in allChatRooms.docs) {
                 String docId = doc.id;
@@ -1108,7 +1155,7 @@ class _RideConfirmationPageState extends State<RideConfirmationPage>
               } else if (chatRoomCollection == 'airportToPsu') {
                 prefix = "atp_";
               }
-              chatRoomId = "${prefix}${locationIdentifier}_$chatRoomNumber";
+              chatRoomId = "$prefix${locationIdentifier}_$chatRoomNumber";
 
               print('새 채팅방 생성: $chatRoomId (기존 채팅방이 가득 찼거나 시간이 맞지 않음)');
 
@@ -1138,18 +1185,20 @@ class _RideConfirmationPageState extends State<RideConfirmationPage>
                 'pickup_info': pickupMap,
                 'destination_info': destinationMap,
                 'members': [user.uid],
-                'member_count': 1,
+                'member_count': 1 + appData.companionCount, // 사용자 본인(1) + 동반자 수
                 'last_message': '새로운 그룹이 생성되었습니다.',
                 'last_message_time': FieldValue.serverTimestamp(),
                 'room_number': chatRoomNumber,
                 'collection_name': chatRoomCollection,
                 'luggage_count_total': luggageCount,
                 'user_luggage_counts': {user.uid: luggageCount},
+                'user_companion_counts': {user.uid: appData.companionCount},
                 'driver_accepted': false,
                 'driver_id': '',
-                'available_for_driver': false,
+                'available_for_driver':
+                    (1 + appData.companionCount) == 4, // 정확히 4명일 때만 true
                 'chat_activated': false,
-                'chat_visible': false
+                'chat_visible': false,
               };
 
               await chatRoomRef.set(chatRoomData).timeout(Duration(seconds: 5));
@@ -1362,12 +1411,13 @@ class _RideConfirmationPageState extends State<RideConfirmationPage>
     if (user == null) return;
 
     // 가장 최근 채팅방 가져오기
-    final chatRoomsQuery = await FirebaseFirestore.instance
-        .collectionGroup('chat_rooms')
-        .where('members', arrayContains: user.uid)
-        .orderBy('created_at', descending: true)
-        .limit(1)
-        .get();
+    final chatRoomsQuery =
+        await FirebaseFirestore.instance
+            .collectionGroup('chat_rooms')
+            .where('members', arrayContains: user.uid)
+            .orderBy('created_at', descending: true)
+            .limit(1)
+            .get();
 
     if (chatRoomsQuery.docs.isEmpty) return;
 
@@ -1383,30 +1433,30 @@ class _RideConfirmationPageState extends State<RideConfirmationPage>
         .doc(chatRoomId)
         .snapshots()
         .listen((snapshot) {
-      if (!snapshot.exists) return;
+          if (!snapshot.exists) return;
 
-      final data = snapshot.data() as Map<String, dynamic>;
-      final driverAccepted = data['driver_accepted'] ?? false;
-      final members = List<String>.from(data['members'] ?? []);
+          final data = snapshot.data() as Map<String, dynamic>;
+          final driverAccepted = data['driver_accepted'] ?? false;
+          final members = List<String>.from(data['members'] ?? []);
 
-      if (driverAccepted && members.contains(user.uid)) {
-        // 채팅방 활성화
-        FirebaseFirestore.instance
-            .collection(chatRoomCollection)
-            .doc(chatRoomId)
-            .update({'chat_activated': true});
+          if (driverAccepted && members.contains(user.uid)) {
+            // 채팅방 활성화
+            FirebaseFirestore.instance
+                .collection(chatRoomCollection)
+                .doc(chatRoomId)
+                .update({'chat_activated': true});
 
-        // 시스템 메시지 추가
-        FirebaseFirestore.instance
-            .collection(chatRoomCollection)
-            .doc(chatRoomId)
-            .collection('messages')
-            .add({
-          'text': '드라이버가 매칭을 수락했습니다. 채팅방이 활성화되었습니다.',
-          'sender': 'system',
-          'timestamp': FieldValue.serverTimestamp(),
+            // 시스템 메시지 추가
+            FirebaseFirestore.instance
+                .collection(chatRoomCollection)
+                .doc(chatRoomId)
+                .collection('messages')
+                .add({
+                  'text': '드라이버가 매칭을 수락했습니다. 채팅방이 활성화되었습니다.',
+                  'sender': 'system',
+                  'timestamp': FieldValue.serverTimestamp(),
+                });
+          }
         });
-      }
-    });
   }
 }

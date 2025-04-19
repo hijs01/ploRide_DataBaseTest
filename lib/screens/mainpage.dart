@@ -36,12 +36,12 @@ class MainPage extends StatefulWidget {
   final double? pickupLongitude;
 
   const MainPage({
-    Key? key,
+    super.key,
     this.showDirections = false,
     this.showPickupLocation = false,
     this.pickupLatitude,
     this.pickupLongitude,
-  }) : super(key: key);
+  });
 
   static const String id = 'mainpage';
 
@@ -603,7 +603,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                           width: double.infinity,
                           child: Column(
                             children: [
-                              Container(
+                              SizedBox(
                                 width: 250,
                                 child: Column(
                                   children: [
@@ -667,7 +667,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                           ),
                         ),
                         SizedBox(height: 10),
-                        Container(
+                        SizedBox(
                           width: double.infinity,
                           child: Text(
                             'Cancel ride',
@@ -1147,7 +1147,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                               ],
                             ),
                             SizedBox(height: 16),
-                            Container(
+                            SizedBox(
                               width: double.infinity,
                               child: ElevatedButton(
                                 style: ElevatedButton.styleFrom(
@@ -1350,7 +1350,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
     await Future.delayed(const Duration(milliseconds: 300));
 
     // 마커 탭 시뮬레이션을 위한 함수
-    void _simulateMarkerTap() {
+    void simulateMarkerTap() {
       setState(() {
         // 마커를 다시 생성하여 InfoWindow가 표시되도록 함
         _Markers.clear();
@@ -1386,7 +1386,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
     }
 
     // 마커 탭 시뮬레이션 실행
-    _simulateMarkerTap();
+    simulateMarkerTap();
 
     // Add circles
     Circle pickupCircle = Circle(
@@ -1495,7 +1495,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
       _Markers.clear();
     });
 
-    Set<Marker> tempMarkers = Set<Marker>();
+    Set<Marker> tempMarkers = <Marker>{};
     for (NearbyDriver driver in FireHelper.nearbyDriverList) {
       LatLng driverPosition = LatLng(driver.latitude, driver.longitude);
       Marker thisMarker = Marker(
@@ -1593,6 +1593,11 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
         'user_id': currentFirebaseUser!.uid,
         'fare': HelperMethods.estimateFares(tripDirectionDetails!),
         'luggage_count': luggageCount, // 캐리어 개수 추가
+        'companion_count':
+            Provider.of<AppData>(
+              context,
+              listen: false,
+            ).companionCount, // 같이 타는 친구 수 추가
       };
 
       print('Firestore에 전송할 데이터:');

@@ -5,6 +5,7 @@ class AppData extends ChangeNotifier {
   Address? pickupAddress;
   Address? destinationAddress;
   int luggageCount = 1;
+  int companionCount = 0; // 같이 타는 친구 수
   DateTime? rideDate;
   TimeOfDay? rideTime;
 
@@ -24,6 +25,11 @@ class AppData extends ChangeNotifier {
 
   void updateLuggageCount(int count) {
     luggageCount = count;
+    notifyListeners();
+  }
+
+  void updateCompanionCount(int count) {
+    companionCount = count;
     notifyListeners();
   }
 
