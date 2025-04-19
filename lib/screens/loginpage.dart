@@ -189,6 +189,158 @@ class _LoginpageState extends State<Loginpage>
     }
   }
 
+  void _showForgotPasswordDialog() {
+    final TextEditingController resetEmailController = TextEditingController();
+    // 현재 이메일 필드에 입력된 값이 있으면 복사
+    if (emailController.text.isNotEmpty) {
+      resetEmailController.text = emailController.text;
+    }
+
+    bool isLoading = false;
+    bool isValidEmail = false;
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            // 이메일 유효성 검사 함수
+            void validateEmail(String email) {
+              final RegExp emailRegex = RegExp(
+                r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$',
+              );
+              setState(() {
+                isValidEmail = email.isNotEmpty && emailRegex.hasMatch(email);
+              });
+            }
+
+            // 초기 이메일 유효성 검사
+            validateEmail(resetEmailController.text);
+
+            return AlertDialog(
+              title: Text('비밀번호 재설정'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    '등록하신 이메일로 비밀번호 재설정 링크를 보내드립니다.',
+                    style: TextStyle(fontSize: 14),
+                  ),
+                  SizedBox(height: 16),
+                  TextField(
+                    controller: resetEmailController,
+                    keyboardType: TextInputType.emailAddress,
+                    decoration: InputDecoration(
+                      prefixIcon: Icon(Icons.email_outlined, color: themeColor),
+                      hintText: '이메일 주소',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.grey.shade300),
+                      ),
+                      contentPadding: EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
+                    ),
+                    onChanged: (value) {
+                      validateEmail(value);
+                    },
+                  ),
+                  SizedBox(height: 8),
+                  if (isLoading)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8.0),
+                      child: Center(
+                        child: CircularProgressIndicator(
+                          valueColor: AlwaysStoppedAnimation<Color>(themeColor),
+                          strokeWidth: 2.0,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                  },
+                  child: Text(
+                    '취소',
+                    style: TextStyle(color: Colors.grey.shade600),
+                  ),
+                ),
+                ElevatedButton(
+                  onPressed:
+                      isLoading || !isValidEmail
+                          ? null
+                          : () async {
+                            setState(() {
+                              isLoading = true;
+                            });
+
+                            try {
+                              // 인터넷 연결 확인
+                              var connectivityResult =
+                                  await Connectivity().checkConnectivity();
+                              if (connectivityResult ==
+                                  ConnectivityResult.none) {
+                                Navigator.pop(context);
+                                showSnackBar('인터넷 연결이 없습니다', isError: true);
+                                return;
+                              }
+
+                              // 비밀번호 재설정 이메일 발송
+                              await _auth.sendPasswordResetEmail(
+                                email: resetEmailController.text.trim(),
+                              );
+
+                              // 다이얼로그 닫기
+                              Navigator.pop(context);
+
+                              // 성공 메시지 표시
+                              showSnackBar(
+                                '${resetEmailController.text}로 비밀번호 재설정 이메일이 발송되었습니다. 이메일을 확인해주세요.',
+                              );
+                            } on FirebaseAuthException catch (e) {
+                              Navigator.pop(context);
+
+                              // 오류 메시지 처리
+                              String errorMessage =
+                                  '비밀번호 재설정 메일 발송 중 오류가 발생했습니다.';
+                              if (e.code == 'user-not-found') {
+                                errorMessage = '해당 이메일로 등록된 계정이 없습니다.';
+                              }
+
+                              showSnackBar(errorMessage, isError: true);
+                            } catch (e) {
+                              Navigator.pop(context);
+                              showSnackBar(
+                                '비밀번호 재설정 메일 발송 중 오류가 발생했습니다.',
+                                isError: true,
+                              );
+                            }
+                          },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: themeColor,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: Text('발송하기'),
+                ),
+              ],
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -466,7 +618,7 @@ class _LoginpageState extends State<Loginpage>
                               alignment: Alignment.centerRight,
                               child: TextButton(
                                 onPressed: () {
-                                  // 비밀번호 찾기 기능 (기존 TODO)
+                                  _showForgotPasswordDialog();
                                 },
                                 child: Text(
                                   '비밀번호를 잊으셨나요?',

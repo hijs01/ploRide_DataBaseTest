@@ -25,7 +25,6 @@ class _RegistrationPageState extends State<RegistrationPage>
 
   var fullnameController = TextEditingController();
   var emailController = TextEditingController();
-  var phoneController = TextEditingController();
   var passwordController = TextEditingController();
 
   // 비밀번호 표시 여부 상태 추가
@@ -66,7 +65,6 @@ class _RegistrationPageState extends State<RegistrationPage>
     _animationController.dispose();
     fullnameController.dispose();
     emailController.dispose();
-    phoneController.dispose();
     passwordController.dispose();
     super.dispose();
   }
@@ -105,7 +103,6 @@ class _RegistrationPageState extends State<RegistrationPage>
         await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
           'fullname': fullnameController.text,
           'email': emailController.text,
-          'phone': phoneController.text,
           'created_at': FieldValue.serverTimestamp(),
           'emailVerified': false, // 이메일 인증 상태 필드 추가
         });
@@ -373,75 +370,13 @@ class _RegistrationPageState extends State<RegistrationPage>
                                     color: themeColor,
                                     size: 22,
                                   ),
-                                  hintText: '이메일 주소',
-                                  hintStyle: TextStyle(
-                                    color: Colors.grey.shade400,
-                                    fontSize: 14,
-                                  ),
-                                  border: InputBorder.none,
-                                  contentPadding: EdgeInsets.symmetric(
-                                    horizontal: 20,
-                                    vertical: 15,
-                                  ),
-                                ),
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: Colors.black87,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-
-                        // 전화번호 입력 필드
-                        FadeTransition(
-                          opacity: _fadeAnimation,
-                          child: SlideTransition(
-                            position: Tween<Offset>(
-                              begin: Offset(0, 0.2),
-                              end: Offset.zero,
-                            ).animate(
-                              CurvedAnimation(
-                                parent: _animationController,
-                                curve: Interval(
-                                  0.2,
-                                  0.7,
-                                  curve: Curves.easeOut,
-                                ),
-                              ),
-                            ),
-                            child: Container(
-                              margin: EdgeInsets.only(bottom: 16),
-                              decoration: BoxDecoration(
-                                color: Colors.grey.shade50,
-                                borderRadius: BorderRadius.circular(20),
-                                border: Border.all(color: Colors.grey.shade200),
-                                gradient: LinearGradient(
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                  colors: [
-                                    themeColor.withOpacity(0.05),
-                                    secondaryColor.withOpacity(0.05),
-                                  ],
-                                ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.03),
-                                    blurRadius: 10,
-                                    offset: Offset(0, 2),
-                                  ),
-                                ],
-                              ),
-                              child: TextField(
-                                controller: phoneController,
-                                keyboardType: TextInputType.phone,
-                                decoration: InputDecoration(
-                                  prefixIcon: Icon(
-                                    Icons.phone_outlined,
+                                  hintText: '이메일 주소 (@gmail.com만 가능)',
+                                  helperText: 'Gmail 계정만 사용 가능합니다',
+                                  helperStyle: TextStyle(
                                     color: themeColor,
-                                    size: 22,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
                                   ),
-                                  hintText: '전화번호',
                                   hintStyle: TextStyle(
                                     color: Colors.grey.shade400,
                                     fontSize: 14,
@@ -627,23 +562,13 @@ class _RegistrationPageState extends State<RegistrationPage>
 
                                             // 이메일 형식 검증
                                             final RegExp emailRegex = RegExp(
-                                              r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$',
+                                              r'^[a-zA-Z0-9._%+-]+@gmail\.com$',
                                             );
                                             if (!emailRegex.hasMatch(
                                               emailController.text,
                                             )) {
                                               showSnackBar(
-                                                '유효한 이메일 주소를 입력해주세요',
-                                                isError: true,
-                                              );
-                                              return;
-                                            }
-
-                                            // 전화번호 검증
-                                            if (phoneController.text.length <
-                                                10) {
-                                              showSnackBar(
-                                                '유효한 전화번호를 입력해주세요',
+                                                'Gmail(@gmail.com) 이메일만 사용 가능합니다',
                                                 isError: true,
                                               );
                                               return;

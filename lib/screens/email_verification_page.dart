@@ -20,10 +20,12 @@ class EmailVerificationPage extends StatefulWidget {
 class _EmailVerificationPageState extends State<EmailVerificationPage> {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   late Timer _timer;
+  late Timer _countdownTimer;
   bool _isEmailVerified = false;
   bool _isResendingEmail = false;
   bool _isCheckingStatus = false;
   int _timeLeft = 60;
+  bool _showResendButton = false;
 
   // 테마 색상 정의
   final Color themeColor = Color(0xFF3F51B5); // 인디고 색상
@@ -39,12 +41,35 @@ class _EmailVerificationPageState extends State<EmailVerificationPage> {
     _timer = Timer.periodic(Duration(seconds: 3), (_) {
       _checkEmailVerified();
     });
+
+    // 초기에는 재전송 버튼 숨김
+    _showResendButton = false;
+
+    // 앱 시작 시 60초 카운트다운 시작
+    _startInitialCountdown();
+  }
+
+  // 초기 카운트다운 시작
+  void _startInitialCountdown() {
+    _countdownTimer = Timer.periodic(Duration(seconds: 1), (timer) {
+      setState(() {
+        if (_timeLeft > 0) {
+          _timeLeft--;
+        } else {
+          timer.cancel();
+          _showResendButton = true;
+        }
+      });
+    });
   }
 
   @override
   void dispose() {
-    // 타이머 해제
+    // 타이머들 해제
     _timer.cancel();
+    if (_countdownTimer.isActive) {
+      _countdownTimer.cancel();
+    }
     super.dispose();
   }
 
@@ -75,6 +100,9 @@ class _EmailVerificationPageState extends State<EmailVerificationPage> {
 
         // 타이머 해제
         _timer.cancel();
+        if (_countdownTimer.isActive) {
+          _countdownTimer.cancel();
+        }
 
         // 홈페이지로 이동
         Navigator.pushNamedAndRemoveUntil(
@@ -94,10 +122,11 @@ class _EmailVerificationPageState extends State<EmailVerificationPage> {
 
   // 인증 이메일 재전송
   Future<void> _resendVerificationEmail() async {
-    if (_isResendingEmail || _timeLeft > 0) return;
+    if (_isResendingEmail) return;
 
     setState(() {
       _isResendingEmail = true;
+      _showResendButton = false;
     });
 
     try {
@@ -109,12 +138,13 @@ class _EmailVerificationPageState extends State<EmailVerificationPage> {
       });
 
       // 카운트다운 타이머
-      Timer.periodic(Duration(seconds: 1), (timer) {
+      _countdownTimer = Timer.periodic(Duration(seconds: 1), (timer) {
         setState(() {
           if (_timeLeft > 0) {
             _timeLeft--;
           } else {
             timer.cancel();
+            _showResendButton = true;
           }
         });
       });
@@ -132,6 +162,9 @@ class _EmailVerificationPageState extends State<EmailVerificationPage> {
           backgroundColor: Colors.red,
         ),
       );
+      setState(() {
+        _showResendButton = true;
+      });
     } finally {
       setState(() {
         _isResendingEmail = false;
@@ -246,46 +279,67 @@ class _EmailVerificationPageState extends State<EmailVerificationPage> {
                             ),
                           ),
                           SizedBox(height: 30),
-                          // 이메일 앱 열기 버튼
-                          ElevatedButton.icon(
-                            onPressed: () {
-                              // 이메일 앱 열기 기능은 구현하지 않음
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text('이메일 앱을 열어주세요'),
-                                  backgroundColor: themeColor,
-                                ),
-                              );
-                            },
-                            icon: Icon(Icons.open_in_new),
-                            label: Text('이메일 앱 열기'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: themeColor,
-                              foregroundColor: Colors.white,
-                              padding: EdgeInsets.symmetric(
-                                horizontal: 24,
-                                vertical: 12,
-                              ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(30),
-                              ),
-                            ),
-                          ),
                           SizedBox(height: 20),
-                          // 이메일 재전송 버튼
-                          TextButton(
-                            onPressed:
-                                _timeLeft > 0 ? null : _resendVerificationEmail,
-                            child: Text(
-                              _timeLeft > 0
-                                  ? '이메일 재전송 (${_timeLeft}초 후 가능)'
-                                  : '인증 이메일 재전송',
-                              style: TextStyle(
-                                color: _timeLeft > 0 ? Colors.grey : themeColor,
-                                fontWeight: FontWeight.bold,
+                          // 타이머 표시 (항상 표시되도록 수정)
+                          if (_timeLeft > 0)
+                            Column(
+                              children: [
+                                Stack(
+                                  alignment: Alignment.center,
+                                  children: [
+                                    SizedBox(
+                                      width: 80,
+                                      height: 80,
+                                      child: CircularProgressIndicator(
+                                        value: _timeLeft / 60,
+                                        valueColor:
+                                            AlwaysStoppedAnimation<Color>(
+                                              themeColor,
+                                            ),
+                                        backgroundColor: Colors.grey[300],
+                                        strokeWidth: 8,
+                                      ),
+                                    ),
+                                    Text(
+                                      '$_timeLeft',
+                                      style: TextStyle(
+                                        fontSize: 22,
+                                        fontWeight: FontWeight.bold,
+                                        color: themeColor,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                SizedBox(height: 10),
+                                Text(
+                                  '재전송 대기 시간',
+                                  style: TextStyle(
+                                    color: Colors.grey[600],
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          // 이메일 재전송 버튼 (타이머가 끝난 후에만 표시)
+                          if (_showResendButton)
+                            ElevatedButton(
+                              onPressed: _resendVerificationEmail,
+                              child: Text(
+                                '인증 이메일 재전송',
+                                style: TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: themeColor,
+                                foregroundColor: Colors.white,
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: 24,
+                                  vertical: 12,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(30),
+                                ),
                               ),
                             ),
-                          ),
                         ],
                       ),
                     ),
