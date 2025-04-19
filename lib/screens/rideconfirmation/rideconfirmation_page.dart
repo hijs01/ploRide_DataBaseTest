@@ -36,11 +36,6 @@ class _RideConfirmationPageState extends State<RideConfirmationPage>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-
-    // 페이지가 로드되면 채팅방 리스너를 설정
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _setupChatRoomListener();
-    });
   }
 
   @override
@@ -811,15 +806,6 @@ class _RideConfirmationPageState extends State<RideConfirmationPage>
 
     // 성공 시 홈페이지로 이동
     if (isSuccess && mounted) {
-      // 알림 전송 부분 주석 처리
-      /*
-      try {
-        // FCM 알림 전송 로직이 있다면 여기에 있을 것
-      } catch (e) {
-        print('알림 전송 오류: $e');
-      }
-      */
-
       Future.delayed(Duration(milliseconds: 500), () {
         Navigator.pushAndRemoveUntil(
           context,
@@ -1371,125 +1357,56 @@ class _RideConfirmationPageState extends State<RideConfirmationPage>
     }
   }
 
-  // 채팅방 리스너 설정을 위한 코드 추가
   Future<void> _setupChatRoomListener() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
-    try {
-      // 최근 추가된 채팅방 찾기
-      QuerySnapshot chatRooms =
-          await FirebaseFirestore.instance
-              .collection('users')
-              .doc(user.uid)
-              .collection('chatRooms')
-              .orderBy('joined_at', descending: true)
-              .limit(1)
-              .get();
+    // 가장 최근 채팅방 가져오기
+    final chatRoomsQuery = await FirebaseFirestore.instance
+        .collectionGroup('chat_rooms')
+        .where('members', arrayContains: user.uid)
+        .orderBy('created_at', descending: true)
+        .limit(1)
+        .get();
 
-      if (chatRooms.docs.isNotEmpty) {
-        Map<String, dynamic> chatRoomData =
-            chatRooms.docs.first.data() as Map<String, dynamic>;
-        String chatRoomCollection = chatRoomData['chat_room_collection'] ?? '';
-        String chatRoomId = chatRoomData['chat_room_id'] ?? '';
+    if (chatRoomsQuery.docs.isEmpty) return;
 
-        if (chatRoomCollection.isNotEmpty && chatRoomId.isNotEmpty) {
-          // 원본 채팅방 문서 리스너 설정
-          FirebaseFirestore.instance
-              .collection(chatRoomCollection)
-              .doc(chatRoomId)
-              .snapshots()
-              .listen(
-                (documentSnapshot) async {
-                  if (documentSnapshot.exists) {
-                    Map<String, dynamic> data =
-                        documentSnapshot.data() as Map<String, dynamic>;
-                    bool driverAccepted = data['driver_accepted'] ?? false;
-                    String driverId = data['driver_id'] ?? '';
-                    bool chatActivated = data['chat_activated'] ?? false;
+    final chatRoomDoc = chatRoomsQuery.docs.first;
+    final chatRoomId = chatRoomDoc.id;
+    final chatRoomCollection = chatRoomDoc.reference.parent.parent?.id;
 
-                    // driver_accepted 상태가 변경되고 chat_activated가 false인 경우에만 처리
-                    if (driverAccepted && !chatActivated) {
-                      // 원본 채팅방 문서에 chat_activated 필드 업데이트
-                      await FirebaseFirestore.instance
-                          .collection(chatRoomCollection)
-                          .doc(chatRoomId)
-                          .update({
-                            'chat_activated': true,
-                            'chat_visible': true,
-                          });
+    if (chatRoomCollection == null) return;
 
-                      // 채팅방의 모든 멤버 가져오기
-                      DocumentSnapshot roomSnapshot =
-                          await FirebaseFirestore.instance
-                              .collection(chatRoomCollection)
-                              .doc(chatRoomId)
-                              .get();
+    // 채팅방 리스너 설정
+    FirebaseFirestore.instance
+        .collection(chatRoomCollection)
+        .doc(chatRoomId)
+        .snapshots()
+        .listen((snapshot) {
+      if (!snapshot.exists) return;
 
-                      if (roomSnapshot.exists) {
-                        Map<String, dynamic> roomData =
-                            roomSnapshot.data() as Map<String, dynamic>;
-                        List<dynamic> members = roomData['members'] ?? [];
+      final data = snapshot.data() as Map<String, dynamic>;
+      final driverAccepted = data['driver_accepted'] ?? false;
+      final members = List<String>.from(data['members'] ?? []);
 
-                        // 각 멤버의 채팅방 정보 업데이트
-                        for (String memberId in members) {
-                          String memberSafeDocId =
-                              "${chatRoomCollection}_$chatRoomId".replaceAll(
-                                '/',
-                                '_',
-                              );
+      if (driverAccepted && members.contains(user.uid)) {
+        // 채팅방 활성화
+        FirebaseFirestore.instance
+            .collection(chatRoomCollection)
+            .doc(chatRoomId)
+            .update({'chat_activated': true});
 
-                          await FirebaseFirestore.instance
-                              .collection('users')
-                              .doc(memberId)
-                              .collection('chatRooms')
-                              .doc(memberSafeDocId)
-                              .update({
-                                'driver_accepted': true,
-                                'driver_id': driverId,
-                                'chat_visible': true,
-                              });
-                        }
-
-                        // 채팅방에 시스템 메시지 추가 (중복 방지를 위해 이전 메시지 확인)
-                        QuerySnapshot existingMessages =
-                            await FirebaseFirestore.instance
-                                .collection(chatRoomCollection)
-                                .doc(chatRoomId)
-                                .collection('messages')
-                                .where(
-                                  'text',
-                                  isEqualTo: '드라이버가 요청을 수락했습니다. 채팅방이 활성화되었습니다.',
-                                )
-                                .get();
-
-                        if (existingMessages.docs.isEmpty) {
-                          await FirebaseFirestore.instance
-                              .collection(chatRoomCollection)
-                              .doc(chatRoomId)
-                              .collection('messages')
-                              .add({
-                                'text': '드라이버가 요청을 수락했습니다. 채팅방이 활성화되었습니다.',
-                                'sender_id': 'system',
-                                'sender_name': '시스템',
-                                'timestamp': FieldValue.serverTimestamp(),
-                                'type': 'system',
-                              });
-                        }
-                      }
-
-                      print('드라이버가 수락했습니다. 채팅방이 활성화됩니다.');
-                    }
-                  }
-                },
-                onError: (error) {
-                  print('채팅방 리스너 오류: $error');
-                },
-              );
-        }
+        // 시스템 메시지 추가
+        FirebaseFirestore.instance
+            .collection(chatRoomCollection)
+            .doc(chatRoomId)
+            .collection('messages')
+            .add({
+          'text': '드라이버가 매칭을 수락했습니다. 채팅방이 활성화되었습니다.',
+          'sender': 'system',
+          'timestamp': FieldValue.serverTimestamp(),
+        });
       }
-    } catch (e) {
-      print('채팅방 리스너 설정 오류: $e');
-    }
+    });
   }
 }

@@ -275,15 +275,18 @@ class _HistoryPageState extends State<HistoryPage> {
               children: [
                 // PSU → Airport 여정
                 if (_psuToAirportTrips.isNotEmpty) ...[
-                  Text(
-                    'PSU → Airport',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: textColor,
+                  Padding(
+                    padding: EdgeInsets.only(left: 16, bottom: 16),
+                    child: Text(
+                      'PSU → Airport',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        color: isDarkMode ? Colors.white : Colors.black87,
+                        letterSpacing: 0.5,
+                      ),
                     ),
                   ),
-                  SizedBox(height: 8),
                   ListView.builder(
                     shrinkWrap: true,
                     physics: NeverScrollableScrollPhysics(),
@@ -292,7 +295,7 @@ class _HistoryPageState extends State<HistoryPage> {
                       final trip = _psuToAirportTrips[index];
                       final driverAccepted = trip['driver_accepted'] ?? false;
                       final status = driverAccepted ? '확정됨' : '대기중';
-                      return _buildTripCard(
+                      return _buildModernTripCard(
                         context,
                         trip['pickup_info']['address'] ?? 'PSU',
                         trip['destination_info']['address'] ?? 'Airport',
@@ -303,20 +306,23 @@ class _HistoryPageState extends State<HistoryPage> {
                       );
                     },
                   ),
-                  SizedBox(height: 16),
+                  SizedBox(height: 32),
                 ],
 
                 // Airport → PSU 여정
                 if (_airportToPsuTrips.isNotEmpty) ...[
-                  Text(
-                    'Airport → PSU',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: textColor,
+                  Padding(
+                    padding: EdgeInsets.only(left: 16, bottom: 16),
+                    child: Text(
+                      'Airport → PSU',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        color: isDarkMode ? Colors.white : Colors.black87,
+                        letterSpacing: 0.5,
+                      ),
                     ),
                   ),
-                  SizedBox(height: 8),
                   ListView.builder(
                     shrinkWrap: true,
                     physics: NeverScrollableScrollPhysics(),
@@ -325,7 +331,7 @@ class _HistoryPageState extends State<HistoryPage> {
                       final trip = _airportToPsuTrips[index];
                       final driverAccepted = trip['driver_accepted'] ?? false;
                       final status = driverAccepted ? '확정됨' : '대기중';
-                      return _buildTripCard(
+                      return _buildModernTripCard(
                         context,
                         trip['pickup_info']['address'] ?? 'Airport',
                         trip['destination_info']['address'] ?? 'PSU',
@@ -337,6 +343,32 @@ class _HistoryPageState extends State<HistoryPage> {
                     },
                   ),
                 ],
+                
+                // 여정이 없는 경우 메시지 표시
+                if (_psuToAirportTrips.isEmpty && _airportToPsuTrips.isEmpty)
+                  Center(
+                    child: Padding(
+                      padding: EdgeInsets.only(top: 60),
+                      child: Column(
+                        children: [
+                          Icon(
+                            Icons.history,
+                            size: 70,
+                            color: isDarkMode ? Colors.grey[700] : Colors.grey[300],
+                          ),
+                          SizedBox(height: 20),
+                          Text(
+                            '아직 이용 내역이 없습니다',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w500,
+                              color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
               ],
             ),
           ),
@@ -361,7 +393,8 @@ class _HistoryPageState extends State<HistoryPage> {
     );
   }
 
-  Widget _buildTripCard(
+  // 모던한 디자인의 여정 카드 위젯
+  Widget _buildModernTripCard(
     BuildContext context,
     String pickup,
     String destination,
@@ -372,88 +405,132 @@ class _HistoryPageState extends State<HistoryPage> {
   ) {
     final driverAccepted = status == '확정됨';
     final updatedStatus = driverAccepted ? '확정됨' : '대기중';
+    final statusColor = _getStatusColor(updatedStatus);
 
     return Container(
-      margin: EdgeInsets.only(bottom: 8),
+      margin: EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
         color: cardColor,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.05),
-            blurRadius: 4,
-            offset: Offset(0, 2),
+            blurRadius: 10,
+            offset: Offset(0, 4),
           ),
         ],
       ),
       child: Padding(
-        padding: EdgeInsets.all(16),
+        padding: EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Icon(Icons.location_on, color: Colors.red, size: 16),
-                SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    pickup,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: textColor,
-                    ),
-                  ),
+            // 상태 표시
+            Container(
+              padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: statusColor.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(
+                updatedStatus,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: statusColor,
                 ),
-              ],
-            ),
-            Padding(
-              padding: EdgeInsets.only(left: 12),
-              child: Container(
-                width: 1,
-                height: 20,
-                color: Colors.grey.withOpacity(0.3),
               ),
             ),
-            Row(
+            SizedBox(height: 16),
+            
+            // 경로 표시 - 세로 레이아웃으로 변경
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(Icons.location_on, color: Colors.green, size: 16),
-                SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    destination,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: textColor,
+                // 출발지
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '출발',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: textColor.withOpacity(0.6),
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
+                    SizedBox(height: 4),
+                    Text(
+                      pickup,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: textColor,
+                      ),
+                    ),
+                  ],
+                ),
+                
+                // 화살표
+                Padding(
+                  padding: EdgeInsets.symmetric(vertical: 8),
+                  child: Icon(
+                    Icons.arrow_downward,
+                    color: textColor.withOpacity(0.5),
+                    size: 20,
                   ),
+                ),
+                
+                // 도착지
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '도착',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: textColor.withOpacity(0.6),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      destination,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: textColor,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
+            
+            SizedBox(height: 16),
+            Divider(
+              color: textColor.withOpacity(0.1),
+              height: 1,
+            ),
             SizedBox(height: 12),
+            
+            // 날짜 정보
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  rideDate != null
-                      ? DateFormat('yyyy-MM-dd').format(rideDate)
-                      : '날짜 없음',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: textColor.withOpacity(0.7),
-                  ),
+                Icon(
+                  Icons.calendar_today,
+                  size: 14,
+                  color: textColor.withOpacity(0.6),
                 ),
-                Container(
-                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: _getStatusColor(updatedStatus).withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
+                SizedBox(width: 6),
+                Expanded(
                   child: Text(
-                    updatedStatus,
+                    rideDate != null
+                        ? DateFormat('yyyy년 MM월 dd일').format(rideDate)
+                        : '날짜 없음',
                     style: TextStyle(
-                      fontSize: 12,
-                      color: _getStatusColor(updatedStatus),
-                      fontWeight: FontWeight.w500,
+                      fontSize: 14,
+                      color: textColor.withOpacity(0.8),
                     ),
                   ),
                 ),

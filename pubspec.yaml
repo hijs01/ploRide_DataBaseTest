@@ -52,6 +52,7 @@ dependencies:
   animate_do: ^4.2.0
   intl: ^0.20.2
   url_launcher: ^6.3.1
+  shared_preferences: ^2.5.3
 
 
 dependency_overrides:

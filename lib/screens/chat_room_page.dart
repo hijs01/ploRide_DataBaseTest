@@ -576,7 +576,12 @@ class _ChatRoomPageState extends State<ChatRoomPage>
             onPressed: () {
               // Drawer를 열기 전에 키보드를 닫습니다
               FocusScope.of(context).unfocus();
-              _scaffoldKey.currentState?.openEndDrawer();
+              // 포커스 노드에서 포커스를 명시적으로 해제
+              _focusNode.unfocus();
+              // 약간의 지연 후 Drawer를 엽니다
+              Future.delayed(Duration(milliseconds: 50), () {
+                _scaffoldKey.currentState?.openEndDrawer();
+              });
             },
           ),
         ],
@@ -586,6 +591,7 @@ class _ChatRoomPageState extends State<ChatRoomPage>
           onTap: () {
             // Drawer 내부를 터치했을 때 키보드를 닫습니다
             FocusScope.of(context).unfocus();
+            _focusNode.unfocus();
           },
           child: Container(
             color: isDarkMode ? Color(0xFF1C1C1E) : Color(0xFFF2F2F7),
@@ -604,6 +610,7 @@ class _ChatRoomPageState extends State<ChatRoomPage>
                   child: GestureDetector(
                     onTap: () {
                       FocusScope.of(context).unfocus();
+                      _focusNode.unfocus();
                     },
                     child: StreamBuilder<DocumentSnapshot>(
                       stream:
