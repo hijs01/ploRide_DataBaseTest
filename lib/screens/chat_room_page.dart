@@ -46,6 +46,7 @@ class _ChatRoomPageState extends State<ChatRoomPage>
   bool _hasMoreMessages = true;
   DocumentSnapshot? _lastDocument;
   static const int _messageLimit = 20;
+  String? _driverName;
 
   @override
   void initState() {
@@ -58,6 +59,7 @@ class _ChatRoomPageState extends State<ChatRoomPage>
     _setupRealtimeUpdates();
     _setupChatRoomListener();
     _setupMembersListener();
+    _loadDriverInfo();
 
     // 키보드 상태 변경 감지를 위해 observer 등록
     WidgetsBinding.instance.addObserver(this);
@@ -841,14 +843,19 @@ class _ChatRoomPageState extends State<ChatRoomPage>
                               bottom: 1.0,
                               top: 4.0,
                             ),
-                            child: Text(
-                              messageData['sender_name'] ?? '알 수 없는 사용자',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: isDarkMode ? Colors.white70 : Colors.black54,
-                                fontWeight: FontWeight.w500,
-                              ),
-                              textAlign: TextAlign.left,
+                            child: FutureBuilder<String>(
+                              future: _getMessageSenderName(messageData['sender_id']),
+                              builder: (context, snapshot) {
+                                return Text(
+                                  snapshot.data ?? '로딩 중...',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: isDarkMode ? Colors.white70 : Colors.black54,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                  textAlign: TextAlign.left,
+                                );
+                              },
                             ),
                           ),
                         Container(
@@ -868,25 +875,28 @@ class _ChatRoomPageState extends State<ChatRoomPage>
                                   child: CircleAvatar(
                                     radius: 16,
                                     backgroundColor: isDarkMode ? Color(0xFF3A3A3C) : Color(0xFFE5E5EA),
-                                    child: FittedBox(
-                                      fit: BoxFit.scaleDown,
-                                      child: Center(
-                                        child: Padding(
-                                          padding: EdgeInsets.all(4),
-                                          child: Text(
-                                            (messageData['sender_name'] ?? '?')
-                                                .substring(0, 1)
-                                                .toUpperCase(),
-                                            style: TextStyle(
-                                              color: isDarkMode ? Colors.white : Colors.black,
-                                              fontSize: 14,
-                                              fontWeight: FontWeight.w600,
-                                              height: 1,
+                                    child: FutureBuilder<String>(
+                                      future: _getMessageSenderName(messageData['sender_id']),
+                                      builder: (context, snapshot) {
+                                        return FittedBox(
+                                          fit: BoxFit.scaleDown,
+                                          child: Center(
+                                            child: Padding(
+                                              padding: EdgeInsets.all(4),
+                                              child: Text(
+                                                (snapshot.data ?? '?').substring(0, 1).toUpperCase(),
+                                                style: TextStyle(
+                                                  color: isDarkMode ? Colors.white : Colors.black,
+                                                  fontSize: 14,
+                                                  fontWeight: FontWeight.w600,
+                                                  height: 1,
+                                                ),
+                                                textAlign: TextAlign.center,
+                                              ),
                                             ),
-                                            textAlign: TextAlign.center,
                                           ),
-                                        ),
-                                      ),
+                                        );
+                                      },
                                     ),
                                   ),
                                 ),
@@ -1074,6 +1084,11 @@ class _ChatRoomPageState extends State<ChatRoomPage>
     _safeSetState(() {
       _chatRoomData = data;
       _isLoading = false;
+      
+      // 드라이버 ID가 변경되었을 때 드라이버 정보 다시 로드
+      if (data['driver_id'] != null) {
+        _loadDriverInfo();
+      }
     });
   }
 
@@ -1182,8 +1197,8 @@ class _ChatRoomPageState extends State<ChatRoomPage>
     
     if (destination.toLowerCase().contains('airport') || 
         destination.toLowerCase().contains('newark') ||
-        destination.toLowerCase().contains('jfk') ||
-        destination.toLowerCase().contains('lga')) {
+        destination.contains('jfk') ||
+        destination.contains('lga')) {
       if (destination.contains('(') && destination.contains(')')) {
         destination = destination.substring(
           destination.indexOf('(') + 1,
@@ -1432,27 +1447,39 @@ class _ChatRoomPageState extends State<ChatRoomPage>
     );
   }
 
-  // 채팅방 문서 변경 감지 설정
+  // 채팅방 문서 변경 감지 설정 수정
   void _setupChatRoomListener() {
-    print('채팅방 리스너 설정...');
     _chatRoomSubscription = _firestore
         .collection(widget.chatRoomCollection)
         .doc(widget.chatRoomId)
         .snapshots()
-        .listen((snapshot) async {
-          if (!snapshot.exists) return;
+        .listen((snapshot) {
+      if (!snapshot.exists) return;
 
-          final data = snapshot.data() as Map<String, dynamic>;
-
-          // lastMessage 필드 변경 감지
-          final String lastMessage =
-              data['lastMessage'] ?? data['last_message'] ?? '';
-
-          if (lastMessage.isNotEmpty) {
-            print('새 메시지 감지: $lastMessage');
-            await _showLocalNotification('새 메시지', lastMessage);
-          }
-        });
+      final data = snapshot.data();
+      if (data != null) {
+        _updateChatRoomState(data);
+        
+        // 드라이버 ID가 변경되었을 때 드라이버 정보 업데이트
+        if (data['driver_id'] != null) {
+          _firestore
+              .collection('drivers')  // users 대신 drivers 컬렉션 사용
+              .doc(data['driver_id'])
+              .snapshots()
+              .listen((driverSnapshot) {
+            if (driverSnapshot.exists) {
+              setState(() {
+                _driverName = driverSnapshot.data()?['fullname'] ?? '알 수 없는 사용자';
+              });
+            }
+          });
+        } else {
+          setState(() {
+            _driverName = null;
+          });
+        }
+      }
+    });
   }
 
   Future<void> _initializeNotifications() async {
@@ -1496,5 +1523,78 @@ class _ChatRoomPageState extends State<ChatRoomPage>
     } catch (e) {
       print('로컬 알림 초기화 중 오류 발생: $e');
     }
+  }
+
+  // 드라이버 정보를 로드하는 메서드 수정
+  Future<void> _loadDriverInfo() async {
+    try {
+      print('드라이버 정보 로드 시작');
+      final chatRoomDoc = await _firestore
+          .collection(widget.chatRoomCollection)
+          .doc(widget.chatRoomId)
+          .get();
+
+      if (chatRoomDoc.exists) {
+        final data = chatRoomDoc.data();
+        print('채팅방 데이터: $data');
+        if (data != null && data['driver_id'] != null) {
+          print('드라이버 ID: ${data['driver_id']}');
+          final driverDoc = await _firestore
+              .collection('drivers')
+              .doc(data['driver_id'])
+              .get();
+
+          if (driverDoc.exists) {
+            print('드라이버 문서 데이터: ${driverDoc.data()}');
+            setState(() {
+              _driverName = driverDoc.data()?['fullname'] ?? '알 수 없는 사용자';
+              print('설정된 드라이버 이름: $_driverName');
+            });
+          } else {
+            print('드라이버 문서가 존재하지 않습니다.');
+          }
+        } else {
+          print('채팅방에 driver_id가 없습니다.');
+        }
+      } else {
+        print('채팅방 문서가 존재하지 않습니다.');
+      }
+    } catch (e) {
+      print('드라이버 정보 로드 오류: $e');
+    }
+  }
+
+  Future<String> _getMessageSenderName(String senderId) async {
+    if (senderId.isEmpty) {
+      return '알 수 없는 사용자';
+    }
+
+    if (_userNames.containsKey(senderId)) {
+      return _userNames[senderId]!;
+    }
+
+    try {
+      // 먼저 drivers 컬렉션에서 확인
+      final driverDoc = await _firestore.collection('drivers').doc(senderId).get();
+      if (driverDoc.exists) {
+        final driverData = driverDoc.data();
+        final driverName = driverData?['fullname'] ?? '알 수 없는 사용자';
+        _userNames[senderId] = driverName;
+        return driverName;
+      }
+
+      // drivers 컬렉션에 없으면 users 컬렉션에서 확인
+      final userDoc = await _firestore.collection('users').doc(senderId).get();
+      if (userDoc.exists) {
+        final userData = userDoc.data();
+        final userName = userData?['fullname'] ?? '알 수 없는 사용자';
+        _userNames[senderId] = userName;
+        return userName;
+      }
+    } catch (e) {
+      print('메시지 발신자 이름 조회 오류: $e');
+    }
+
+    return '알 수 없는 사용자';
   }
 }
