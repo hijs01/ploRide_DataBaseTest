@@ -1010,10 +1010,13 @@ class _RideConfirmationPageState extends State<RideConfirmationPage>
                   // 채팅방 멤버 수 확인
                   List<dynamic> members = roomData['members'] ?? [];
 
-                  // 시간 차이가 1시간 이내이고, 멤버 수가 4명 미만이며, 해당 사용자가 멤버가 아닌 경우
-                  if (timeDifference.inHours <= 1 &&
-                      members.length < 4 &&
-                      !members.contains(user.uid)) {
+                  // 시간 차이가 1시간 이내이고, 멤버 수가 4명 미만인 경우
+                  if (timeDifference.inHours <= 1) {
+                    if (members.length >= 4) {
+                      print('채팅방이 가득 찼습니다. 새로운 채팅방을 생성합니다.');
+                      continue; // 다음 채팅방을 확인
+                    }
+                    
                     chatRoomId = doc.id;
                     chatRoomRef = FirebaseFirestore.instance
                         .collection(chatRoomCollection)
@@ -1036,8 +1039,6 @@ class _RideConfirmationPageState extends State<RideConfirmationPage>
 
               for (var doc in existingChatRooms.docs) {
                 String docId = doc.id;
-
-                // 문서 ID에서 번호 부분 추출 (예: jfk_1 -> 1)
                 List<String> parts = docId.split('_');
                 if (parts.length > 1) {
                   try {
@@ -1052,7 +1053,6 @@ class _RideConfirmationPageState extends State<RideConfirmationPage>
               }
 
               chatRoomNumber = maxRoomNumber + 1;
-              // 새 채팅방 ID 생성 (locationIdentifier_번호)
               String prefix = "";
               if (chatRoomCollection == 'psuToAirport') {
                 prefix = "pta_";
@@ -1061,9 +1061,19 @@ class _RideConfirmationPageState extends State<RideConfirmationPage>
               }
               chatRoomId = "${prefix}${locationIdentifier}_$chatRoomNumber";
 
-              print('새 채팅방 생성: $chatRoomId');
+              print('새 채팅방 생성: $chatRoomId (기존 채팅방이 가득 찼거나 시간이 맞지 않음)');
 
-              // 채팅방 참조
+              // 사용자에게 알림
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('새로운 채팅방이 생성되었습니다.'),
+                    backgroundColor: Colors.blue,
+                    duration: Duration(seconds: 2),
+                  ),
+                );
+              }
+
               chatRoomRef = FirebaseFirestore.instance
                   .collection(chatRoomCollection)
                   .doc(chatRoomId);
@@ -1086,20 +1096,17 @@ class _RideConfirmationPageState extends State<RideConfirmationPage>
                 'collection_name': chatRoomCollection,
                 'luggage_count_total': luggageCount,
                 'user_luggage_counts': {user.uid: luggageCount},
-                // 새로운 필드 추가: 드라이버 앱 관련 필드
-                'driver_accepted': false, // 드라이버가 수락했는지 여부
-                'driver_id': '', // 수락한 드라이버 ID
-                'available_for_driver': false, // 드라이버 앱에 표시 여부
-                'chat_activated': false, // 채팅방 활성화 여부
-                'chat_visible': false, // 채팅방 표시 여부 필드 추가 (driver_accepted와 연동)
+                'driver_accepted': false,
+                'driver_id': '',
+                'available_for_driver': false,
+                'chat_activated': false,
+                'chat_visible': false
               };
 
-              // 채팅방 생성
               await chatRoomRef.set(chatRoomData).timeout(Duration(seconds: 5));
 
               // 시스템 메시지 추가
               try {
-                // 사용자 정보 가져오기
                 DocumentSnapshot userDoc =
                     await FirebaseFirestore.instance
                         .collection('users')
@@ -1117,28 +1124,16 @@ class _RideConfirmationPageState extends State<RideConfirmationPage>
                     .collection(chatRoomCollection)
                     .doc(chatRoomId)
                     .collection('messages')
-                    .where('text', isEqualTo: '$userName님이 그룹에 참여했습니다.')
-                    .get()
-                    .then((snapshot) async {
-                      if (snapshot.docs.isEmpty) {
-                        await FirebaseFirestore.instance
-                            .collection(chatRoomCollection)
-                            .doc(chatRoomId)
-                            .collection('messages')
-                            .add({
-                              'text': '$userName님이 그룹에 참여했습니다.',
-                              'sender_id': 'system',
-                              'sender_name': '시스템',
-                              'timestamp': FieldValue.serverTimestamp(),
-                              'type': 'system',
-                            });
-                      }
+                    .add({
+                      'text': '$userName님이 그룹에 참여했습니다.',
+                      'sender_id': 'system',
+                      'sender_name': '시스템',
+                      'timestamp': FieldValue.serverTimestamp(),
+                      'type': 'system',
                     });
               } catch (e) {
                 print('시스템 메시지 추가 중 오류: $e');
               }
-
-              print('새 채팅방 생성 완료: $chatRoomId in $chatRoomCollection');
             }
             // 적합한 채팅방을 찾은 경우, 해당 채팅방에 사용자 추가
             else {
@@ -1151,73 +1146,62 @@ class _RideConfirmationPageState extends State<RideConfirmationPage>
                   chatRoomDoc.data() as Map<String, dynamic>;
               List<dynamic> members = chatRoomData['members'] ?? [];
 
-              if (!members.contains(user.uid)) {
-                // 사용자 정보 가져오기
-                DocumentSnapshot userDoc =
-                    await FirebaseFirestore.instance
-                        .collection('users')
-                        .doc(user.uid)
-                        .get();
-
-                String userName = '알 수 없음';
-                if (userDoc.exists) {
-                  Map<String, dynamic> userData =
-                      userDoc.data() as Map<String, dynamic>;
-                  userName = userData['fullname'] ?? '알 수 없음';
-                }
-
-                // 채팅방 멤버 목록에 사용자 추가
-                members.add(user.uid);
-
-                // 업데이트할 데이터 준비
-                Map<String, dynamic> updateData = {
-                  'members': FieldValue.arrayUnion([user.uid]),
-                  'member_count': FieldValue.increment(1),
-                  'last_message': '$userName님이 그룹에 참여했습니다.',
-                  'last_message_time': FieldValue.serverTimestamp(),
-                  'luggage_count_total': FieldValue.increment(luggageCount),
-                  'user_luggage_counts.${user.uid}': luggageCount,
-                };
-
-                // 1명이 모이면 드라이버 앱에 표시 가능하도록 설정
-                if (members.length + 1 >= 1) {
-                  // 기존 멤버 + 현재 추가된 사용자
-                  updateData['available_for_driver'] = true;
-
-                  // 로그 추가
-                  print('1명이 모였습니다. 드라이버 앱에 표시됩니다.');
-                }
-
-                // 채팅방 업데이트
-                await chatRoomRef.update(updateData);
-
-                // 참여 메시지 추가
-                await FirebaseFirestore.instance
-                    .collection(chatRoomCollection)
-                    .doc(chatRoomId)
-                    .collection('messages')
-                    .where('text', isEqualTo: '$userName님이 그룹에 참여했습니다.')
-                    .get()
-                    .then((snapshot) async {
-                      if (snapshot.docs.isEmpty) {
-                        await FirebaseFirestore.instance
-                            .collection(chatRoomCollection)
-                            .doc(chatRoomId)
-                            .collection('messages')
-                            .add({
-                              'text': '$userName님이 그룹에 참여했습니다.',
-                              'sender_id': 'system',
-                              'sender_name': '시스템',
-                              'timestamp': FieldValue.serverTimestamp(),
-                              'type': 'system',
-                            });
-                      }
-                    });
-
-                print('사용자를 기존 채팅방에 추가했습니다.');
-              } else {
-                print('사용자가 이미 채팅방에 존재합니다.');
+              // 사용자가 이미 채팅방에 있는지 확인
+              if (members.contains(user.uid)) {
+                print('사용자가 이미 채팅방에 있습니다.');
+                return;
               }
+
+              // 사용자 정보 가져오기
+              DocumentSnapshot userDoc =
+                  await FirebaseFirestore.instance
+                      .collection('users')
+                      .doc(user.uid)
+                      .get();
+
+              String userName = '알 수 없음';
+              if (userDoc.exists) {
+                Map<String, dynamic> userData =
+                    userDoc.data() as Map<String, dynamic>;
+                userName = userData['fullname'] ?? '알 수 없음';
+              }
+
+              // 채팅방 멤버 목록에 사용자 추가 (기존 멤버 유지)
+              members.add(user.uid);
+
+              // 업데이트할 데이터 준비
+              Map<String, dynamic> updateData = {
+                'members': members,
+                'member_count': members.length,
+                'last_message': '$userName님이 그룹에 참여했습니다.',
+                'last_message_time': FieldValue.serverTimestamp(),
+                'luggage_count_total': FieldValue.increment(luggageCount),
+                'user_luggage_counts.${user.uid}': luggageCount,
+              };
+
+              // 1명이 모이면 드라이버 앱에 표시 가능하도록 설정
+              if (members.length >= 1) {
+                updateData['available_for_driver'] = true;
+                print('1명이 모였습니다. 드라이버 앱에 표시됩니다.');
+              }
+
+              // 채팅방 업데이트
+              await chatRoomRef.update(updateData);
+
+              // 참여 메시지 추가
+              await FirebaseFirestore.instance
+                  .collection(chatRoomCollection)
+                  .doc(chatRoomId)
+                  .collection('messages')
+                  .add({
+                    'text': '$userName님이 그룹에 참여했습니다.',
+                    'sender_id': 'system',
+                    'sender_name': '시스템',
+                    'timestamp': FieldValue.serverTimestamp(),
+                    'type': 'system',
+                  });
+
+              print('사용자를 기존 채팅방에 추가했습니다.');
             }
           }).timeout(Duration(seconds: 15)),
         ]);

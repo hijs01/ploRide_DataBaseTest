@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cabrider/screens/homepage.dart';
 import 'package:cabrider/screens/chat_page.dart';
 import 'package:cabrider/screens/settings_page.dart';
+import 'package:intl/intl.dart';
 
 class HistoryPage extends StatefulWidget {
   static const String id = 'history';
@@ -20,6 +21,8 @@ class _HistoryPageState extends State<HistoryPage> {
   bool isLoading = true;
   int _selectedIndex = 1; // 히스토리 탭이 선택됨
   bool _isRefreshing = false; // 새로고침 상태 추가
+  List<Map<String, dynamic>> _psuToAirportTrips = [];
+  List<Map<String, dynamic>> _airportToPsuTrips = [];
 
   @override
   void initState() {
@@ -28,6 +31,7 @@ class _HistoryPageState extends State<HistoryPage> {
     _checkUserData();
     _deleteTestData(); // 테스트 데이터 삭제
     _checkAllRidesStatus(); // 모든 라이드 상태 확인
+    _loadTrips(); // 새로운 메서드 호출
   }
 
   Future<void> _checkUserData() async {
@@ -133,6 +137,49 @@ class _HistoryPageState extends State<HistoryPage> {
     }
   }
 
+  // 새로운 메서드: psuToAirport와 airportToPsu 여정 로드
+  Future<void> _loadTrips() async {
+    try {
+      final currentUser = _auth.currentUser;
+      if (currentUser == null) return;
+
+      // psuToAirport 여정 로드
+      final psuToAirportSnapshot = await _firestore
+          .collection('psuToAirport')
+          .where('members', arrayContains: currentUser.uid)
+          .get();
+
+      // airportToPsu 여정 로드
+      final airportToPsuSnapshot = await _firestore
+          .collection('airportToPsu')
+          .where('members', arrayContains: currentUser.uid)
+          .get();
+
+      setState(() {
+        _psuToAirportTrips = psuToAirportSnapshot.docs
+            .map((doc) => {
+                  ...doc.data(),
+                  'id': doc.id,
+                  'collection': 'psuToAirport',
+                })
+            .toList();
+        
+        _airportToPsuTrips = airportToPsuSnapshot.docs
+            .map((doc) => {
+                  ...doc.data(),
+                  'id': doc.id,
+                  'collection': 'airportToPsu',
+                })
+            .toList();
+      });
+
+      print('PSU → Airport 여정 수: ${_psuToAirportTrips.length}');
+      print('Airport → PSU 여정 수: ${_airportToPsuTrips.length}');
+    } catch (e) {
+      print('여정 로드 중 오류 발생: $e');
+    }
+  }
+
   void _onItemTapped(int index) {
     setState(() {
       if (index != _selectedIndex) {
@@ -186,269 +233,111 @@ class _HistoryPageState extends State<HistoryPage> {
 
   @override
   Widget build(BuildContext context) {
-    final isDarkMode =
-        MediaQuery.of(context).platformBrightness == Brightness.dark;
-    final currentUser = FirebaseAuth.instance.currentUser;
+    final isDarkMode = MediaQuery.of(context).platformBrightness == Brightness.dark;
+    final textColor = isDarkMode ? Colors.white : Colors.black;
+    final backgroundColor = isDarkMode ? Color(0xFF000000) : Color(0xFFF2F2F7);
+    final cardColor = isDarkMode ? Color(0xFF1C1C1E) : Colors.white;
 
     return Scaffold(
-      backgroundColor: isDarkMode ? Colors.black : Colors.white,
+      backgroundColor: backgroundColor,
       appBar: AppBar(
-        title: Text('이용 내역'),
-        automaticallyImplyLeading: false,
         backgroundColor: isDarkMode ? Colors.black : Colors.white,
+        title: Text(
+          '이용 내역',
+          style: TextStyle(
+            color: textColor,
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        centerTitle: true,
         elevation: 0,
-        iconTheme: IconThemeData(
-          color: isDarkMode ? Colors.white : Colors.black,
-        ),
-        titleTextStyle: TextStyle(
-          color: isDarkMode ? Colors.white : Colors.black,
-          fontSize: 20,
-          fontWeight: FontWeight.bold,
-        ),
-
+        automaticallyImplyLeading: false,
         actions: [
-          // 새로고침 버튼 추가
-          _isRefreshing
-              ? Padding(
-                padding: const EdgeInsets.all(10.0),
-                child: SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2.0,
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      isDarkMode ? Colors.white : Colors.blue,
-                    ),
-                  ),
-                ),
-              )
-              : IconButton(
-                icon: Icon(
-                  Icons.refresh,
-                  color: isDarkMode ? Colors.white : Colors.black,
-                ),
-                onPressed: _refreshHistory,
-              ),
+          IconButton(
+            icon: Icon(Icons.refresh, color: textColor),
+            onPressed: () {
+              setState(() {
+                _loadTrips();
+              });
+            },
+          ),
         ],
       ),
-      body:
-          currentUser == null
-              ? Center(
-                child: Text(
-                  '로그인이 필요합니다',
-                  style: TextStyle(
-                    fontSize: 18,
-                    color: isDarkMode ? Colors.white : Colors.black,
+      body: RefreshIndicator(
+        onRefresh: _loadTrips,
+        child: SingleChildScrollView(
+          physics: AlwaysScrollableScrollPhysics(),
+          child: Padding(
+            padding: EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // PSU → Airport 여정
+                if (_psuToAirportTrips.isNotEmpty) ...[
+                  Text(
+                    'PSU → Airport',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: textColor,
+                    ),
                   ),
-                ),
-
-              )
-              : StreamBuilder<QuerySnapshot>(
-                stream:
-                    FirebaseFirestore.instance
-                        .collection('users')
-                        .doc(currentUser.uid)
-                        .collection('history')
-                        .orderBy('timestamp', descending: true)
-                        .snapshots(),
-                builder: (context, snapshot) {
-                  if (snapshot.hasError) {
-                    return Center(
-                      child: Text(
-                        '오류가 발생했습니다',
-                        style: TextStyle(
-                          fontSize: 18,
-                          color: isDarkMode ? Colors.white : Colors.black,
-                        ),
-                      ),
-                    );
-                  }
-
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return Center(child: CircularProgressIndicator());
-                  }
-
-                  final userTrips = snapshot.data?.docs ?? [];
-
-                  print('User trips count: ${userTrips.length}');
-
-                  if (userTrips.isEmpty) {
-                    return Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.history,
-                            size: 64,
-                            color:
-                                isDarkMode
-                                    ? Colors.grey[600]
-                                    : Colors.grey[400],
-                          ),
-                          SizedBox(height: 16),
-                          Text(
-                            '이용 내역이 없습니다',
-                            style: TextStyle(
-                              fontSize: 18,
-                              color:
-                                  isDarkMode
-                                      ? Colors.grey[400]
-                                      : Colors.grey[600],
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  }
-
-                  return ListView.builder(
-                    itemCount: userTrips.length,
+                  SizedBox(height: 8),
+                  ListView.builder(
+                    shrinkWrap: true,
+                    physics: NeverScrollableScrollPhysics(),
+                    itemCount: _psuToAirportTrips.length,
                     itemBuilder: (context, index) {
-                      final tripData =
-                          userTrips[index].data() as Map<String, dynamic>;
-                      print(
-                        'Building trip item $index: $tripData',
-                      ); // 디버그 로그 추가
-
-                      final pickup = tripData['pickup'] ?? '출발지 정보 없음';
-                      final destination =
-                          tripData['destination'] ?? '도착지 정보 없음';
-                      final status = tripData['status'] ?? '상태 정보 없음';
-                      final timestamp = tripData['timestamp'] as Timestamp?;
-                      final date = timestamp?.toDate() ?? DateTime.now();
-
-                      print(
-                        'Trip details - Pickup: $pickup, Destination: $destination, Status: $status',
-                      ); // 디버그 로그 추가
-
-                      // 히스토리 데이터는 한 번만 저장
-                      // if (index == 0) {
-                      //   _saveToHistory(tripData);
-                      // }
-
-                      return Container(
-                        margin: EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 8,
-                        ),
-                        decoration: BoxDecoration(
-                          color: isDarkMode ? Color(0xFF1E1E1E) : Colors.white,
-                          borderRadius: BorderRadius.circular(12),
-                          boxShadow: [
-                            BoxShadow(
-                              color:
-                                  isDarkMode
-                                      ? Colors.black12
-                                      : Colors.grey.withOpacity(0.1),
-                              blurRadius: 10,
-                              offset: Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                        child: ListTile(
-                          contentPadding: EdgeInsets.all(16),
-                          title: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Icon(
-                                    Icons.location_on,
-                                    color: Colors.red,
-                                    size: 16,
-                                  ),
-                                  SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      pickup,
-                                      style: TextStyle(
-                                        color:
-                                            isDarkMode
-                                                ? Colors.white
-                                                : Colors.black,
-                                        fontSize: 16,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              SizedBox(height: 8),
-                              Row(
-                                children: [
-                                  Icon(
-                                    Icons.flag,
-                                    color: Colors.green,
-                                    size: 16,
-                                  ),
-                                  SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      destination,
-                                      style: TextStyle(
-                                        color:
-                                            isDarkMode
-                                                ? Colors.white
-                                                : Colors.black,
-                                        fontSize: 16,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                          subtitle: Padding(
-                            padding: const EdgeInsets.only(top: 8.0),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  '${date.year}년 ${date.month}월 ${date.day}일 ${date.hour}:${date.minute.toString().padLeft(2, '0')}',
-                                  style: TextStyle(
-                                    color:
-                                        isDarkMode
-                                            ? Colors.grey[400]
-                                            : Colors.grey[600],
-                                  ),
-                                ),
-                                Container(
-                                  padding: EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 4,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: _getStatusColor(
-                                      status,
-                                    ).withOpacity(0.1),
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: Text(
-                                    status,
-                                    style: TextStyle(
-                                      color: _getStatusColor(status),
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          onTap: () {
-                            // 상태가 '드라이버의 수락을 기다리는 중'인 경우에만 상태 확인
-                            if (status == '드라이버의 수락을 기다리는 중' &&
-                                tripData.containsKey('tripId')) {
-                              _checkRideStatus(
-                                tripData,
-                                userTrips[index].reference,
-                              );
-                            }
-                          },
-                        ),
+                      final trip = _psuToAirportTrips[index];
+                      return _buildTripCard(
+                        context,
+                        trip['pickup_info']['address'] ?? 'PSU',
+                        trip['destination_info']['address'] ?? 'Airport',
+                        trip['ride_date']?.toDate(),
+                        trip['status'] ?? 'pending',
+                        cardColor,
+                        textColor,
                       );
                     },
-                  );
-                },
-              ),
+                  ),
+                  SizedBox(height: 16),
+                ],
+
+                // Airport → PSU 여정
+                if (_airportToPsuTrips.isNotEmpty) ...[
+                  Text(
+                    'Airport → PSU',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: textColor,
+                    ),
+                  ),
+                  SizedBox(height: 8),
+                  ListView.builder(
+                    shrinkWrap: true,
+                    physics: NeverScrollableScrollPhysics(),
+                    itemCount: _airportToPsuTrips.length,
+                    itemBuilder: (context, index) {
+                      final trip = _airportToPsuTrips[index];
+                      return _buildTripCard(
+                        context,
+                        trip['pickup_info']['address'] ?? 'Airport',
+                        trip['destination_info']['address'] ?? 'PSU',
+                        trip['ride_date']?.toDate(),
+                        trip['status'] ?? 'pending',
+                        cardColor,
+                        textColor,
+                      );
+                    },
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
       bottomNavigationBar: BottomNavigationBar(
         items: const <BottomNavigationBarItem>[
           BottomNavigationBarItem(icon: Icon(Icons.home), label: ''),
@@ -468,22 +357,130 @@ class _HistoryPageState extends State<HistoryPage> {
     );
   }
 
+  Widget _buildTripCard(
+    BuildContext context,
+    String pickup,
+    String destination,
+    DateTime? rideDate,
+    String status,
+    Color cardColor,
+    Color textColor,
+  ) {
+    return Container(
+      margin: EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        color: cardColor,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 4,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.location_on, color: Colors.red, size: 16),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    pickup,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: textColor,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            Padding(
+              padding: EdgeInsets.only(left: 12),
+              child: Container(
+                width: 1,
+                height: 20,
+                color: Colors.grey.withOpacity(0.3),
+              ),
+            ),
+            Row(
+              children: [
+                Icon(Icons.location_on, color: Colors.green, size: 16),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    destination,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: textColor,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: 12),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  rideDate != null
+                      ? DateFormat('yyyy-MM-dd').format(rideDate)
+                      : '날짜 없음',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: textColor.withOpacity(0.7),
+                  ),
+                ),
+                Container(
+                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: _getStatusColor(status).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    _getStatusText(status),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: _getStatusColor(status),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Color _getStatusColor(String status) {
     switch (status.toLowerCase()) {
-      case 'accepted':
-        return Colors.blue;
       case 'completed':
         return Colors.green;
       case 'pending':
         return Colors.orange;
-      case 'canceled':
+      case 'cancelled':
         return Colors.red;
-      case '확정됨':
-        return Colors.green;
-      case '드라이버의 수락을 기다리는 중':
-        return Colors.orange;
       default:
         return Colors.grey;
+    }
+  }
+
+  String _getStatusText(String status) {
+    switch (status.toLowerCase()) {
+      case 'completed':
+        return '완료';
+      case 'pending':
+        return '대기중';
+      case 'cancelled':
+        return '취소됨';
+      default:
+        return '알 수 없음';
     }
   }
 
@@ -537,46 +534,6 @@ class _HistoryPageState extends State<HistoryPage> {
       print('해당 채팅방을 찾을 수 없거나 드라이버가 아직 수락하지 않았습니다.');
     } catch (e) {
       print('채팅방 상태 확인 중 오류: $e');
-    }
-  }
-
-  // 이용 내역 새로고침 함수
-  Future<void> _refreshHistory() async {
-    if (_isRefreshing) return;
-
-    setState(() {
-      _isRefreshing = true;
-    });
-
-    try {
-      // 이용 내역 상태 확인
-      await _checkAllRidesStatus();
-
-      // 새로고침 성공 메시지
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('이용 내역이 업데이트되었습니다'),
-          backgroundColor: Colors.green,
-          duration: Duration(seconds: 2),
-        ),
-      );
-    } catch (e) {
-      print('새로고침 중 오류 발생: $e');
-
-      // 오류 메시지
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('업데이트 중 오류가 발생했습니다'),
-          backgroundColor: Colors.red,
-          duration: Duration(seconds: 2),
-        ),
-      );
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isRefreshing = false;
-        });
-      }
     }
   }
 }
