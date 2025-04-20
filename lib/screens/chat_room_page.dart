@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:async';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:easy_localization/easy_localization.dart';
 
 class ChatRoomPage extends StatefulWidget {
   final String chatRoomId;
@@ -1115,7 +1116,7 @@ class _ChatRoomPageState extends State<ChatRoomPage>
                         controller: _messageController,
                         focusNode: _focusNode,
                         decoration: InputDecoration(
-                          hintText: '메시지를 입력하세요',
+                          hintText: 'app.chat.room.type'.tr(),
                           hintStyle: TextStyle(
                             color: isDarkMode ? Colors.white60 : Colors.black38,
                           ),

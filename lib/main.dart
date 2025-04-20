@@ -17,6 +17,7 @@ import 'package:provider/provider.dart';
 import 'package:cabrider/dataprovider/appdata.dart';
 import 'package:cabrider/helpers/helpermethods.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:easy_localization/easy_localization.dart';
 
 // 백그라운드 메시지 핸들러
 @pragma('vm:entry-point')
@@ -299,18 +300,22 @@ Future<void> _initializeMessaging() async {
   print('Firebase Messaging 초기화 완료');
 }
 
-Future<void> main() async {
-  try {
-    WidgetsFlutterBinding.ensureInitialized();
-    await _initializeFirebase();
-  } catch (e) {
-    print('앱 초기화 오류: $e');
-  }
-
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await EasyLocalization.ensureInitialized();
+  await _initializeFirebase();
   runApp(
-    ChangeNotifierProvider(
-      create: (context) => AppData(),
-      child: const MyApp(),
+    EasyLocalization(
+      supportedLocales: const [
+        Locale('ko', 'KR'),
+        Locale('en', 'US'),
+      ],
+      path: 'assets/translations',
+      fallbackLocale: const Locale('ko', 'KR'),
+      child: ChangeNotifierProvider(
+        create: (context) => AppData(),
+        child: const MyApp(),
+      ),
     ),
   );
 }
@@ -350,7 +355,10 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      navigatorKey: navigatorKey, // 전역 NavigatorKey 설정
+      localizationsDelegates: context.localizationDelegates,
+      supportedLocales: context.supportedLocales,
+      locale: context.locale,
+      navigatorKey: navigatorKey,
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         primarySwatch: Colors.blue,

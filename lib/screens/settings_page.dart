@@ -8,6 +8,8 @@ import 'package:cabrider/screens/loginpage.dart';
 import 'package:cabrider/screens/history_page.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:easy_localization/easy_localization.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class SettingsPage extends StatefulWidget {
   static const String id = 'settings';
@@ -39,12 +41,16 @@ class _SettingsPageState extends State<SettingsPage> {
   final List<String> _developers = ['김태현', '박지성', '김기성', '송우주', '이정수', '홍인기'];
 
   // 언어 옵션
-  final List<String> languages = ['English', '한국어', '中文', '日本語', 'Español'];
+  final List<Map<String, String>> languages = [
+    {'name': '한국어', 'code': 'ko', 'country': 'KR'},
+    {'name': 'English', 'code': 'en', 'country': 'US'},
+  ];
 
   @override
   void initState() {
     super.initState();
     _getUserInfo();
+    _loadSavedLanguage();
   }
 
   // 사용자 정보 가져오기
@@ -77,6 +83,35 @@ class _SettingsPageState extends State<SettingsPage> {
         });
       }
     }
+  }
+
+  // 저장된 언어 설정 불러오기
+  Future<void> _loadSavedLanguage() async {
+    final prefs = await SharedPreferences.getInstance();
+    final languageCode = prefs.getString('language_code') ?? 'ko';
+    final countryCode = prefs.getString('country_code') ?? 'KR';
+    
+    setState(() {
+      selectedLanguage = languages.firstWhere(
+        (lang) => lang['code'] == languageCode && lang['country'] == countryCode,
+        orElse: () => languages.first,
+      )['name']!;
+    });
+  }
+
+  // 언어 변경 함수
+  Future<void> _changeLanguage(String languageCode, String countryCode) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('language_code', languageCode);
+    await prefs.setString('country_code', countryCode);
+    
+    setState(() {
+      selectedLanguage = languages.firstWhere(
+        (lang) => lang['code'] == languageCode && lang['country'] == countryCode,
+      )['name']!;
+    });
+    
+    context.setLocale(Locale(languageCode, countryCode));
   }
 
   // 개발자 정보 다이얼로그 표시
@@ -249,46 +284,38 @@ class _SettingsPageState extends State<SettingsPage> {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder:
-          (context) => Container(
+      builder: (BuildContext context) {
+        return SafeArea(
+          child: Container(
             padding: EdgeInsets.symmetric(vertical: 20),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16.0,
-                    vertical: 8.0,
-                  ),
-                  child: Text(
-                    '언어 선택',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                Text(
+                  'app.language'.tr(),
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
-                Divider(),
-                ...languages
-                    .map(
-                      (language) => ListTile(
-                        title: Text(language),
-                        trailing:
-                            language == selectedLanguage
-                                ? Icon(
-                                  Icons.check,
-                                  color: Theme.of(context).primaryColor,
-                                )
-                                : null,
-                        onTap: () {
-                          setState(() {
-                            selectedLanguage = language;
-                          });
-                          Navigator.pop(context);
-                        },
-                      ),
-                    )
-                    .toList(),
+                SizedBox(height: 20),
+                ...languages.map((language) => ListTile(
+                  title: Text(language['name'] ?? ''),
+                  trailing: selectedLanguage == language['name']
+                      ? Icon(Icons.check, color: Colors.blue)
+                      : null,
+                  onTap: () {
+                    if (language['code'] != null && language['country'] != null) {
+                      _changeLanguage(language['code']!, language['country']!);
+                    }
+                    Navigator.pop(context);
+                  },
+                )).toList(),
               ],
             ),
           ),
+        );
+      },
     );
   }
 
@@ -351,7 +378,7 @@ class _SettingsPageState extends State<SettingsPage> {
         elevation: 0,
         backgroundColor: backgroundColor,
         title: Text(
-          '설정',
+          'app.settings'.tr(),
           style: TextStyle(
             color: textColor,
             fontSize: 22,
@@ -411,10 +438,9 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
           ),
 
-
           // 지원 섹션
           _buildSectionCard(
-            title: '지원',
+            title: 'app.support'.tr(),
             icon: Icons.help_outline,
             isDarkMode: isDarkMode,
             backgroundColor: cardColor,
@@ -422,8 +448,8 @@ class _SettingsPageState extends State<SettingsPage> {
             children: [
               _buildSettingItem(
                 icon: Icons.help,
-                title: '도움말',
-                subtitle: '자주 묻는 질문 및 도움말',
+                title: 'app.faq'.tr(),
+                subtitle: 'app.faq'.tr(),
                 isDarkMode: isDarkMode,
                 onTap: () {},
                 trailing: Icon(
@@ -434,10 +460,22 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
               _buildSettingItem(
                 icon: Icons.support_agent,
-                title: '고객 지원',
-                subtitle: 'ploride.dev@gmail.com',
+                title: 'app.customer_support'.tr(),
+                subtitle: 'app.support_email'.tr(),
                 isDarkMode: isDarkMode,
                 onTap: () {},
+                trailing: Icon(
+                  Icons.arrow_forward_ios,
+                  size: 16,
+                  color: isDarkMode ? Colors.grey : Colors.grey[600],
+                ),
+              ),
+              _buildSettingItem(
+                icon: Icons.translate,
+                title: 'app.language'.tr(),
+                subtitle: selectedLanguage,
+                isDarkMode: isDarkMode,
+                onTap: _showLanguageModal,
                 trailing: Icon(
                   Icons.arrow_forward_ios,
                   size: 16,
@@ -450,17 +488,16 @@ class _SettingsPageState extends State<SettingsPage> {
           // 기타 섹션 제거하고 개발자 정보 섹션 추가
 
           _buildSectionCard(
-            title: '기타',
+            title: 'app.about'.tr(),
             icon: Icons.code,
             isDarkMode: isDarkMode,
             backgroundColor: cardColor,
             shadowColor: shadowColor,
             children: [
               _buildSettingItem(
-
                 icon: Icons.info,
-                title: 'PLO 개발자 정보',
-                subtitle: '개발팀에 대한 정보를 확인하세요',
+                title: 'app.developer_info'.tr(),
+                subtitle: 'app.developer_info'.tr(),
                 isDarkMode: isDarkMode,
                 onTap: _showDevelopersInfo,
                 trailing: Icon(
@@ -471,9 +508,8 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
               _buildSettingItem(
                 icon: Icons.support_agent,
-                title: '고객 지원',
-                subtitle: '터치해서 PLO 인스타로 문의하기',
-
+                title: 'app.customer_support'.tr(),
+                subtitle: 'app.instagram_support'.tr(),
                 isDarkMode: isDarkMode,
                 onTap: _launchInstagram,
                 trailing: Icon(
@@ -484,8 +520,8 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
               _buildSettingItem(
                 icon: Icons.logout,
-                title: '로그아웃',
-                subtitle: '계정에서 로그아웃합니다',
+                title: 'app.logout'.tr(),
+                subtitle: 'app.logout_confirm'.tr(),
                 isDarkMode: isDarkMode,
                 isDestructive: true,
                 onTap: _signOut,
@@ -518,7 +554,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 ),
                 SizedBox(height: 12.0),
                 Text(
-                  'PLO RIDE',
+                  'app.title'.tr(),
                   style: TextStyle(
                     fontSize: 20.0,
                     fontWeight: FontWeight.bold,
@@ -527,7 +563,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 ),
                 SizedBox(height: 4.0),
                 Text(
-                  '버전 1.0.0',
+                  'app.version'.tr() + ' 1.0.0',
                   style: TextStyle(
                     fontSize: 14.0,
                     color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
@@ -535,7 +571,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 ),
                 SizedBox(height: 16.0),
                 Text(
-                  '© 2023 PLO 팀. All rights reserved.',
+                  'app.copyright'.tr(),
                   style: TextStyle(
                     fontSize: 12.0,
                     color: isDarkMode ? Colors.grey[400] : Colors.grey[600],

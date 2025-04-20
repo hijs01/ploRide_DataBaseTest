@@ -8,6 +8,7 @@ import 'package:cabrider/screens/history_page.dart';
 import 'package:intl/intl.dart';
 import 'dart:async'; // StreamSubscription을 위한 임포트 추가
 import 'package:cabrider/themes/app_themes.dart'; // 앱 테마 가져오기
+import 'package:easy_localization/easy_localization.dart';
 
 class ChatPage extends StatefulWidget {
   static const String id = 'chat';
@@ -380,23 +381,20 @@ class _ChatPageState extends State<ChatPage> {
         appBar: AppBar(
           backgroundColor: isDarkMode ? Colors.black : Colors.white,
           title: Text(
-            '채팅방',
+            'app.chat.title'.tr(),
             style: TextStyle(
               color: isDarkMode ? Colors.white : Colors.black,
               fontWeight: FontWeight.bold,
             ),
-
           ),
           elevation: 0,
           automaticallyImplyLeading: false,
           actions: [
             IconButton(
-
               icon: Icon(
                 Icons.refresh,
                 color: isDarkMode ? Colors.white : Colors.black,
               ),
-
               onPressed: _loadChatRooms,
             ),
           ],
@@ -404,46 +402,46 @@ class _ChatPageState extends State<ChatPage> {
         body:
             _isLoading
                 ? Center(
-                  child: CircularProgressIndicator(
-                    valueColor: AlwaysStoppedAnimation<Color>(accentColor),
-                  ),
-                )
+                    child: CircularProgressIndicator(
+                      valueColor: AlwaysStoppedAnimation<Color>(accentColor),
+                    ),
+                  )
                 : _chatRooms.isEmpty
                 ? Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.chat_bubble_outline,
-                        size: 64,
-                        color: textColor.withOpacity(0.5),
-                      ),
-                      SizedBox(height: 16),
-                      Text(
-                        '채팅방이 없습니다',
-                        style: TextStyle(
-                          fontSize: 18,
-                          color: textColor.withOpacity(0.7),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.chat_bubble_outline,
+                          size: 64,
+                          color: textColor.withOpacity(0.5),
                         ),
-                      ),
-                    ],
-                  ),
-                )
+                        SizedBox(height: 16),
+                        Text(
+                          'app.chat.no_chats'.tr(),
+                          style: TextStyle(
+                            fontSize: 18,
+                            color: textColor.withOpacity(0.7),
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
                 : ListView.builder(
-                  itemCount: _chatRooms.length,
-                  padding: EdgeInsets.symmetric(vertical: 8),
-                  itemBuilder: (context, index) {
-                    final chatRoom = _chatRooms[index];
-                    return _buildChatRoomCard(
-                      context,
-                      chatRoom,
-                      cardColor,
-                      textColor,
-                      accentColor,
-                      secondaryColor,
-                    );
-                  },
-                ),
+                    itemCount: _chatRooms.length,
+                    padding: EdgeInsets.symmetric(vertical: 8),
+                    itemBuilder: (context, index) {
+                      final chatRoom = _chatRooms[index];
+                      return _buildChatRoomCard(
+                        context,
+                        chatRoom,
+                        cardColor,
+                        textColor,
+                        accentColor,
+                        secondaryColor,
+                      );
+                    },
+                  ),
         bottomNavigationBar: BottomNavigationBar(
           items: const <BottomNavigationBarItem>[
             BottomNavigationBarItem(icon: Icon(Icons.home), label: ''),
@@ -455,10 +453,8 @@ class _ChatPageState extends State<ChatPage> {
           selectedItemColor: isDarkMode ? Colors.white : Colors.blue,
           unselectedItemColor: isDarkMode ? Colors.grey[600] : Colors.grey,
           backgroundColor: isDarkMode ? Colors.black : Colors.white,
-
           showSelectedLabels: false,
           showUnselectedLabels: false,
-
           type: BottomNavigationBarType.fixed,
           onTap: _onItemTapped,
         ),
@@ -475,13 +471,17 @@ class _ChatPageState extends State<ChatPage> {
     Color secondaryColor,
   ) {
     final departureTime = (chatRoom['departureTime'] as Timestamp).toDate();
-    final formattedDate = DateFormat('M월 d일').format(departureTime);
+    final formattedDate = DateFormat('MMM d', 'en_US').format(departureTime);
     final formattedTime = DateFormat('HH:mm').format(departureTime);
-
-    // 채팅방이 보이지 않아야 하는 경우 빈 컨테이너 반환 (쿼리에서 이미 필터링됨)
-    // if (!(chatRoom['driver_accepted'] == true || chatRoom['chat_visible'] == true)) {
-    //   return Container();
-    // }
+    
+    // Pre-translate strings to avoid issues
+    final membersText = 'app.chat.members'.tr();
+    final acceptedText = 'app.chat.status.accepted'.tr();
+    final pendingText = 'app.chat.status.pending'.tr();
+    final pickupText = 'app.chat.pickup'.tr();
+    final dropoffText = 'app.chat.dropoff'.tr();
+    final noMessagesText = 'app.chat.no_messages'.tr();
+    final timeAgoText = _formatTimestamp(chatRoom['timestamp']);
 
     return Card(
       margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -494,12 +494,11 @@ class _ChatPageState extends State<ChatPage> {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder:
-                  (context) => ChatRoomPage(
-                    chatRoomId: chatRoom['id'],
-                    chatRoomName: chatRoom['name'],
-                    chatRoomCollection: chatRoom['collection'],
-                  ),
+              builder: (context) => ChatRoomPage(
+                chatRoomId: chatRoom['id'],
+                chatRoomName: chatRoom['name'],
+                chatRoomCollection: chatRoom['collection'],
+              ),
             ),
           );
         },
@@ -508,50 +507,45 @@ class _ChatPageState extends State<ChatPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Top row with status and time
               Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  // 확정 여부 표시
+                  // Status badge
                   Container(
                     padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color:
-                          chatRoom['isConfirmed']
-                              ? secondaryColor
-                              : Colors.grey.withOpacity(0.3),
+                      color: chatRoom['isConfirmed']
+                          ? secondaryColor
+                          : Colors.grey.withOpacity(0.3),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
-                      chatRoom['isConfirmed'] ? '확정됨' : '미확정',
+                      chatRoom['isConfirmed'] ? acceptedText : pendingText,
                       style: TextStyle(
-                        color:
-                            chatRoom['isConfirmed']
-                                ? Colors.white
-                                : textColor.withOpacity(0.7),
+                        color: chatRoom['isConfirmed']
+                            ? Colors.white
+                            : textColor.withOpacity(0.7),
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                   ),
                   SizedBox(width: 8),
-
-                  // 출발 시간 표시
-                  Icon(
-                    Icons.access_time,
-                    size: 16,
-                    color: textColor.withOpacity(0.7),
-                  ),
-                  SizedBox(width: 4),
+                  
+                  // Time information - simplified
                   Text(
                     '$formattedDate $formattedTime',
                     style: TextStyle(
                       color: textColor.withOpacity(0.7),
                       fontSize: 14,
                     ),
+                    overflow: TextOverflow.ellipsis,
                   ),
-
+                  
                   Spacer(),
-
-                  // 인원 표시
+                  
+                  // Member count
                   Container(
                     padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
@@ -559,7 +553,7 @@ class _ChatPageState extends State<ChatPage> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
-                      '${chatRoom['memberCount']}/${chatRoom['maxMembers']}명',
+                      '${chatRoom['memberCount']}/${chatRoom['maxMembers']}$membersText',
                       style: TextStyle(
                         color: accentColor,
                         fontSize: 12,
@@ -569,10 +563,7 @@ class _ChatPageState extends State<ChatPage> {
                   ),
                 ],
               ),
-
               SizedBox(height: 12),
-
-              // 경로 정보
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -582,7 +573,7 @@ class _ChatPageState extends State<ChatPage> {
                       SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          '출발: ${chatRoom['origin']}',
+                          '$pickupText: ${chatRoom['origin']}',
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.bold,
@@ -601,7 +592,7 @@ class _ChatPageState extends State<ChatPage> {
                       SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          '도착: ${chatRoom['destination']}',
+                          '$dropoffText: ${chatRoom['destination']}',
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.bold,
@@ -615,15 +606,12 @@ class _ChatPageState extends State<ChatPage> {
                   ),
                 ],
               ),
-
               SizedBox(height: 12),
-
-              // 마지막 메시지 정보
               Row(
                 children: [
                   Expanded(
                     child: Text(
-                      chatRoom['lastMessage'] ?? '대화가 시작되지 않았습니다',
+                      chatRoom['lastMessage'] ?? noMessagesText,
                       style: TextStyle(
                         color: textColor.withOpacity(0.7),
                         fontSize: 14,
@@ -634,14 +622,12 @@ class _ChatPageState extends State<ChatPage> {
                   ),
                   SizedBox(width: 8),
                   Text(
-                    _formatTimestamp(chatRoom['timestamp']),
+                    timeAgoText,
                     style: TextStyle(
                       color: textColor.withOpacity(0.5),
                       fontSize: 12,
                     ),
                   ),
-
-                  // 새 메시지 표시
                   if (chatRoom['hasNewMessages'] == true)
                     Container(
                       margin: EdgeInsets.only(left: 8),
@@ -667,13 +653,13 @@ class _ChatPageState extends State<ChatPage> {
     final difference = now.difference(messageTime);
 
     if (difference.inDays > 0) {
-      return '${difference.inDays}일 전';
+      return 'app.chat.time_ago.days_ago'.tr(args: [difference.inDays.toString()], namedArgs: {'days': difference.inDays.toString()});
     } else if (difference.inHours > 0) {
-      return '${difference.inHours}시간 전';
+      return 'app.chat.time_ago.hours_ago'.tr(args: [difference.inHours.toString()], namedArgs: {'hours': difference.inHours.toString()});
     } else if (difference.inMinutes > 0) {
-      return '${difference.inMinutes}분 전';
+      return 'app.chat.time_ago.minutes_ago'.tr(args: [difference.inMinutes.toString()], namedArgs: {'minutes': difference.inMinutes.toString()});
     } else {
-      return '방금';
+      return 'app.chat.time_ago.just_now'.tr();
     }
   }
 }

@@ -1,0 +1,164 @@
+{
+  "app": {
+    "title": "PLO RIDE",
+    "welcome": "Welcome",
+    "login": "Login",
+    "signup": "Sign Up",
+    "email": "Email",
+    "password": "Password",
+    "forgot_password": "Forgot Password?",
+    "settings": "Settings",
+    "profile": "Profile",
+    "logout": "Logout",
+    "language": "Language",
+    "theme": "Theme",
+    "notifications": "Notifications",
+    "help": "Help",
+    "about": "About",
+    "support": "Support",
+    "customer_support": "Customer Support",
+    "faq": "FAQ",
+    "developer_info": "Developer Information",
+    "version": "Version",
+    "copyright": "© 2023 PLO Team. All rights reserved.",
+    "support_email": "ploride.dev@gmail.com",
+    "instagram_support": "Contact PLO on Instagram",
+    "logout_confirm": "Sign out of your account",
+    "guest": "Guest",
+    "home": {
+      "welcome_prefix": "Hello",
+      "welcome_suffix": "",
+      "find_ride": "Where are you going?",
+      "my_rides": "My Rides",
+      "chat": "Chat",
+      "settings": "Settings",
+      "free_rides": "Free Rides",
+      "payments": "Payments",
+      "ride_history": "Ride History",
+      "recent_rides": "Recent Rides",
+      "no_recent_rides": "No recent rides",
+      "pickup_location": "Pickup Location",
+      "destination": "Destination",
+      "date": "Date",
+      "status": {
+        "accepted": "Accepted",
+        "completed": "Completed",
+        "pending": "Pending",
+        "cancelled": "Cancelled",
+        "확정됨": "Confirmed",
+        "드라이버의 수락을 기다리는 중": "Waiting for driver's acceptance",
+        "취소됨": "Cancelled"
+      }
+    },
+    "history": {
+      "title": "Ride History",
+      "no_history": "No ride history yet",
+      "pickup_location": "Pickup Location",
+      "destination": "Destination",
+      "date": "Date",
+      "pickup": "Pickup",
+      "dropoff": "Dropoff",
+      "psu_to_airport": "PSU → Airport",
+      "airport_to_psu": "Airport → PSU",
+      "status": {
+        "accepted": "Accepted",
+        "completed": "Completed",
+        "pending": "Pending",
+        "cancelled": "Cancelled",
+        "확정됨": "Confirmed",
+        "드라이버의 수락을 기다리는 중": "Waiting for driver's acceptance",
+        "취소됨": "Cancelled"
+      }
+    },
+    "error": {
+      "general": "An error occurred",
+      "invalid_email": "Invalid email address",
+      "invalid_password": "Invalid password",
+      "login_failed": "Login failed",
+      "signup_failed": "Sign up failed"
+    },
+    "success": {
+      "login": "Login successful",
+      "signup": "Sign up successful"
+    },
+    "notifications": {
+      "new_request": "New Ride Request",
+      "driver_arrived": "Driver has arrived at pickup location",
+      "ride_started": "Ride has started",
+      "ride_completed": "Ride completed"
+    },
+    "chat": {
+      "title": "Chat",
+      "no_chats": "No chat rooms yet",
+      "psu_to_airport": "PSU → Airport",
+      "airport_to_psu": "Airport → PSU",
+      "pickup": "Pickup",
+      "dropoff": "Dropoff",
+      "date": "Date",
+      "time": "Time",
+      "members": " members",
+      "no_messages": "No messages yet",
+      "ride_date": "Ride Date",
+      "time_ago": {
+        "just_now": "Just now",
+        "minutes_ago": "{minutes} minutes ago",
+        "hours_ago": "{hours} hours ago",
+        "days_ago": "{days} days ago"
+      },
+      "status": {
+        "accepted": "Accepted",
+        "completed": "Completed",
+        "pending": "Pending",
+        "cancelled": "Cancelled",
+        "확정됨": "Confirmed",
+        "드라이버의 수락을 기다리는 중": "Waiting for driver's acceptance",
+        "취소됨": "Cancelled"
+      },
+      "room": {
+        "type": "Type a message",
+        "send": "Send",
+        "ride_info": "Ride Information",
+        "pickup_location": "Pickup Location",
+        "dropoff_location": "Dropoff Location",
+        "departure_time": "Departure Time",
+        "members_count": "Members",
+        "status": "Status",
+        "driver": "Driver",
+        "passenger": "Passenger",
+        "system_message": "System Message",
+        "message_deleted": "Message deleted",
+        "image_sent": "Image sent",
+        "file_sent": "File sent",
+        "system": {
+          "joined": "{name} has joined the group",
+          "driver_accepted": "Driver has accepted the request",
+          "chat_activated": "Chat room has been activated",
+          "left": "{name} has left the group"
+        }
+      }
+    }
+  },
+  "errors": {
+    "general": "An error occurred",
+    "network": "Please check your network connection",
+    "invalid_email": "Invalid email address",
+    "invalid_password": "Invalid password",
+    "weak_password": "Password is too weak",
+    "email_in_use": "Email is already in use",
+    "user_not_found": "User not found",
+    "wrong_password": "Wrong password"
+  },
+  "success": {
+    "login": "Login successful",
+    "signup": "Sign up successful",
+    "password_reset": "Password reset email has been sent",
+    "profile_updated": "Profile updated",
+    "settings_updated": "Settings saved"
+  },
+  "notifications": {
+    "new_ride_request": "New Ride Request",
+    "destination_unknown": "Destination: Unknown",
+    "ride_accepted": "Driver has accepted your request",
+    "ride_status_updated": "Ride status updated"
+  }
+} 

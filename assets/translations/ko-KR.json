@@ -1,0 +1,139 @@
+{
+  "app": {
+    "title": "PLO RIDE",
+    "version": "버전",
+    "copyright": "© 2023 PLO 팀. All rights reserved.",
+    "support": "지원",
+    "faq": "도움말",
+    "customer_support": "고객 지원",
+    "support_email": "ploride.dev@gmail.com",
+    "about": "기타",
+    "developer_info": "개발자 정보",
+    "instagram_support": "PLO 인스타로 문의하기",
+    "logout": "로그아웃",
+    "logout_confirm": "계정에서 로그아웃합니다",
+    "language": "언어",
+    "welcome": "환영합니다",
+    "login": "로그인",
+    "signup": "회원가입",
+    "email": "이메일",
+    "password": "비밀번호",
+    "forgot_password": "비밀번호를 잊으셨나요?",
+    "settings": "설정",
+    "profile": "프로필",
+    "guest": "게스트",
+    "home": {
+      "welcome_prefix": "안녕하세요",
+      "welcome_suffix": "님",
+      "find_ride": "어디로 가시나요?",
+      "my_rides": "내 운행",
+      "chat": "채팅",
+      "settings": "설정",
+      "free_rides": "무료 택시",
+      "payments": "결제",
+      "ride_history": "이용 내역",
+      "recent_rides": "최근 이용 내역",
+      "no_recent_rides": "최근 이용 내역이 없습니다",
+      "pickup_location": "출발지",
+      "destination": "도착지",
+      "date": "날짜",
+      "status": {
+        "accepted": "확정됨",
+        "completed": "완료됨",
+        "pending": "대기중",
+        "cancelled": "취소됨",
+        "확정됨": "확정됨",
+        "드라이버의 수락을 기다리는 중": "드라이버의 수락을 기다리는 중",
+        "취소됨": "취소됨"
+      }
+    },
+    "history": {
+      "title": "이용 내역",
+      "no_history": "아직 이용 내역이 없습니다",
+      "pickup_location": "출발지",
+      "destination": "도착지",
+      "date": "날짜",
+      "pickup": "출발",
+      "dropoff": "도착",
+      "psu_to_airport": "PSU → 공항",
+      "airport_to_psu": "공항 → PSU",
+      "status": {
+        "accepted": "확정됨",
+        "completed": "완료됨",
+        "pending": "대기중",
+        "cancelled": "취소됨",
+        "확정됨": "확정됨",
+        "드라이버의 수락을 기다리는 중": "드라이버의 수락을 기다리는 중",
+        "취소됨": "취소됨"
+      }
+    },
+    "error": {
+      "general": "오류가 발생했습니다",
+      "invalid_email": "유효하지 않은 이메일입니다",
+      "invalid_password": "유효하지 않은 비밀번호입니다",
+      "login_failed": "로그인에 실패했습니다",
+      "signup_failed": "회원가입에 실패했습니다"
+    },
+    "success": {
+      "login": "로그인 성공",
+      "signup": "회원가입 성공"
+    },
+    "notifications": {
+      "new_request": "새로운 택시 요청",
+      "driver_arrived": "기사가 픽업 위치에 도착했습니다",
+      "ride_started": "운행이 시작되었습니다",
+      "ride_completed": "운행이 완료되었습니다"
+    },
+    "help": "도움말",
+    "chat": {
+      "title": "채팅",
+      "no_chats": "아직 채팅방이 없습니다",
+      "psu_to_airport": "PSU → 공항",
+      "airport_to_psu": "공항 → PSU",
+      "pickup": "출발",
+      "dropoff": "도착",
+      "date": "날짜",
+      "time": "시간",
+      "members": "명",
+      "no_messages": "아직 메시지가 없습니다",
+      "ride_date": "운행 날짜",
+      "time_ago": {
+        "just_now": "방금 전",
+        "minutes_ago": "{minutes}분 전",
+        "hours_ago": "{hours}시간 전",
+        "days_ago": "{days}일 전"
+      },
+      "status": {
+        "accepted": "확정됨",
+        "completed": "완료됨",
+        "pending": "대기중",
+        "cancelled": "취소됨",
+        "확정됨": "확정됨",
+        "드라이버의 수락을 기다리는 중": "드라이버의 수락을 기다리는 중",
+        "취소됨": "취소됨"
+      },
+      "room": {
+        "type": "메시지를 입력하세요",
+        "send": "전송",
+        "ride_info": "운행 정보",
+        "pickup_location": "출발지",
+        "dropoff_location": "도착지",
+        "departure_time": "출발 시간",
+        "members_count": "멤버",
+        "status": "상태",
+        "driver": "기사",
+        "passenger": "승객",
+        "system_message": "시스템 메시지",
+        "message_deleted": "메시지가 삭제되었습니다",
+        "image_sent": "이미지를 전송했습니다",
+        "file_sent": "파일을 전송했습니다",
+        "system": {
+          "joined": "{name}님이 그룹에 참여했습니다",
+          "driver_accepted": "드라이버가 요청을 수락했습니다",
+          "chat_activated": "채팅방이 활성화되었습니다",
+          "left": "{name}님이 그룹에서 나갔습니다"
+        }
+      }
+    }
+  }
+} 

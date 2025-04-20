@@ -9,6 +9,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:easy_localization/easy_localization.dart';
 import 'dart:convert';
 import 'package:intl/intl.dart';
 
@@ -97,18 +98,18 @@ class _HomePageState extends State<HomePage> {
     try {
       final user = _auth.currentUser;
       if (user != null) {
-        final userDoc =
-            await _firestore.collection('users').doc(user.uid).get();
+        final userDoc = await _firestore.collection('users').doc(user.uid).get();
         if (userDoc.exists) {
+          final userData = userDoc.data();
           setState(() {
-            _username = userDoc.data()?['fullname'] ?? '게스트';
+            _username = userData?['fullname'] ?? 'app.guest'.tr();
           });
         }
       }
     } catch (e) {
       print('사용자 정보 로드 중 오류: $e');
       setState(() {
-        _username = '게스트';
+        _username = 'app.guest'.tr();
       });
     }
   }
@@ -500,7 +501,7 @@ class _HomePageState extends State<HomePage> {
         ),
       ),
       ChatPage(),
-      SettingsPage(useScaffold: false), // Scaffold 없이 내용만 표시
+      SettingsPage(useScaffold: false),
     ];
 
     // 현재 탭에 따라 AppBar를 다르게 표시
@@ -508,18 +509,16 @@ class _HomePageState extends State<HomePage> {
     Widget body;
 
     if (_selectedIndex == 3) {
-      // Settings 탭일 때는 AppBar 없음 (SettingsPage가 자체 AppBar 포함)
       appBar = null;
-      // SettingsPage를 직접 사용하는 대신 간단한 Container로 감싸 렌더링
       body = Container(child: pages[_selectedIndex]);
     } else if (_selectedIndex <= 1) {
-      // Home, In Progress 탭일 때
       appBar = PreferredSize(
-        preferredSize: Size.fromHeight(160),
+        preferredSize: Size.fromHeight(180),
         child: Container(
           color: isDarkMode ? Colors.black : Colors.white,
           child: SafeArea(
             child: Column(
+              mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Padding(
@@ -530,9 +529,9 @@ class _HomePageState extends State<HomePage> {
                       Text(
                         'TAGO',
                         style: TextStyle(
-                          fontSize: 24,
+                          fontSize: 32,
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFF3F51B5), // 인디고 색상
+                          color: Color(0xFF3F51B5),
                         ),
                       ),
                     ],
@@ -542,20 +541,22 @@ class _HomePageState extends State<HomePage> {
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: Column(
+                    mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        '안녕하세요, $_username 님',
+                        'app.home.welcome_prefix'.tr() + ' $_username' + 'app.home.welcome_suffix'.tr(),
                         style: TextStyle(
-                          fontSize: 26,
+                          fontSize: 28,
                           fontWeight: FontWeight.bold,
                           color: isDarkMode ? Colors.white : Colors.black,
                         ),
                       ),
+                      SizedBox(height: 8),
                       Text(
-                        '어디로 가시나요?',
+                        'app.home.find_ride'.tr(),
                         style: TextStyle(
-                          fontSize: 26,
+                          fontSize: 28,
                           fontWeight: FontWeight.bold,
                           color: isDarkMode ? Colors.white : Colors.black,
                         ),
@@ -563,6 +564,7 @@ class _HomePageState extends State<HomePage> {
                     ],
                   ),
                 ),
+                SizedBox(height: 16),
               ],
             ),
           ),
@@ -629,7 +631,7 @@ class _HomePageState extends State<HomePage> {
                             ),
                             SizedBox(width: 16),
                             Text(
-                              '탑승 정보 입력하기',
+                              'app.home.find_ride'.tr(),
                               style: TextStyle(
                                 fontSize: 18,
                                 color:
@@ -656,11 +658,12 @@ class _HomePageState extends State<HomePage> {
     } else {
       // TaxiInfo 탭일 때 (Index 2)
       appBar = PreferredSize(
-        preferredSize: Size.fromHeight(160),
+        preferredSize: Size.fromHeight(180),
         child: Container(
           color: isDarkMode ? Colors.black : Colors.white,
           child: SafeArea(
             child: Column(
+              mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Padding(
@@ -671,7 +674,7 @@ class _HomePageState extends State<HomePage> {
                       Text(
                         'TAGO',
                         style: TextStyle(
-                          fontSize: 24,
+                          fontSize: 32,
                           fontWeight: FontWeight.bold,
                           color: Color(0xFF3F51B5), // 인디고 색상
                         ),
@@ -683,20 +686,22 @@ class _HomePageState extends State<HomePage> {
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: Column(
+                    mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        '안녕하세요, $_username',
+                        'app.home.welcome_prefix'.tr() + ' $_username' + 'app.home.welcome_suffix'.tr(),
                         style: TextStyle(
-                          fontSize: 26,
+                          fontSize: 28,
                           fontWeight: FontWeight.bold,
                           color: isDarkMode ? Colors.white : Colors.black,
                         ),
                       ),
+                      SizedBox(height: 8),
                       Text(
-                        '어디로 가시나요?',
+                        'app.home.find_ride'.tr(),
                         style: TextStyle(
-                          fontSize: 26,
+                          fontSize: 28,
                           fontWeight: FontWeight.bold,
                           color: isDarkMode ? Colors.white : Colors.black,
                         ),
@@ -704,6 +709,7 @@ class _HomePageState extends State<HomePage> {
                     ],
                   ),
                 ),
+                SizedBox(height: 16),
               ],
             ),
           ),
@@ -785,14 +791,13 @@ class _HomePageState extends State<HomePage> {
                   color: isDarkMode ? Colors.white : Colors.black,
                 ),
                 title: Text(
-                  'Home',
+                  'app.home.find_ride'.tr(),
                   style: TextStyle(
                     fontSize: 16,
                     color: isDarkMode ? Colors.white : Colors.black,
                   ),
                 ),
                 onTap: () {
-                  //수정1
                   Navigator.pushReplacementNamed(context, MainPage.id);
                 },
               ),
@@ -802,7 +807,7 @@ class _HomePageState extends State<HomePage> {
                   color: isDarkMode ? Colors.white : Colors.black,
                 ),
                 title: Text(
-                  'Free Rides',
+                  'app.home.free_rides'.tr(),
                   style: TextStyle(
                     fontSize: 16,
                     color: isDarkMode ? Colors.white : Colors.black,
@@ -815,7 +820,7 @@ class _HomePageState extends State<HomePage> {
                   color: isDarkMode ? Colors.white : Colors.black,
                 ),
                 title: Text(
-                  'Payments',
+                  'app.home.payments'.tr(),
                   style: TextStyle(
                     fontSize: 16,
                     color: isDarkMode ? Colors.white : Colors.black,
@@ -828,7 +833,7 @@ class _HomePageState extends State<HomePage> {
                   color: isDarkMode ? Colors.white : Colors.black,
                 ),
                 title: Text(
-                  'Ride History',
+                  'app.home.ride_history'.tr(),
                   style: TextStyle(
                     fontSize: 16,
                     color: isDarkMode ? Colors.white : Colors.black,
@@ -841,7 +846,7 @@ class _HomePageState extends State<HomePage> {
                   color: isDarkMode ? Colors.white : Colors.black,
                 ),
                 title: Text(
-                  'Support',
+                  'app.support'.tr(),
                   style: TextStyle(
                     fontSize: 16,
                     color: isDarkMode ? Colors.white : Colors.black,
@@ -854,7 +859,7 @@ class _HomePageState extends State<HomePage> {
                   color: isDarkMode ? Colors.white : Colors.black,
                 ),
                 title: Text(
-                  'About',
+                  'app.about'.tr(),
                   style: TextStyle(
                     fontSize: 16,
                     color: isDarkMode ? Colors.white : Colors.black,
@@ -864,7 +869,7 @@ class _HomePageState extends State<HomePage> {
             ],
           ),
         ),
-        body: body, // IndexedStack를 제거하고 직접 body 변수 사용
+        body: body,
         bottomNavigationBar: BottomNavigationBar(
           items: const <BottomNavigationBarItem>[
             BottomNavigationBarItem(icon: Icon(Icons.home), label: ''),
@@ -1036,7 +1041,7 @@ class _HomeContentState extends State<HomeContent> {
                         ),
                         SizedBox(width: 8),
                         Text(
-                          '최근 이용 내역',
+                          'app.home.recent_rides'.tr(),
                           style: TextStyle(
                             color: accentColor,
                             fontSize: 16,
@@ -1074,7 +1079,7 @@ class _HomeContentState extends State<HomeContent> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                _reservedTrip!['pickup_info']?['address'] ?? '출발지 정보 없음',
+                                _reservedTrip!['pickup_info']?['address'] ?? 'app.home.pickup_location'.tr(),
                                 style: TextStyle(
                                   color: textColor,
                                   fontSize: 15,
@@ -1082,7 +1087,7 @@ class _HomeContentState extends State<HomeContent> {
                               ),
                               SizedBox(height: 16),
                               Text(
-                                _reservedTrip!['destination_info']?['address'] ?? '도착지 정보 없음',
+                                _reservedTrip!['destination_info']?['address'] ?? 'app.home.destination'.tr(),
                                 style: TextStyle(
                                   color: textColor,
                                   fontSize: 15,
@@ -1135,7 +1140,7 @@ class _HomeContentState extends State<HomeContent> {
                                 _getStatusIcon(_reservedTrip!['status']),
                                 SizedBox(width: 4),
                                 Text(
-                                  _reservedTrip!['status'] ?? '상태 정보 없음',
+                                  'app.home.status.${_reservedTrip!['status']}'.tr(),
                                   style: TextStyle(
                                     color: _getStatusColor(
                                       _reservedTrip!['status'],
@@ -1172,7 +1177,7 @@ class _HomeContentState extends State<HomeContent> {
                     ),
                     SizedBox(width: 12),
                     Text(
-                      '최근 이용 내역이 없습니다.',
+                      'app.home.no_recent_rides'.tr(),
                       style: TextStyle(
                         color: textColor,
                         fontSize: 16,
@@ -1283,21 +1288,39 @@ class _HomeContentState extends State<HomeContent> {
     return '요금 정보 없음';
   }
 
+  String _getStatusTranslation(String status) {
+    switch (status.toLowerCase()) {
+      case 'accepted':
+        return 'app.home.status.accepted'.tr();
+      case 'completed':
+        return 'app.home.status.completed'.tr();
+      case 'pending':
+        return 'app.home.status.pending'.tr();
+      case 'canceled':
+      case 'cancelled':
+        return 'app.home.status.cancelled'.tr();
+      case '확정됨':
+        return 'app.home.status.confirmed'.tr();
+      case '드라이버의 수락을 기다리는 중':
+        return 'app.home.status.waiting'.tr();
+      default:
+        return status;
+    }
+  }
+
   Color _getStatusColor(String status) {
     switch (status.toLowerCase()) {
       case 'accepted':
+      case '확정됨':
         return Colors.green;
       case 'completed':
+      case '완료됨':
         return Colors.green;
       case 'pending':
+      case '대기중':
         return Colors.orange;
       case 'canceled':
       case 'cancelled':
-        return Colors.red;
-      case '확정됨':
-        return Colors.green;
-      case '드라이버의 수락을 기다리는 중':
-        return Colors.orange;
       case '취소됨':
         return Colors.red;
       default:
@@ -1308,26 +1331,23 @@ class _HomeContentState extends State<HomeContent> {
   Icon _getStatusIcon(String status) {
     switch (status.toLowerCase()) {
       case 'accepted':
-        return Icon(Icons.check_circle, color: Colors.green);
+      case '확정됨':
+        return Icon(Icons.check_circle, color: Colors.green, size: 12);
       case 'completed':
-        return Icon(Icons.done, color: Colors.green);
+      case '완료됨':
+        return Icon(Icons.done, color: Colors.green, size: 12);
       case 'pending':
-        return Icon(Icons.schedule, color: Colors.orange);
+      case '대기중':
+        return Icon(Icons.schedule, color: Colors.orange, size: 12);
       case 'canceled':
       case 'cancelled':
-        return Icon(Icons.cancel, color: Colors.red);
-      case '확정됨':
-        return Icon(Icons.check_circle, color: Colors.green);
-      case '드라이버의 수락을 기다리는 중':
-        return Icon(Icons.schedule, color: Colors.orange);
       case '취소됨':
-        return Icon(Icons.cancel, color: Colors.red);
+        return Icon(Icons.cancel, color: Colors.red, size: 12);
       default:
-        return Icon(Icons.help_outline, color: Colors.grey);
+        return Icon(Icons.help_outline, color: Colors.grey, size: 12);
     }
   }
 
-  // Instagram URL을 열기 위한 함수
   Future<void> _launchPLOInstagram() async {
     final Uri instagramUrl = Uri.parse(
       'https://www.instagram.com/psu_plo?utm_source=ig_web_button_share_sheet&igsh=ZDNlZDc0MzIxNw==',

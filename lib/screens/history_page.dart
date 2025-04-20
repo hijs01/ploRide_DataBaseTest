@@ -5,6 +5,8 @@ import 'package:cabrider/screens/homepage.dart';
 import 'package:cabrider/screens/chat_page.dart';
 import 'package:cabrider/screens/settings_page.dart';
 import 'package:intl/intl.dart';
+import 'package:intl/date_symbol_data_local.dart';
+import 'package:easy_localization/easy_localization.dart';
 
 class HistoryPage extends StatefulWidget {
   static const String id = 'history';
@@ -18,7 +20,7 @@ class HistoryPage extends StatefulWidget {
 class _HistoryPageState extends State<HistoryPage> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  bool isLoading = true;
+  bool _isLoading = true;
   int _selectedIndex = 1; // 히스토리 탭이 선택됨
   bool _isRefreshing = false; // 새로고침 상태 추가
   List<Map<String, dynamic>> _psuToAirportTrips = [];
@@ -27,11 +29,21 @@ class _HistoryPageState extends State<HistoryPage> {
   @override
   void initState() {
     super.initState();
+    initializeDateFormatting();
     print('HistoryPage initialized');
     _checkUserData();
     _deleteTestData(); // 테스트 데이터 삭제
     _checkAllRidesStatus(); // 모든 라이드 상태 확인
     _loadTrips(); // 새로운 메서드 호출
+  }
+
+  String _formatDate(DateTime date) {
+    final locale = context.locale.languageCode;
+    if (locale == 'ko') {
+      return DateFormat('yyyy년 MM월 dd일', 'ko').format(date);
+    } else {
+      return DateFormat('MMMM d, yyyy', 'en_US').format(date);
+    }
   }
 
   Future<void> _checkUserData() async {
@@ -243,10 +255,10 @@ class _HistoryPageState extends State<HistoryPage> {
       appBar: AppBar(
         backgroundColor: isDarkMode ? Colors.black : Colors.white,
         title: Text(
-          '이용 내역',
+          'app.history.title'.tr(),
           style: TextStyle(
             color: textColor,
-            fontSize: 16,
+            fontSize: 20,
             fontWeight: FontWeight.bold,
           ),
         ),
@@ -278,7 +290,7 @@ class _HistoryPageState extends State<HistoryPage> {
                   Padding(
                     padding: EdgeInsets.only(left: 16, bottom: 16),
                     child: Text(
-                      'PSU → Airport',
+                      'app.history.psu_to_airport'.tr(),
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w600,
@@ -314,7 +326,7 @@ class _HistoryPageState extends State<HistoryPage> {
                   Padding(
                     padding: EdgeInsets.only(left: 16, bottom: 16),
                     child: Text(
-                      'Airport → PSU',
+                      'app.history.airport_to_psu'.tr(),
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w600,
@@ -358,7 +370,7 @@ class _HistoryPageState extends State<HistoryPage> {
                           ),
                           SizedBox(height: 20),
                           Text(
-                            '아직 이용 내역이 없습니다',
+                            'app.history.no_history'.tr(),
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w500,
@@ -404,7 +416,7 @@ class _HistoryPageState extends State<HistoryPage> {
     Color textColor,
   ) {
     final driverAccepted = status == '확정됨';
-    final updatedStatus = driverAccepted ? '확정됨' : '대기중';
+    final updatedStatus = driverAccepted ? 'app.history.status.accepted'.tr() : 'app.history.status.pending'.tr();
     final statusColor = _getStatusColor(updatedStatus);
     final isCancelled = status == '취소됨';
 
@@ -453,7 +465,7 @@ class _HistoryPageState extends State<HistoryPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '출발',
+                      'app.history.pickup'.tr(),
                       style: TextStyle(
                         fontSize: 12,
                         color: textColor.withOpacity(0.6),
@@ -487,7 +499,7 @@ class _HistoryPageState extends State<HistoryPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '도착',
+                      'app.history.dropoff'.tr(),
                       style: TextStyle(
                         fontSize: 12,
                         color: textColor.withOpacity(0.6),
@@ -527,8 +539,8 @@ class _HistoryPageState extends State<HistoryPage> {
                 Expanded(
                   child: Text(
                     rideDate != null
-                        ? DateFormat('yyyy년 MM월 dd일').format(rideDate)
-                        : '날짜 없음',
+                        ? _formatDate(rideDate)
+                        : 'app.history.date'.tr(),
                     style: TextStyle(
                       fontSize: 14,
                       color: textColor.withOpacity(0.8),
@@ -555,16 +567,43 @@ class _HistoryPageState extends State<HistoryPage> {
   }
 
   Color _getStatusColor(String status) {
-    if (status == '확정됨') {
-      return Colors.green;
-    } else if (status == '대기중') {
-      return Colors.orange;
-    } else if (status == '드라이버의 수락을 기다리는 중') {
-      return Colors.orange;
-    } else if (status == '취소됨') {
-      return Colors.red;
+    switch (status.toLowerCase()) {
+      case 'accepted':
+      case '확정됨':
+        return Colors.green;
+      case 'completed':
+      case '완료됨':
+        return Colors.green;
+      case 'pending':
+      case '대기중':
+        return Colors.orange;
+      case 'canceled':
+      case 'cancelled':
+      case '취소됨':
+        return Colors.red;
+      default:
+        return Colors.grey;
     }
-    return Colors.grey;
+  }
+
+  Icon _getStatusIcon(String status) {
+    switch (status.toLowerCase()) {
+      case 'accepted':
+      case '확정됨':
+        return Icon(Icons.check_circle, color: Colors.green, size: 12);
+      case 'completed':
+      case '완료됨':
+        return Icon(Icons.done, color: Colors.green, size: 12);
+      case 'pending':
+      case '대기중':
+        return Icon(Icons.schedule, color: Colors.orange, size: 12);
+      case 'canceled':
+      case 'cancelled':
+      case '취소됨':
+        return Icon(Icons.cancel, color: Colors.red, size: 12);
+      default:
+        return Icon(Icons.help_outline, color: Colors.grey, size: 12);
+    }
   }
 
   // 추가: 채팅방 상태를 확인하여 히스토리 상태 업데이트
