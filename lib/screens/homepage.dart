@@ -916,36 +916,75 @@ class _HomeContentState extends State<HomeContent> {
 
       print('사용자 ID: ${currentUser.uid}로 이용 내역 조회 시작');
 
-      // 사용자의 히스토리에서 가장 최근의 라이드 데이터 가져오기 (상태 필터 제거)
-      final historyQuery =
-          await _firestore
-              .collection('users')
-              .doc(currentUser.uid)
-              .collection('history')
-              .orderBy('timestamp', descending: true)
-              .limit(1)
-              .get();
+      // psuToAirport 여정 로드
+      final psuToAirportSnapshot = await _firestore
+          .collection('psuToAirport')
+          .where('members', arrayContains: currentUser.uid)
+          .get();
 
-      print('조회된 문서 수: ${historyQuery.docs.length}');
+      // airportToPsu 여정 로드
+      final airportToPsuSnapshot = await _firestore
+          .collection('airportToPsu')
+          .where('members', arrayContains: currentUser.uid)
+          .get();
 
-      if (historyQuery.docs.isNotEmpty) {
-        final tripData = historyQuery.docs.first.data();
-        print('가져온 데이터: $tripData');
+      // 두 컬렉션의 결과를 합치고 시간순으로 정렬
+      List<Map<String, dynamic>> allTrips = [];
+      
+      allTrips.addAll(psuToAirportSnapshot.docs.map((doc) => {
+        ...doc.data(),
+        'id': doc.id,
+        'collection': 'psuToAirport',
+      }));
+      
+      allTrips.addAll(airportToPsuSnapshot.docs.map((doc) => {
+        ...doc.data(),
+        'id': doc.id,
+        'collection': 'airportToPsu',
+      }));
 
-        setState(() {
-          _reservedTrip = tripData;
-          _isLoading = false;
-        });
-      } else {
+      // timestamp 기준으로 정렬
+      allTrips.sort((a, b) {
+        Timestamp aTime = a['timestamp'] as Timestamp;
+        Timestamp bTime = b['timestamp'] as Timestamp;
+        return bTime.compareTo(aTime);
+      });
+
+      print('전체 여정 수: ${allTrips.length}');
+      print('PSU → Airport 여정 수: ${psuToAirportSnapshot.docs.length}');
+      print('Airport → PSU 여정 수: ${airportToPsuSnapshot.docs.length}');
+
+      if (allTrips.isEmpty) {
         print('이용 내역이 없습니다');
         setState(() {
           _reservedTrip = null;
           _isLoading = false;
         });
+        return;
       }
+
+      // 가장 최근의 취소되지 않은 여정 찾기
+      for (var trip in allTrips) {
+        if (trip['status'] != 'cancelled' && trip['status'] != '취소됨') {
+          print('가져온 데이터: $trip');
+          setState(() {
+            _reservedTrip = trip;
+            _isLoading = false;
+          });
+          return;
+        }
+      }
+
+      // 모든 여정이 취소된 경우
+      print('모든 여정이 취소되었습니다');
+      setState(() {
+        _reservedTrip = null;
+        _isLoading = false;
+      });
     } catch (e) {
       print('예약된 탑승 정보를 가져오는 중 오류 발생: $e');
       setState(() {
+        _reservedTrip = null;
         _isLoading = false;
       });
     }
@@ -1035,7 +1074,7 @@ class _HomeContentState extends State<HomeContent> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                _reservedTrip!['pickup'] ?? '출발지 정보 없음',
+                                _reservedTrip!['pickup_info']?['address'] ?? '출발지 정보 없음',
                                 style: TextStyle(
                                   color: textColor,
                                   fontSize: 15,
@@ -1043,7 +1082,7 @@ class _HomeContentState extends State<HomeContent> {
                               ),
                               SizedBox(height: 16),
                               Text(
-                                _reservedTrip!['destination'] ?? '도착지 정보 없음',
+                                _reservedTrip!['destination_info']?['address'] ?? '도착지 정보 없음',
                                 style: TextStyle(
                                   color: textColor,
                                   fontSize: 15,
@@ -1109,6 +1148,36 @@ class _HomeContentState extends State<HomeContent> {
                             ),
                           ),
                       ],
+                    ),
+                  ],
+                ),
+              )
+            else
+              Container(
+                decoration: BoxDecoration(
+                  border: Border.all(
+                    color: accentColor.withOpacity(0.3),
+                    width: 1.5,
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                  color: cardColor,
+                ),
+                padding: EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.error_outline,
+                      color: Colors.orange,
+                      size: 24,
+                    ),
+                    SizedBox(width: 12),
+                    Text(
+                      '최근 이용 내역이 없습니다.',
+                      style: TextStyle(
+                        color: textColor,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                   ],
                 ),
@@ -1217,17 +1286,20 @@ class _HomeContentState extends State<HomeContent> {
   Color _getStatusColor(String status) {
     switch (status.toLowerCase()) {
       case 'accepted':
-        return Colors.blue;
+        return Colors.green;
       case 'completed':
         return Colors.green;
       case 'pending':
         return Colors.orange;
       case 'canceled':
+      case 'cancelled':
         return Colors.red;
       case '확정됨':
         return Colors.green;
       case '드라이버의 수락을 기다리는 중':
         return Colors.orange;
+      case '취소됨':
+        return Colors.red;
       default:
         return Colors.grey;
     }
@@ -1236,17 +1308,20 @@ class _HomeContentState extends State<HomeContent> {
   Icon _getStatusIcon(String status) {
     switch (status.toLowerCase()) {
       case 'accepted':
-        return Icon(Icons.check_circle, color: Colors.blue);
+        return Icon(Icons.check_circle, color: Colors.green);
       case 'completed':
         return Icon(Icons.done, color: Colors.green);
       case 'pending':
         return Icon(Icons.schedule, color: Colors.orange);
       case 'canceled':
+      case 'cancelled':
         return Icon(Icons.cancel, color: Colors.red);
       case '확정됨':
         return Icon(Icons.check_circle, color: Colors.green);
       case '드라이버의 수락을 기다리는 중':
         return Icon(Icons.schedule, color: Colors.orange);
+      case '취소됨':
+        return Icon(Icons.cancel, color: Colors.red);
       default:
         return Icon(Icons.help_outline, color: Colors.grey);
     }

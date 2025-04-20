@@ -406,6 +406,7 @@ class _HistoryPageState extends State<HistoryPage> {
     final driverAccepted = status == '확정됨';
     final updatedStatus = driverAccepted ? '확정됨' : '대기중';
     final statusColor = _getStatusColor(updatedStatus);
+    final isCancelled = status == '취소됨';
 
     return Container(
       margin: EdgeInsets.only(bottom: 16),
@@ -560,6 +561,8 @@ class _HistoryPageState extends State<HistoryPage> {
       return Colors.orange;
     } else if (status == '드라이버의 수락을 기다리는 중') {
       return Colors.orange;
+    } else if (status == '취소됨') {
+      return Colors.red;
     }
     return Colors.grey;
   }
