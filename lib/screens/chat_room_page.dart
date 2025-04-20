@@ -48,6 +48,7 @@ class _ChatRoomPageState extends State<ChatRoomPage>
   DocumentSnapshot? _lastDocument;
   static const int _messageLimit = 20;
   String? _driverName;
+  final Map<String, String> _systemMessageCache = {};
 
   @override
   void initState() {
@@ -474,7 +475,7 @@ class _ChatRoomPageState extends State<ChatRoomPage>
     if (_messageController.text.trim().isEmpty) return;
 
     setState(() {
-      _isSending = true; // 전송 중 상태 표시
+      _isSending = true;
     });
 
     final messageText = _messageController.text.trim();
@@ -483,8 +484,7 @@ class _ChatRoomPageState extends State<ChatRoomPage>
 
     // 사용자 프로필에서 이름 가져오기
     try {
-      final userDoc =
-          await _firestore.collection('users').doc(_currentUserId).get();
+      final userDoc = await _firestore.collection('users').doc(_currentUserId).get();
       if (userDoc.exists) {
         final userData = userDoc.data();
         senderName = userData?['fullname'] ?? senderName;
@@ -505,28 +505,32 @@ class _ChatRoomPageState extends State<ChatRoomPage>
     };
 
     try {
-      await _firestore
+      // 메시지 추가
+      final messageRef = await _firestore
           .collection(widget.chatRoomCollection)
           .doc(widget.chatRoomId)
           .collection('messages')
           .add(message);
 
       // 마지막 메시지 업데이트
-      try {
-        await _firestore
-            .collection(widget.chatRoomCollection)
-            .doc(widget.chatRoomId)
-            .update({
-              'lastMessage': messageText,
-              'last_message': messageText,
-              'last_message_time': FieldValue.serverTimestamp(),
-              'last_message_sender_id': _currentUserId,
-              'last_message_sender_name': senderName,
-              'timestamp': FieldValue.serverTimestamp(),
-            });
-        print('메시지 업데이트 성공: last_message = $messageText');
-      } catch (e) {
-        print('메시지 업데이트 실패: $e');
+      await _firestore
+          .collection(widget.chatRoomCollection)
+          .doc(widget.chatRoomId)
+          .update({
+            'lastMessage': messageText,
+            'last_message': messageText,
+            'last_message_time': FieldValue.serverTimestamp(),
+            'last_message_sender_id': _currentUserId,
+            'last_message_sender_name': senderName,
+            'timestamp': FieldValue.serverTimestamp(),
+          });
+
+      // 새 메시지를 로컬 상태에 추가
+      if (mounted) {
+        setState(() {
+          _messages.add(messageRef as QueryDocumentSnapshot);
+          _isSending = false;
+        });
       }
 
       // 다른 멤버들에게 알림 전송
@@ -538,10 +542,11 @@ class _ChatRoomPageState extends State<ChatRoomPage>
       });
     } catch (e) {
       print('Error sending message: $e');
-    } finally {
-      setState(() {
-        _isSending = false; // 전송 완료 상태 표시
-      });
+      if (mounted) {
+        setState(() {
+          _isSending = false;
+        });
+      }
     }
   }
 
@@ -598,12 +603,55 @@ class _ChatRoomPageState extends State<ChatRoomPage>
             color: isDarkMode ? Color(0xFF1C1C1E) : Color(0xFFF2F2F7),
             child: Column(
               children: [
-                AppBar(
-                  title: Text('채팅방 정보', style: TextStyle(color: Colors.white)),
-                  automaticallyImplyLeading: false,
-                  backgroundColor:
-                      isDarkMode ? Color(0xFF1C1C1E) : Color(0xFFF2F2F7),
-                  elevation: 0,
+                Container(
+                  padding: EdgeInsets.only(top: MediaQuery.of(context).padding.top + 16, bottom: 16),
+                  decoration: BoxDecoration(
+                    color: isDarkMode ? Color(0xFF2C2C2E) : Colors.white,
+                    borderRadius: BorderRadius.only(
+                      bottomLeft: Radius.circular(20),
+                      bottomRight: Radius.circular(20),
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: isDarkMode ? Colors.black12 : Colors.black.withOpacity(0.05),
+                        blurRadius: 10,
+                        offset: Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    children: [
+                      Row(
+                        children: [
+                          IconButton(
+                            icon: Icon(Icons.close, color: isDarkMode ? Colors.white : Colors.black),
+                            onPressed: () => Navigator.pop(context),
+                          ),
+                          Expanded(
+                            child: Text(
+                              'app.chat.room.drawer.title'.tr(),
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: isDarkMode ? Colors.white : Colors.black,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                          SizedBox(width: 48), // 균형을 위한 빈 공간
+                        ],
+                      ),
+                      SizedBox(height: 8),
+                      Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: isDarkMode ? Colors.white24 : Colors.black12,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
                 Expanded(
                   child: GestureDetector(
@@ -612,18 +660,17 @@ class _ChatRoomPageState extends State<ChatRoomPage>
                       _focusNode.unfocus();
                     },
                     child: StreamBuilder<DocumentSnapshot>(
-                      stream:
-                          _firestore
-                              .collection(widget.chatRoomCollection)
-                              .doc(widget.chatRoomId)
-                              .snapshots(),
+                      stream: _firestore
+                          .collection(widget.chatRoomCollection)
+                          .doc(widget.chatRoomId)
+                          .snapshots(),
                       builder: (context, snapshot) {
                         if (snapshot.hasError) {
                           print('StreamBuilder error: ${snapshot.error}');
                           return Center(
                             child: Text(
-                              '채팅방 정보를 불러오는 중 오류가 발생했습니다.',
-                              style: TextStyle(color: Colors.grey),
+                              'app.chat.room.drawer.error_loading'.tr(),
+                              style: TextStyle(color: isDarkMode ? Colors.white70 : Colors.black54),
                             ),
                           );
                         }
@@ -633,181 +680,310 @@ class _ChatRoomPageState extends State<ChatRoomPage>
                         }
 
                         try {
-                          final data =
-                              snapshot.data!.data() as Map<String, dynamic>;
+                          final data = snapshot.data!.data() as Map<String, dynamic>;
                           final users = data['members'] as List<dynamic>? ?? [];
                           final driver = data['driver_id'] as String? ?? '';
 
                           return Column(
                             children: [
-                              Padding(
-                                padding: const EdgeInsets.all(16.0),
-                                child: Text(
-                                  '참여자 목록',
-                                  style: TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.white,
+                              // 드라이버 섹션
+                              Container(
+                                margin: EdgeInsets.fromLTRB(16, 16, 16, 8),
+                                padding: EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: isDarkMode ? Color(0xFF2C2C2E) : Colors.white,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: isDarkMode ? Color(0xFF3A3A3C) : Color(0xFFE5E5EA),
+                                    width: 1,
                                   ),
                                 ),
-                              ),
-                              FutureBuilder<String>(
-                                future: _getUserName(driver),
-                                builder: (context, snapshot) {
-                                  return ListTile(
-                                    leading: CircleAvatar(
-                                      child: Icon(Icons.person),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Icon(
+                                          Icons.drive_eta,
+                                          color: isDarkMode ? Colors.white70 : Colors.black54,
+                                          size: 18,
+                                        ),
+                                        SizedBox(width: 8),
+                                        Text(
+                                          'app.chat.room.drawer.driver'.tr(),
+                                          style: TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.w600,
+                                            color: isDarkMode ? Colors.white : Colors.black,
+                                          ),
+                                        ),
+                                      ],
                                     ),
-                                    title: Text(
-                                      '드라이버',
-                                      style: TextStyle(color: Colors.white),
-                                    ),
-                                    subtitle: Text(
-                                      snapshot.data ?? '로딩 중...',
-                                      style: TextStyle(color: Colors.white70),
-                                    ),
-                                  );
-                                },
-                              ),
-                              Divider(color: Colors.white24),
-                              Expanded(
-                                child: ListView.builder(
-                                  itemCount: users.length,
-                                  itemBuilder: (context, index) {
-                                    final userId = users[index];
-                                    final companionCount =
-                                        data['user_companion_counts']?[userId] ??
-                                        0;
-                                    final luggageCount =
-                                        data['user_luggage_counts']?[userId] ??
-                                        0;
-
-                                    return FutureBuilder<String>(
-                                      future: _getUserName(userId),
+                                    SizedBox(height: 12),
+                                    FutureBuilder<String>(
+                                      future: _getUserName(driver),
                                       builder: (context, snapshot) {
-                                        return ListTile(
-                                          leading: CircleAvatar(
-                                            child: Icon(Icons.person),
-                                          ),
-                                          title: Row(
-                                            children: [
-                                              Expanded(
-                                                child: Text(
-                                                  snapshot.data ?? '로딩 중...',
-                                                  style: TextStyle(
-                                                    color: Colors.white,
-                                                  ),
+                                        return Row(
+                                          children: [
+                                            CircleAvatar(
+                                              radius: 20,
+                                              backgroundColor: isDarkMode ? Color(0xFF3A3A3C) : Color(0xFFE5E5EA),
+                                              child: Icon(
+                                                Icons.person,
+                                                color: isDarkMode ? Colors.white70 : Colors.black54,
+                                              ),
+                                            ),
+                                            SizedBox(width: 12),
+                                            Expanded(
+                                              child: Text(
+                                                snapshot.data ?? 'app.chat.room.drawer.loading'.tr(),
+                                                style: TextStyle(
+                                                  fontSize: 16,
+                                                  color: isDarkMode ? Colors.white : Colors.black,
                                                 ),
                                               ),
-                                              // 총 인원수 표시
-                                              Container(
-                                                padding: EdgeInsets.symmetric(
-                                                  horizontal: 4,
-                                                  vertical: 2,
-                                                ),
-                                                child: Row(
-                                                  mainAxisSize:
-                                                      MainAxisSize.min,
-                                                  children: [
-                                                    Icon(
-                                                      Icons.people_rounded,
-                                                      size: 14,
-                                                      color: Colors.white70,
-                                                    ),
-                                                    SizedBox(width: 2),
-                                                    Text(
-                                                      '${companionCount + 1}',
-                                                      style: TextStyle(
-                                                        color: Colors.white70,
-                                                        fontSize: 12,
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
-                                              SizedBox(width: 8),
-                                              // 캐리어 개수 표시
-                                              Container(
-                                                padding: EdgeInsets.symmetric(
-                                                  horizontal: 4,
-                                                  vertical: 2,
-                                                ),
-                                                child: Row(
-                                                  mainAxisSize:
-                                                      MainAxisSize.min,
-                                                  children: [
-                                                    Icon(
-                                                      Icons.luggage_rounded,
-                                                      size: 14,
-                                                      color: Colors.white70,
-                                                    ),
-                                                    SizedBox(width: 2),
-                                                    Text(
-                                                      '$luggageCount',
-                                                      style: TextStyle(
-                                                        color: Colors.white70,
-                                                        fontSize: 12,
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
-                                            ],
-                                          ),
+                                            ),
+                                          ],
                                         );
                                       },
-                                    );
-                                  },
-                                ),
-                              ),
-                              // 예상 가격 표시
-                              Container(
-                                padding: EdgeInsets.all(16.0),
-                                decoration: BoxDecoration(
-                                  color:
-                                      isDarkMode
-                                          ? Color(0xFF1C1C1E)
-                                          : Color(0xFFF2F2F7),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.center,
-                                  children: [
-                                    Text(
-                                      'Total Price',
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.white,
-                                      ),
-                                    ),
-                                    SizedBox(height: 8),
-                                    Text(
-                                      data['member_count'] <= 2
-                                          ? '\$500'
-                                          : data['member_count'] == 3
-                                          ? '\$440'
-                                          : '\$500',
-                                      style: TextStyle(
-                                        fontSize: 24,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.white,
-                                      ),
-                                    ),
-                                    SizedBox(height: 4),
-                                    Text(
-                                      '${data['member_count']}명 기준',
-                                      style: TextStyle(
-                                        fontSize: 14,
-                                        color: Colors.white70,
-                                      ),
                                     ),
                                   ],
                                 ),
                               ),
-                              SizedBox(height: 16),
+                              
+                              // 라이더 섹션
+                              Container(
+                                margin: EdgeInsets.fromLTRB(16, 8, 16, 8),
+                                padding: EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: isDarkMode ? Color(0xFF2C2C2E) : Colors.white,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: isDarkMode ? Color(0xFF3A3A3C) : Color(0xFFE5E5EA),
+                                    width: 1,
+                                  ),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Icon(
+                                          Icons.people_outline,
+                                          color: isDarkMode ? Colors.white70 : Colors.black54,
+                                          size: 18,
+                                        ),
+                                        SizedBox(width: 8),
+                                        Text(
+                                          'app.chat.room.drawer.riders'.tr(),
+                                          style: TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.w600,
+                                            color: isDarkMode ? Colors.white : Colors.black,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    SizedBox(height: 12),
+                                    if (users.isEmpty)
+                                      Center(
+                                        child: Padding(
+                                          padding: const EdgeInsets.all(8.0),
+                                          child: Text(
+                                            'No riders yet',
+                                            style: TextStyle(
+                                              color: isDarkMode ? Colors.white70 : Colors.black54,
+                                            ),
+                                          ),
+                                        ),
+                                      )
+                                    else
+                                      ListView.builder(
+                                        shrinkWrap: true,
+                                        physics: NeverScrollableScrollPhysics(),
+                                        itemCount: users.length,
+                                        itemBuilder: (context, index) {
+                                          final userId = users[index];
+                                          final companionCount = data['user_companion_counts']?[userId] ?? 0;
+                                          final luggageCount = data['user_luggage_counts']?[userId] ?? 0;
+
+                                          return FutureBuilder<String>(
+                                            future: _getUserName(userId),
+                                            builder: (context, snapshot) {
+                                              return Padding(
+                                                padding: const EdgeInsets.only(bottom: 12.0),
+                                                child: Row(
+                                                  children: [
+                                                    CircleAvatar(
+                                                      radius: 20,
+                                                      backgroundColor: isDarkMode ? Color(0xFF3A3A3C) : Color(0xFFE5E5EA),
+                                                      child: Text(
+                                                        (snapshot.data ?? '?').substring(0, 1).toUpperCase(),
+                                                        style: TextStyle(
+                                                          color: isDarkMode ? Colors.white : Colors.black,
+                                                          fontWeight: FontWeight.w600,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                    SizedBox(width: 12),
+                                                    Expanded(
+                                                      child: Column(
+                                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                                        children: [
+                                                          Text(
+                                                            snapshot.data ?? 'app.chat.room.drawer.loading'.tr(),
+                                                            style: TextStyle(
+                                                              fontSize: 16,
+                                                              color: isDarkMode ? Colors.white : Colors.black,
+                                                            ),
+                                                          ),
+                                                          SizedBox(height: 4),
+                                                          Row(
+                                                            children: [
+                                                              Container(
+                                                                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                                                decoration: BoxDecoration(
+                                                                  color: isDarkMode ? Color(0xFF3A3A3C) : Color(0xFFE5E5EA),
+                                                                  borderRadius: BorderRadius.circular(10),
+                                                                ),
+                                                                child: Row(
+                                                                  mainAxisSize: MainAxisSize.min,
+                                                                  children: [
+                                                                    Icon(
+                                                                      Icons.people_rounded,
+                                                                      size: 14,
+                                                                      color: isDarkMode ? Colors.white70 : Colors.black54,
+                                                                    ),
+                                                                    SizedBox(width: 4),
+                                                                    Text(
+                                                                      '${companionCount + 1}',
+                                                                      style: TextStyle(
+                                                                        color: isDarkMode ? Colors.white70 : Colors.black54,
+                                                                        fontSize: 12,
+                                                                        fontWeight: FontWeight.w500,
+                                                                      ),
+                                                                    ),
+                                                                  ],
+                                                                ),
+                                                              ),
+                                                              SizedBox(width: 8),
+                                                              Container(
+                                                                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                                                decoration: BoxDecoration(
+                                                                  color: isDarkMode ? Color(0xFF3A3A3C) : Color(0xFFE5E5EA),
+                                                                  borderRadius: BorderRadius.circular(10),
+                                                                ),
+                                                                child: Row(
+                                                                  mainAxisSize: MainAxisSize.min,
+                                                                  children: [
+                                                                    Icon(
+                                                                      Icons.luggage_rounded,
+                                                                      size: 14,
+                                                                      color: isDarkMode ? Colors.white70 : Colors.black54,
+                                                                    ),
+                                                                    SizedBox(width: 4),
+                                                                    Text(
+                                                                      '$luggageCount',
+                                                                      style: TextStyle(
+                                                                        color: isDarkMode ? Colors.white70 : Colors.black54,
+                                                                        fontSize: 12,
+                                                                        fontWeight: FontWeight.w500,
+                                                                      ),
+                                                                    ),
+                                                                  ],
+                                                                ),
+                                                              ),
+                                                            ],
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              );
+                                            },
+                                          );
+                                        },
+                                      ),
+                                  ],
+                                ),
+                              ),
+                              
+                              // 가격 정보 섹션
+                              Container(
+                                margin: EdgeInsets.fromLTRB(16, 8, 16, 8),
+                                padding: EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: isDarkMode ? Color(0xFF2C2C2E) : Colors.white,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: isDarkMode ? Color(0xFF3A3A3C) : Color(0xFFE5E5EA),
+                                    width: 1,
+                                  ),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Icon(
+                                          Icons.payments_outlined,
+                                          color: isDarkMode ? Colors.white70 : Colors.black54,
+                                          size: 18,
+                                        ),
+                                        SizedBox(width: 8),
+                                        Text(
+                                          'app.chat.room.drawer.total_price'.tr(),
+                                          style: TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.w600,
+                                            color: isDarkMode ? Colors.white : Colors.black,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    SizedBox(height: 12),
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Text(
+                                          data['member_count'] <= 2
+                                              ? '\$500'
+                                              : data['member_count'] == 3
+                                                  ? '\$440'
+                                                  : '\$500',
+                                          style: TextStyle(
+                                            fontSize: 24,
+                                            fontWeight: FontWeight.bold,
+                                            color: isDarkMode ? Colors.white : Colors.black,
+                                          ),
+                                        ),
+                                        Container(
+                                          padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                          decoration: BoxDecoration(
+                                            color: isDarkMode ? Color(0xFF3A3A3C) : Color(0xFFE5E5EA),
+                                            borderRadius: BorderRadius.circular(10),
+                                          ),
+                                          child: Text(
+                                            context.locale.languageCode == 'ko' 
+                                                ? '${data['member_count']}명 기준'
+                                                : 'Based on ${data['member_count']} people',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              color: isDarkMode ? Colors.white70 : Colors.black54,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              
+                              // 나가기 버튼
                               Padding(
-                                padding: const EdgeInsets.all(16.0),
+                                padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
                                 child: ElevatedButton(
                                   onPressed: () => _showExitDialog(context),
                                   style: ElevatedButton.styleFrom(
@@ -816,14 +992,14 @@ class _ChatRoomPageState extends State<ChatRoomPage>
                                     foregroundColor: Colors.white,
                                     elevation: 0,
                                     shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(8),
+                                      borderRadius: BorderRadius.circular(12),
                                     ),
                                   ),
                                   child: Text(
-                                    '채팅방 나가기',
+                                    'app.chat.room.drawer.leave_room'.tr(),
                                     style: TextStyle(
                                       fontSize: 16,
-                                      fontWeight: FontWeight.w500,
+                                      fontWeight: FontWeight.w600,
                                     ),
                                   ),
                                 ),
@@ -834,8 +1010,8 @@ class _ChatRoomPageState extends State<ChatRoomPage>
                           print('Error loading chat room data: $e');
                           return Center(
                             child: Text(
-                              '채팅방 정보를 불러오는 중 오류가 발생했습니다.',
-                              style: TextStyle(color: Colors.grey),
+                              'app.chat.room.drawer.error_loading'.tr(),
+                              style: TextStyle(color: isDarkMode ? Colors.white70 : Colors.black54),
                             ),
                           );
                         }
@@ -878,27 +1054,7 @@ class _ChatRoomPageState extends State<ChatRoomPage>
 
                     if (isSystem) {
                       // 시스템 메시지 UI
-                      return Center(
-                        child: Container(
-                          margin: EdgeInsets.symmetric(vertical: 10),
-                          padding: EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 8,
-                          ),
-                          decoration: BoxDecoration(
-                            color: systemMessageColor,
-                            borderRadius: BorderRadius.circular(15),
-                          ),
-                          child: Text(
-                            messageData['text'] ?? '',
-                            style: TextStyle(
-                              color:
-                                  isDarkMode ? Colors.white70 : Colors.black87,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ),
-                      );
+                      return _buildSystemMessage(messageData['text'], messageData);
                     }
 
                     return Column(
@@ -1371,15 +1527,13 @@ class _ChatRoomPageState extends State<ChatRoomPage>
           if (snapshot.docs.isNotEmpty) {
             final latestMessage = snapshot.docs.first;
             final latestMessageData = latestMessage.data();
-            final latestTimestamp =
-                latestMessageData['timestamp'] as Timestamp?;
+            final latestTimestamp = latestMessageData['timestamp'] as Timestamp?;
 
             // 현재 메시지 목록의 마지막 메시지와 비교
             if (_messages.isEmpty ||
                 (latestTimestamp != null &&
                     latestTimestamp.millisecondsSinceEpoch >
-                        (_messages.last.data()
-                                as Map<String, dynamic>)['timestamp']
+                        (_messages.last.data() as Map<String, dynamic>)['timestamp']
                             .millisecondsSinceEpoch)) {
               // 새로운 메시지가 있는 경우
               final newMessage = latestMessage;
@@ -1719,5 +1873,170 @@ class _ChatRoomPageState extends State<ChatRoomPage>
     }
 
     return '알 수 없는 사용자';
+  }
+
+  Future<String> _getSystemMessageKey(String text, Map<String, dynamic> messageData) async {
+    // 캐시된 메시지가 있으면 반환
+    if (_systemMessageCache.containsKey(text)) {
+      return _systemMessageCache[text]!;
+    }
+
+    String translatedMessage = text;
+    
+    if (text.contains('님이 그룹에 참여했습니다')) {
+      String userName = text.substring(0, text.indexOf('님이')).trim();
+      try {
+        final userQuery = await _firestore
+            .collection('users')
+            .where('fullname', isEqualTo: userName)
+            .get();
+            
+        if (userQuery.docs.isNotEmpty) {
+          String userId = userQuery.docs.first.id;
+          String actualName = await _getUserName(userId);
+          translatedMessage = 'app.chat.room.system.member_joined'.tr();
+          translatedMessage = translatedMessage.replaceAll('\$fullname', actualName);
+        }
+      } catch (e) {
+        print('Error finding user: $e');
+      }
+    } else if (text.contains('님이 그룹에서 나갔습니다')) {
+      String userName = text.substring(0, text.indexOf('님이')).trim();
+      try {
+        final userQuery = await _firestore
+            .collection('users')
+            .where('fullname', isEqualTo: userName)
+            .get();
+            
+        if (userQuery.docs.isNotEmpty) {
+          String userId = userQuery.docs.first.id;
+          String actualName = await _getUserName(userId);
+          translatedMessage = 'app.chat.room.system.member_left'.tr();
+          translatedMessage = translatedMessage.replaceAll('\$fullname', actualName);
+        }
+      } catch (e) {
+        print('Error finding user: $e');
+      }
+    } else if (text.contains('요청을 수락했습니다')) {
+      translatedMessage = 'app.chat.room.system.driver_accepted'.tr();
+    } else if (text.contains('픽업 위치에 도착했습니다')) {
+      translatedMessage = 'app.chat.room.system.driver_arrived'.tr();
+    } else if (text.contains('여행이 시작되었습니다')) {
+      translatedMessage = 'app.chat.room.system.ride_started'.tr();
+    } else if (text.contains('여행이 완료되었습니다')) {
+      translatedMessage = 'app.chat.room.system.ride_completed'.tr();
+    } else if (text.contains('여행이 취소되었습니다')) {
+      translatedMessage = 'app.chat.room.system.ride_cancelled'.tr();
+    } else if (text.contains('그룹이 생성되었습니다')) {
+      translatedMessage = 'app.chat.room.system.group_created'.tr();
+    } else if (text.contains('그룹이 해체되었습니다')) {
+      translatedMessage = 'app.chat.room.system.group_disbanded'.tr();
+    } else if (text.contains('대기열에 추가되었습니다')) {
+      translatedMessage = 'app.chat.room.system.added_to_queue'.tr();
+    } else if (text == 'app.chat.room.system.added_to_queue') {
+      translatedMessage = 'app.chat.room.system.added_to_queue'.tr();
+    } else if (text == 'app.chat.room.system.driver_accepted') {
+      translatedMessage = 'app.chat.room.system.driver_accepted'.tr();
+    } else if (text == 'app.chat.room.system.chat_room_created') {
+      translatedMessage = 'app.chat.room.system.chat_room_created'.tr();
+    }
+
+    // 번역된 메시지를 캐시에 저장
+    _systemMessageCache[text] = translatedMessage;
+    return translatedMessage;
+  }
+
+  // 시스템 메시지 위젯 생성
+  Widget _buildSystemMessage(String text, Map<String, dynamic> messageData) {
+    final isDarkMode = MediaQuery.of(context).platformBrightness == Brightness.dark;
+    final systemMessageColor = isDarkMode ? Color(0xFF1C1C1E) : Color(0xFFE5E5EA);
+
+    // 캐시된 메시지가 있으면 바로 표시
+    if (_systemMessageCache.containsKey(text)) {
+      return Container(
+        width: double.infinity,
+        margin: EdgeInsets.symmetric(vertical: 10),
+        child: Center(
+          child: Container(
+            padding: EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 8,
+            ),
+            decoration: BoxDecoration(
+              color: systemMessageColor,
+              borderRadius: BorderRadius.circular(15),
+            ),
+            child: Text(
+              _systemMessageCache[text]!,
+              style: TextStyle(
+                color: isDarkMode ? Colors.white70 : Colors.black87,
+                fontSize: 12,
+              ),
+              textAlign: TextAlign.center,
+              maxLines: 2,
+            ),
+          ),
+        ),
+      );
+    }
+
+    // 캐시된 메시지가 없는 경우에만 FutureBuilder 사용
+    return FutureBuilder<String>(
+      future: _getSystemMessageKey(text, messageData),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Container(
+            width: double.infinity,
+            margin: EdgeInsets.symmetric(vertical: 10),
+            child: Center(
+              child: Container(
+                padding: EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: systemMessageColor,
+                  borderRadius: BorderRadius.circular(15),
+                ),
+                child: Text(
+                  text,
+                  style: TextStyle(
+                    color: isDarkMode ? Colors.white70 : Colors.black87,
+                    fontSize: 12,
+                  ),
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                ),
+              ),
+            ),
+          );
+        }
+        return Container(
+          width: double.infinity,
+          margin: EdgeInsets.symmetric(vertical: 10),
+          child: Center(
+            child: Container(
+              padding: EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 8,
+              ),
+              decoration: BoxDecoration(
+                color: systemMessageColor,
+                borderRadius: BorderRadius.circular(15),
+              ),
+              child: Text(
+                snapshot.data ?? text,
+                style: TextStyle(
+                  color: isDarkMode ? Colors.white70 : Colors.black87,
+                  fontSize: 12,
+                ),
+                textAlign: TextAlign.center,
+                maxLines: 2,
+              ),
+            ),
+          ),
+        );
+      },
+    );
   }
 }

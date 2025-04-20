@@ -130,11 +130,210 @@
         "image_sent": "Image sent",
         "file_sent": "File sent",
         "system": {
-          "joined": "{name} has joined the group",
-          "driver_accepted": "Driver has accepted the request",
-          "chat_activated": "Chat room has been activated",
-          "left": "{name} has left the group"
+          "driver_accepted": "Driver has accepted your request.\nChat room is now active.",
+          "driver_arrived": "Driver has arrived at the pickup location.",
+          "ride_started": "The journey has started.",
+          "ride_completed": "The journey has completed.",
+          "ride_cancelled": "The journey has been cancelled.",
+          "group_created": "Group has been created.",
+          "member_joined": "$fullname has joined the group.",
+          "member_left": "$fullname has left the group.",
+          "group_disbanded": "Group has been disbanded.",
+          "chat_room_created": "New chat room has been created.",
+          "added_to_queue": "You have been added to the waiting queue."
+        },
+        "drawer": {
+          "title": "Chat Room Info",
+          "riders": "Riders",
+          "driver": "Driver",
+          "loading": "Loading...",
+          "total_price": "Total Price",
+          "price_based_on": "Based on {0} people",
+          "leave_room": "Leave Chat Room",
+          "error_loading": "Error loading chat room information"
         }
+      }
+    },
+    "search": {
+      "title": "Search Ride",
+      "pickup": "Pickup Location",
+      "destination": "Destination",
+      "date": "Date",
+      "time": "Time",
+      "luggage": "Total Luggage",
+      "companions": "Total Passengers\n(with companions)",
+      "group_ride": "Group Ride",
+      "select_date": "Select Ride Date",
+      "select_time": "Select Ride Time",
+      "cancel": "Cancel",
+      "confirm": "Confirm Ride",
+      "current_location": "Current Location",
+      "psu_locations": "PSU Locations",
+      "airport_locations": "Airport Locations",
+      "error": {
+        "pickup_destination_required": "Please select both pickup and destination locations.",
+        "invalid_location": "Invalid location information.",
+        "date_time_required": "Please select both date and time.",
+        "location_permission_denied": "Location permission denied."
+      },
+      "validation": {
+        "select_pickup": "Please select a pickup location",
+        "select_destination": "Please select a destination",
+        "select_date_time": "Please select date and time",
+        "invalid_pickup": "Invalid pickup location",
+        "invalid_destination": "Invalid destination location"
+      },
+      "tips": {
+        "title": "Tips",
+        "book_early": "Book Early",
+        "book_early_desc": "It's recommended to depart at least 3 hours before your flight",
+        "prepare_luggage": "Prepare Your Luggage",
+        "prepare_luggage_desc": "Appropriate vehicle will be assigned based on luggage count",
+        "arrival_time": "Mind Your Arrival Time",
+        "arrival_time_desc": "Consider traffic conditions and allow sufficient time"
+      },
+      "passenger_count": "{count}",
+      "banner": {
+        "description": "Safe and comfortable airport transfer service",
+        "book_now": "Book Now"
+      },
+      "popup": {
+        "select_pickup": "Select Pickup Location",
+        "select_destination": "Select Destination",
+        "psu_option": "Penn State University",
+        "psu_subtitle": "Depart from university campus",
+        "psu_destination_subtitle": "Arrive at university campus",
+        "airport_option": "Airport",
+        "airport_subtitle": "Depart from airport",
+        "airport_destination_subtitle": "Arrive at airport",
+        "psu_locations": "Penn State University Locations",
+        "airport_locations": "Airport Locations",
+        "airport_pickup": "Airport Pickup Locations",
+        "airport_destination": "Select Airport Destination"
+      },
+      "location_map": {
+        "title_error": "Location Check",
+        "invalid_location": "Invalid location information",
+        "title_pickup": "Confirm Pickup Location",
+        "title_destination": "Confirm Destination Location",
+        "confirm": "Confirm Location"
+      },
+      "date_picker": {
+        "title": "Enter Ride Date"
+      },
+      "time_picker": {
+        "title": "Enter Ride Time"
+      }
+    },
+    "location_map": {
+      "title_pickup": "Confirm Pickup Location",
+      "title_destination": "Confirm Destination Location",
+      "confirm": "Confirm Location"
+    },
+    "common": {
+      "cancel": "Cancel",
+      "confirm": "Confirm"
+    },
+    "ride_confirmation": {
+      "title": "Confirm Ride Details",
+      "pickup": "Pickup Location",
+      "destination": "Destination",
+      "date": "Date",
+      "time": "Time",
+      "luggage": "Total Luggage",
+      "companions": "Total Passengers",
+      "price": "Total Price",
+      "price_per_person": "Price per person",
+      "confirm": "Confirm Ride",
+      "cancel": "Cancel",
+      "processing": "Processing your reservation",
+      "finding_travelers": "Finding travelers with similar schedules",
+      "driver_matching_info": "When 4 travelers are matched, it will be shown to drivers.\nChat room will be activated after driver acceptance",
+      "error": {
+        "invalid_location": "Invalid location information",
+        "invalid_date_time": "Invalid date or time",
+        "invalid_luggage": "Invalid luggage count"
+      }
+    },
+    "snackbar": {
+      "login": {
+        "email_required": "Please enter your email",
+        "invalid_email": "Invalid email format",
+        "password_required": "Please enter your password",
+        "password_length": "Password must be at least 6 characters",
+        "wrong_credentials": "Incorrect email or password",
+        "invalid_email_format": "Invalid email format",
+        "no_internet": "No internet connection"
+      },
+      "signup": {
+        "name_required": "Please enter your name",
+        "gmail_only": "Only Gmail (@gmail.com) is allowed",
+        "password_length": "Password must be at least 6 characters",
+        "no_internet": "No internet connection"
+      },
+      "password_reset": {
+        "email_sent": "Password reset email has been sent to {email}. Please check your email.",
+        "account_not_found": "No account found with this email",
+        "error": "An error occurred while sending the password reset email"
+      },
+      "ride": {
+        "booking_complete": "Booking completed! Please communicate with other travelers in the chat room.",
+        "booking_registered": "Booking information has been registered. Please wait for driver matching.",
+        "added_to_queue": "Your booking has been added to the queue. Chat room will be activated after driver acceptance.",
+        "new_chat_room": "A new chat room has been created"
+      },
+      "location": {
+        "check_network": "Please check your network connection",
+        "address_fetch_error": "Failed to fetch address information. Please try again later.",
+        "driver_not_found": "Driver not found",
+        "driver_token_not_found": "Driver's FCM token not found"
+      },
+      "search": {
+        "locations_required": "Please select both pickup and destination locations",
+        "invalid_location": "Invalid location information",
+        "datetime_required": "Please select both date and time",
+        "max_luggage": "Maximum 2 pieces of luggage per person allowed"
+      },
+      "settings": {
+        "logout_error": "An error occurred while logging out. Please try again.",
+        "instagram_error": "Unable to open Instagram link. Please try again."
+      },
+      "chat": {
+        "status_updated": "Ride status has been updated: {status}"
+      },
+      "user": {
+        "info_not_found": "User information not found",
+        "route_not_found": "Route information not found",
+        "request_error": "An error occurred while sending the request. Please try again."
+      }
+    },
+    "login_page": {
+      "title": "TAGO",
+      "subtitle": "WE ARE, TAGO",
+      "email_hint": "Email address",
+      "password_hint": "Password",
+      "forgot_password": "Forgot your password?",
+      "login_button": "Login",
+      "no_account": "Don't have an account? ",
+      "signup": "Sign Up",
+      "reset_password_title": "Reset Password",
+      "reset_password_desc": "We'll send a password reset link to your registered email.",
+      "cancel": "Cancel",
+      "send": "Send",
+      "user_data_not_found": "User data not found",
+      "made_by": "Made by team PLO",
+      "errors": {
+        "email_required": "Please enter your email",
+        "invalid_email": "Invalid email format",
+        "password_required": "Please enter your password",
+        "password_length": "Password must be at least 6 characters",
+        "wrong_credentials": "Incorrect email or password",
+        "invalid_email_format": "Invalid email format",
+        "no_internet": "No internet connection",
+        "login_error": "An error occurred during login.",
+        "reset_email_sent": "Password reset email has been sent to {email}. Please check your email.",
+        "reset_error": "An error occurred while sending the password reset email.",
+        "account_not_found": "No account found with this email."
       }
     }
   },

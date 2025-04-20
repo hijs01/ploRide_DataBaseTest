@@ -404,7 +404,7 @@ class _HomePageState extends State<HomePage> {
                                     .where(
                                       'text',
                                       isEqualTo:
-                                          '드라이버가 요청을 수락했습니다. 채팅방이 활성화되었습니다.',
+                                          'app.chat.room.system.driver_accepted'.tr(),
                                     )
                                     .get();
 
@@ -414,13 +414,39 @@ class _HomePageState extends State<HomePage> {
                                   .doc(chatRoomId)
                                   .collection('messages')
                                   .add({
-                                    'text': '드라이버가 요청을 수락했습니다. 채팅방이 활성화되었습니다.',
+                                    'text': 'app.chat.room.system.driver_accepted',
                                     'sender_id': 'system',
                                     'sender_name': '시스템',
                                     'timestamp': FieldValue.serverTimestamp(),
                                     'type': 'system',
                                   });
                             }
+
+                            // 새로운 채팅방 생성 메시지 추가
+                            await FirebaseFirestore.instance
+                                .collection(chatRoomCollection)
+                                .doc(chatRoomId)
+                                .collection('messages')
+                                .add({
+                                  'text': 'app.chat.room.system.chat_room_created',
+                                  'sender_id': 'system',
+                                  'sender_name': '시스템',
+                                  'timestamp': FieldValue.serverTimestamp(),
+                                  'type': 'system',
+                                });
+
+                            // 대기열 추가 메시지 추가
+                            await FirebaseFirestore.instance
+                                .collection(chatRoomCollection)
+                                .doc(chatRoomId)
+                                .collection('messages')
+                                .add({
+                                  'text': 'app.chat.room.system.added_to_queue',
+                                  'sender_id': 'system',
+                                  'sender_name': '시스템',
+                                  'timestamp': FieldValue.serverTimestamp(),
+                                  'type': 'system',
+                                });
                           }
 
                           print('드라이버가 수락했습니다. 채팅방이 활성화됩니다.');
@@ -513,7 +539,7 @@ class _HomePageState extends State<HomePage> {
       body = Container(child: pages[_selectedIndex]);
     } else if (_selectedIndex <= 1) {
       appBar = PreferredSize(
-        preferredSize: Size.fromHeight(180),
+        preferredSize: Size.fromHeight(200),
         child: Container(
           color: isDarkMode ? Colors.black : Colors.white,
           child: SafeArea(
@@ -773,10 +799,7 @@ class _HomePageState extends State<HomePage> {
                           Text(
                             'View Profile',
                             style: TextStyle(
-                              color:
-                                  isDarkMode
-                                      ? Colors.grey[400]
-                                      : Colors.grey[600],
+                              color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
                             ),
                           ),
                         ],
@@ -948,10 +971,10 @@ class _HomeContentState extends State<HomeContent> {
         'collection': 'airportToPsu',
       }));
 
-      // timestamp 기준으로 정렬
+      // ride_date 기준으로 정렬 (히스토리 페이지와 동일하게)
       allTrips.sort((a, b) {
-        Timestamp aTime = a['timestamp'] as Timestamp;
-        Timestamp bTime = b['timestamp'] as Timestamp;
+        Timestamp aTime = a['ride_date'] as Timestamp;
+        Timestamp bTime = b['ride_date'] as Timestamp;
         return bTime.compareTo(aTime);
       });
 
@@ -968,22 +991,10 @@ class _HomeContentState extends State<HomeContent> {
         return;
       }
 
-      // 가장 최근의 취소되지 않은 여정 찾기
-      for (var trip in allTrips) {
-        if (trip['status'] != 'cancelled' && trip['status'] != '취소됨') {
-          print('가져온 데이터: $trip');
-          setState(() {
-            _reservedTrip = trip;
-            _isLoading = false;
-          });
-          return;
-        }
-      }
-
-      // 모든 여정이 취소된 경우
-      print('모든 여정이 취소되었습니다');
+      // 가장 최근의 여정 선택 (취소 여부와 관계없이)
+      print('가장 최근 여정 선택: ${allTrips.first}');
       setState(() {
-        _reservedTrip = null;
+        _reservedTrip = allTrips.first;
         _isLoading = false;
       });
     } catch (e) {
@@ -1212,7 +1223,9 @@ class _HomeContentState extends State<HomeContent> {
                       children: [
                         SizedBox(height: 16),
                         Text(
-                          'PLO 와 함께할 용사',
+                          context.locale.languageCode == 'ko' 
+                              ? 'PLO 와 함께할 용사' 
+                              : 'Join PLO Gang',
                           style: TextStyle(
                             color: Colors.white,
                             fontSize: 18,
@@ -1221,7 +1234,9 @@ class _HomeContentState extends State<HomeContent> {
                         ),
                         SizedBox(height: 6),
                         Text(
-                          'PLO 와 함께할 기회 바로 지금입니다.',
+                          context.locale.languageCode == 'ko'
+                              ? 'PLO 와 함께할 기회 바로 지금입니다.'
+                              : 'Your chance to join PLO is now.',
                           style: TextStyle(
                             color: Colors.white.withOpacity(0.9),
                             fontSize: 13,
@@ -1243,7 +1258,7 @@ class _HomeContentState extends State<HomeContent> {
                       ),
                     ),
                     child: Text(
-                      'ㄱㄱ?',
+                      context.locale.languageCode == 'ko' ? 'ㄱㄱ?' : 'Join',
                       style: TextStyle(fontWeight: FontWeight.bold),
                     ),
                   ),
@@ -1260,14 +1275,29 @@ class _HomeContentState extends State<HomeContent> {
 
   // Timestamp를 포맷팅하는 함수
   String _formatDateTime(dynamic timestamp) {
-    if (timestamp == null) return '날짜 정보 없음';
+    if (timestamp == null) return 'app.home.no_date_info'.tr();
 
     if (timestamp is Timestamp) {
       final date = timestamp.toDate();
-      return '${date.year}년 ${date.month}월 ${date.day}일 ${date.hour}:${date.minute.toString().padLeft(2, '0')}';
+      final locale = context.locale.languageCode;
+      
+      if (locale == 'ko') {
+        return '${date.year}년 ${date.month}월 ${date.day}일 ${date.hour}:${date.minute.toString().padLeft(2, '0')}';
+      } else {
+        // 영어 형식으로 날짜 변환
+        final months = [
+          'January', 'February', 'March', 'April', 'May', 'June',
+          'July', 'August', 'September', 'October', 'November', 'December'
+        ];
+        String period = date.hour < 12 ? 'AM' : 'PM';
+        int hour = date.hour % 12;
+        if (hour == 0) hour = 12;
+        
+        return '${months[date.month - 1]} ${date.day}, ${date.year} ${hour}:${date.minute.toString().padLeft(2, '0')} $period';
+      }
     }
 
-    return '날짜 정보 없음';
+    return 'app.home.no_date_info'.tr();
   }
 
   // 요금 정보를 포맷팅하는 함수

@@ -82,7 +82,7 @@ class _LoginpageState extends State<Loginpage>
   void login() async {
     // 이메일 형식 검증
     if (emailController.text.isEmpty) {
-      showSnackBar('이메일을 입력해주세요', isError: true);
+      showSnackBar('Please enter your email', isError: true);
       return;
     }
 
@@ -90,18 +90,18 @@ class _LoginpageState extends State<Loginpage>
       r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$',
     );
     if (!emailRegex.hasMatch(emailController.text)) {
-      showSnackBar('올바른 이메일 형식이 아닙니다', isError: true);
+      showSnackBar('Invalid email format', isError: true);
       return;
     }
 
     // 비밀번호 검증
     if (passwordController.text.isEmpty) {
-      showSnackBar('비밀번호를 입력해주세요', isError: true);
+      showSnackBar('Please enter your password', isError: true);
       return;
     }
 
     if (passwordController.text.length < 6) {
-      showSnackBar('비밀번호는 6자리 이상이어야 합니다', isError: true);
+      showSnackBar('Password must be at least 6 characters', isError: true);
       return;
     }
 
@@ -158,7 +158,7 @@ class _LoginpageState extends State<Loginpage>
           setState(() {
             _isLoading = false;
           });
-          showSnackBar('사용자 데이터를 찾을 수 없습니다', isError: true);
+          showSnackBar('User data not found', isError: true);
         }
       }
     } on FirebaseAuthException catch (e) {
@@ -167,17 +167,17 @@ class _LoginpageState extends State<Loginpage>
       });
 
       // 오류 메시지 처리
-      String errorMessage = '로그인 중 오류가 발생했습니다.';
+      String errorMessage = 'An error occurred during login.';
       switch (e.code) {
         case 'user-not-found':
         case 'wrong-password':
-          errorMessage = '이메일이나 비밀번호가 틀렸습니다.';
+          errorMessage = 'Incorrect email or password.';
           break;
         case 'invalid-email':
-          errorMessage = '유효하지 않은 이메일 형식입니다.';
+          errorMessage = 'Invalid email format.';
           break;
         default:
-          errorMessage = '이메일이나 비밀번호가 틀렸습니다.';
+          errorMessage = 'Incorrect email or password.';
       }
 
       showSnackBar(errorMessage, isError: true);
@@ -185,7 +185,7 @@ class _LoginpageState extends State<Loginpage>
       setState(() {
         _isLoading = false;
       });
-      showSnackBar('이메일이나 비밀번호가 틀렸습니다.', isError: true);
+      showSnackBar('Incorrect email or password.', isError: true);
     }
   }
 
@@ -218,12 +218,12 @@ class _LoginpageState extends State<Loginpage>
             validateEmail(resetEmailController.text);
 
             return AlertDialog(
-              title: Text('비밀번호 재설정'),
+              title: Text('Reset Password'),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    '등록하신 이메일로 비밀번호 재설정 링크를 보내드립니다.',
+                    'We\'ll send a password reset link to your registered email.',
                     style: TextStyle(fontSize: 14),
                   ),
                   SizedBox(height: 16),
@@ -232,7 +232,7 @@ class _LoginpageState extends State<Loginpage>
                     keyboardType: TextInputType.emailAddress,
                     decoration: InputDecoration(
                       prefixIcon: Icon(Icons.email_outlined, color: themeColor),
-                      hintText: '이메일 주소',
+                      hintText: 'Email address',
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                         borderSide: BorderSide(color: Colors.grey.shade300),
@@ -265,7 +265,7 @@ class _LoginpageState extends State<Loginpage>
                     Navigator.pop(context);
                   },
                   child: Text(
-                    '취소',
+                    'Cancel',
                     style: TextStyle(color: Colors.grey.shade600),
                   ),
                 ),
@@ -285,7 +285,7 @@ class _LoginpageState extends State<Loginpage>
                               if (connectivityResult ==
                                   ConnectivityResult.none) {
                                 Navigator.pop(context);
-                                showSnackBar('인터넷 연결이 없습니다', isError: true);
+                                showSnackBar('No internet connection', isError: true);
                                 return;
                               }
 
@@ -299,23 +299,23 @@ class _LoginpageState extends State<Loginpage>
 
                               // 성공 메시지 표시
                               showSnackBar(
-                                '${resetEmailController.text}로 비밀번호 재설정 이메일이 발송되었습니다. 이메일을 확인해주세요.',
+                                'Password reset email has been sent to ${resetEmailController.text}. Please check your email.',
                               );
                             } on FirebaseAuthException catch (e) {
                               Navigator.pop(context);
 
                               // 오류 메시지 처리
                               String errorMessage =
-                                  '비밀번호 재설정 메일 발송 중 오류가 발생했습니다.';
+                                  'An error occurred while sending the password reset email.';
                               if (e.code == 'user-not-found') {
-                                errorMessage = '해당 이메일로 등록된 계정이 없습니다.';
+                                errorMessage = 'No account found with this email.';
                               }
 
                               showSnackBar(errorMessage, isError: true);
                             } catch (e) {
                               Navigator.pop(context);
                               showSnackBar(
-                                '비밀번호 재설정 메일 발송 중 오류가 발생했습니다.',
+                                'An error occurred while sending the password reset email.',
                                 isError: true,
                               );
                             }
@@ -328,7 +328,7 @@ class _LoginpageState extends State<Loginpage>
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  child: Text('발송하기'),
+                  child: Text('Send'),
                 ),
               ],
               shape: RoundedRectangleBorder(
@@ -495,7 +495,7 @@ class _LoginpageState extends State<Loginpage>
                                     color: themeColor,
                                     size: 22,
                                   ),
-                                  hintText: '이메일 주소',
+                                  hintText: 'Email address',
                                   hintStyle: TextStyle(
                                     color: Colors.grey.shade400,
                                     fontSize: 14,
@@ -577,7 +577,7 @@ class _LoginpageState extends State<Loginpage>
                                       });
                                     },
                                   ),
-                                  hintText: '비밀번호',
+                                  hintText: 'Password',
                                   hintStyle: TextStyle(
                                     color: Colors.grey.shade400,
                                     fontSize: 14,
@@ -621,7 +621,7 @@ class _LoginpageState extends State<Loginpage>
                                   _showForgotPasswordDialog();
                                 },
                                 child: Text(
-                                  '비밀번호를 잊으셨나요?',
+                                  'Forgot your password?',
                                   style: TextStyle(
                                     color: themeColor,
                                     fontSize: 14,
@@ -701,7 +701,7 @@ class _LoginpageState extends State<Loginpage>
                                             if (connectivityResult ==
                                                 ConnectivityResult.none) {
                                               showSnackBar(
-                                                '인터넷 연결이 없습니다',
+                                                'No internet connection',
                                                 isError: true,
                                               );
                                               return;
@@ -753,7 +753,7 @@ class _LoginpageState extends State<Loginpage>
                                                   ),
                                                   SizedBox(width: 8),
                                                   Text(
-                                                    '로그인',
+                                                    'Login',
                                                     style: TextStyle(
                                                       color: Colors.white,
                                                       fontSize: 18,
@@ -808,14 +808,14 @@ class _LoginpageState extends State<Loginpage>
                                 text: TextSpan(
                                   children: [
                                     TextSpan(
-                                      text: '계정이 없으신가요? ',
+                                      text: 'Don\'t have an account? ',
                                       style: TextStyle(
                                         color: Colors.black54,
                                         fontSize: 14,
                                       ),
                                     ),
                                     TextSpan(
-                                      text: '회원가입',
+                                      text: 'Sign Up',
                                       style: TextStyle(
                                         color: themeColor,
                                         fontSize: 14,

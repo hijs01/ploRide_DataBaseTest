@@ -126,16 +126,16 @@ class _RegistrationPageState extends State<RegistrationPage>
       });
 
       // 오류 메시지 처리
-      String errorMessage = '회원가입 중 오류가 발생했습니다.';
+      String errorMessage = 'An error occurred during registration.';
       switch (e.code) {
         case 'email-already-in-use':
-          errorMessage = '이미 사용 중인 이메일 주소입니다.';
+          errorMessage = 'This email is already in use.';
           break;
         case 'weak-password':
-          errorMessage = '비밀번호가 너무 약합니다.';
+          errorMessage = 'Password is too weak.';
           break;
         case 'invalid-email':
-          errorMessage = '유효하지 않은 이메일 형식입니다.';
+          errorMessage = 'Invalid email format.';
           break;
         default:
           errorMessage = e.message ?? errorMessage;
@@ -223,7 +223,7 @@ class _RegistrationPageState extends State<RegistrationPage>
                         ),
                         SizedBox(height: 10),
                         Text(
-                          '계정 생성하기',
+                          'Create Account',
                           style: TextStyle(
                             fontSize: 16,
                             color: Colors.white.withOpacity(0.9),
@@ -302,7 +302,7 @@ class _RegistrationPageState extends State<RegistrationPage>
                                     color: themeColor,
                                     size: 22,
                                   ),
-                                  hintText: '이름',
+                                  hintText: 'Full Name',
                                   hintStyle: TextStyle(
                                     color: Colors.grey.shade400,
                                     fontSize: 14,
@@ -370,8 +370,8 @@ class _RegistrationPageState extends State<RegistrationPage>
                                     color: themeColor,
                                     size: 22,
                                   ),
-                                  hintText: '이메일 주소 (@gmail.com만 가능)',
-                                  helperText: 'Gmail 계정만 사용 가능합니다',
+                                  hintText: 'Email address (Gmail only)',
+                                  helperText: 'Only Gmail accounts are allowed',
                                   helperStyle: TextStyle(
                                     color: themeColor,
                                     fontSize: 12,
@@ -458,7 +458,7 @@ class _RegistrationPageState extends State<RegistrationPage>
                                       });
                                     },
                                   ),
-                                  hintText: '비밀번호',
+                                  hintText: 'Password',
                                   hintStyle: TextStyle(
                                     color: Colors.grey.shade400,
                                     fontSize: 14,
@@ -544,7 +544,7 @@ class _RegistrationPageState extends State<RegistrationPage>
                                             if (connectivityResult ==
                                                 ConnectivityResult.none) {
                                               showSnackBar(
-                                                '인터넷 연결이 없습니다',
+                                                'No internet connection',
                                                 isError: true,
                                               );
                                               return;
@@ -554,7 +554,7 @@ class _RegistrationPageState extends State<RegistrationPage>
                                             if (fullnameController.text.length <
                                                 3) {
                                               showSnackBar(
-                                                '이름을 입력해주세요',
+                                                'Please enter your name',
                                                 isError: true,
                                               );
                                               return;
@@ -568,7 +568,7 @@ class _RegistrationPageState extends State<RegistrationPage>
                                               emailController.text,
                                             )) {
                                               showSnackBar(
-                                                'Gmail(@gmail.com) 이메일만 사용 가능합니다',
+                                                'Only Gmail(@gmail.com) is allowed',
                                                 isError: true,
                                               );
                                               return;
@@ -578,7 +578,7 @@ class _RegistrationPageState extends State<RegistrationPage>
                                             if (passwordController.text.length <
                                                 6) {
                                               showSnackBar(
-                                                '비밀번호는 최소 6자 이상이어야 합니다',
+                                                'Password must be at least 6 characters',
                                                 isError: true,
                                               );
                                               return;
@@ -631,7 +631,7 @@ class _RegistrationPageState extends State<RegistrationPage>
                                                   ),
                                                   SizedBox(width: 8),
                                                   Text(
-                                                    '회원가입',
+                                                    'Sign Up',
                                                     style: TextStyle(
                                                       color: Colors.white,
                                                       fontSize: 18,
@@ -686,14 +686,14 @@ class _RegistrationPageState extends State<RegistrationPage>
                                 text: TextSpan(
                                   children: [
                                     TextSpan(
-                                      text: '이미 계정이 있으신가요? ',
+                                      text: 'Already have an account? ',
                                       style: TextStyle(
                                         color: Colors.black54,
                                         fontSize: 14,
                                       ),
                                     ),
                                     TextSpan(
-                                      text: '로그인',
+                                      text: 'Login',
                                       style: TextStyle(
                                         color: themeColor,
                                         fontSize: 14,

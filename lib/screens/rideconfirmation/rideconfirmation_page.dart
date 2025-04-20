@@ -9,6 +9,7 @@ import 'package:cabrider/globalvariable.dart';
 // 알림 관련 임포트 주석 처리
 // import 'package:cabrider/helpers/helpermethods.dart';
 import 'package:cabrider/screens/homepage.dart';
+import 'package:easy_localization/easy_localization.dart';
 
 class RideConfirmationPage extends StatefulWidget {
   static const String id = 'rideconfirmation';
@@ -176,16 +177,20 @@ class _RideConfirmationPageState extends State<RideConfirmationPage>
     String formattedTime = '';
 
     if (appData.rideDate != null) {
-      formattedDate =
-          "${appData.rideDate!.year}년 ${appData.rideDate!.month}월 ${appData.rideDate!.day}일";
+      // 영어 형식으로 날짜 변환
+      final months = [
+        'January', 'February', 'March', 'April', 'May', 'June',
+        'July', 'August', 'September', 'October', 'November', 'December'
+      ];
+      formattedDate = "${months[appData.rideDate!.month - 1]} ${appData.rideDate!.day}, ${appData.rideDate!.year}";
     }
 
     if (appData.rideTime != null) {
-      String period = appData.rideTime!.hour < 12 ? '오전' : '오후';
+      // 영어 형식으로 시간 변환 (AM/PM)
+      String period = appData.rideTime!.hour < 12 ? 'AM' : 'PM';
       int hour = appData.rideTime!.hour % 12;
       if (hour == 0) hour = 12;
-      formattedTime =
-          "$period $hour:${appData.rideTime!.minute.toString().padLeft(2, '0')}";
+      formattedTime = "$hour:${appData.rideTime!.minute.toString().padLeft(2, '0')} $period";
     }
 
     return Scaffold(
@@ -194,7 +199,7 @@ class _RideConfirmationPageState extends State<RideConfirmationPage>
         backgroundColor: backgroundColor,
         elevation: 0,
         title: Text(
-          '탑승 정보 확인',
+          'app.ride_confirmation.title'.tr(),
           style: TextStyle(
             color: textColor,
             fontSize: 16,
@@ -288,7 +293,7 @@ class _RideConfirmationPageState extends State<RideConfirmationPage>
                                         CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        '출발지',
+                                        'app.ride_confirmation.pickup'.tr(),
                                         style: TextStyle(
                                           fontSize: 12,
                                           color: subtitleColor,
@@ -296,7 +301,7 @@ class _RideConfirmationPageState extends State<RideConfirmationPage>
                                       ),
                                       SizedBox(height: 2),
                                       Text(
-                                        pickup?.placeName ?? '정보 없음',
+                                        pickup?.placeName ?? 'app.ride_confirmation.error.invalid_location'.tr(),
                                         style: TextStyle(
                                           fontSize: 14,
                                           fontWeight: FontWeight.bold,
@@ -314,7 +319,7 @@ class _RideConfirmationPageState extends State<RideConfirmationPage>
                                         CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        '목적지',
+                                        'app.ride_confirmation.destination'.tr(),
                                         style: TextStyle(
                                           fontSize: 12,
                                           color: subtitleColor,
@@ -322,7 +327,7 @@ class _RideConfirmationPageState extends State<RideConfirmationPage>
                                       ),
                                       SizedBox(height: 2),
                                       Text(
-                                        destination?.placeName ?? '정보 없음',
+                                        destination?.placeName ?? 'app.ride_confirmation.error.invalid_location'.tr(),
                                         style: TextStyle(
                                           fontSize: 14,
                                           fontWeight: FontWeight.bold,
@@ -345,52 +350,67 @@ class _RideConfirmationPageState extends State<RideConfirmationPage>
 
                 // 날짜, 시간, 캐리어 개수, 같이 타는 친구 수 그리드
                 Container(
-                  margin: EdgeInsets.only(bottom: 8),
-                  child: Row(
+                  margin: EdgeInsets.only(bottom: 16),
+                  child: Column(
                     children: [
-                      _buildInfoCard(
-                        context,
-                        Icons.calendar_today_outlined,
-                        '날짜',
-                        formattedDate.isEmpty ? '정보 없음' : formattedDate,
-                        primaryColor,
-                        textColor,
-                        subtitleColor,
-                        cardColor,
-                        flex: 2,
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildInfoCard(
+                              context,
+                              Icons.calendar_today_outlined,
+                              'app.ride_confirmation.date'.tr(),
+                              formattedDate.isEmpty ? 'app.ride_confirmation.error.invalid_date_time'.tr() : formattedDate,
+                              primaryColor,
+                              textColor,
+                              subtitleColor,
+                              cardColor,
+                            ),
+                          ),
+                          SizedBox(width: 12),
+                          Expanded(
+                            child: _buildInfoCard(
+                              context,
+                              Icons.access_time,
+                              'app.ride_confirmation.time'.tr(),
+                              formattedTime.isEmpty ? 'app.ride_confirmation.error.invalid_date_time'.tr() : formattedTime,
+                              primaryColor,
+                              textColor,
+                              subtitleColor,
+                              cardColor,
+                            ),
+                          ),
+                        ],
                       ),
-                      SizedBox(width: 8),
-                      _buildInfoCard(
-                        context,
-                        Icons.access_time,
-                        '시간',
-                        formattedTime.isEmpty ? '정보 없음' : formattedTime,
-                        primaryColor,
-                        textColor,
-                        subtitleColor,
-                        cardColor,
-                      ),
-                      SizedBox(width: 8),
-                      _buildInfoCard(
-                        context,
-                        Icons.luggage,
-                        '캐리어',
-                        '${appData.luggageCount}개',
-                        primaryColor,
-                        textColor,
-                        subtitleColor,
-                        cardColor,
-                      ),
-                      SizedBox(width: 8),
-                      _buildInfoCard(
-                        context,
-                        Icons.people_rounded,
-                        '총 인원',
-                        '${appData.companionCount + 1}명',
-                        primaryColor,
-                        textColor,
-                        subtitleColor,
-                        cardColor,
+                      SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildInfoCard(
+                              context,
+                              Icons.luggage,
+                              'app.ride_confirmation.luggage'.tr(),
+                              '${appData.luggageCount}',
+                              primaryColor,
+                              textColor,
+                              subtitleColor,
+                              cardColor,
+                            ),
+                          ),
+                          SizedBox(width: 12),
+                          Expanded(
+                            child: _buildInfoCard(
+                              context,
+                              Icons.people_rounded,
+                              'app.ride_confirmation.companions'.tr(),
+                              '${appData.companionCount + 1}',
+                              primaryColor,
+                              textColor,
+                              subtitleColor,
+                              cardColor,
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -398,7 +418,7 @@ class _RideConfirmationPageState extends State<RideConfirmationPage>
 
                 // 요금 카드 (강조 표시)
                 Container(
-                  height: 80,
+                  height: 90,
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: [primaryColor, secondaryColor],
@@ -436,7 +456,9 @@ class _RideConfirmationPageState extends State<RideConfirmationPage>
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Text(
-                              '주의!',
+                              context.locale.languageCode == 'ko' 
+                                  ? '주의!' 
+                                  : 'Warning!',
                               style: TextStyle(
                                 fontSize: 13,
                                 fontWeight: FontWeight.bold,
@@ -447,11 +469,15 @@ class _RideConfirmationPageState extends State<RideConfirmationPage>
                             ),
                             SizedBox(height: 3),
                             Text(
-                              '다시 한번 확인해 주세요!',
+                              context.locale.languageCode == 'ko'
+                                  ? '다시 한번 확인해 주세요!'
+                                  : 'Please check your ride details again!',
                               style: TextStyle(
-                                fontSize: 14,
+                                fontSize: 13,
                                 color: Colors.white.withOpacity(0.9),
                               ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ],
                         ),
@@ -468,7 +494,7 @@ class _RideConfirmationPageState extends State<RideConfirmationPage>
                         child: Row(
                           children: [
                             Text(
-                              '현금결제',
+                              context.locale.languageCode == 'ko' ? '현금결제' : 'Cash',
                               style: TextStyle(
                                 fontSize: 13,
                                 color: Colors.white,
@@ -518,30 +544,18 @@ class _RideConfirmationPageState extends State<RideConfirmationPage>
 
                             // 안내 텍스트
                             Center(
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    Icons.arrow_forward,
-                                    color:
-                                        _sliderValue > 0.6
-                                            ? Colors.white
-                                            : primaryColor,
-                                    size: 16,
-                                  ),
-                                  SizedBox(width: 8),
-                                  Text(
-                                    '스와이프하여 예약 확정',
-                                    style: TextStyle(
-                                      color:
-                                          _sliderValue > 0.6
-                                              ? Colors.white
-                                              : primaryColor,
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: 15,
-                                    ),
-                                  ),
-                                ],
+                              child: Text(
+                                context.locale.languageCode == 'ko' 
+                                    ? '슬라이드하여 탑승 확정' 
+                                    : 'Slide to confirm ride!',
+                                style: TextStyle(
+                                  color:
+                                      _sliderValue > 0.6
+                                          ? Colors.white
+                                          : primaryColor,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 15,
+                                ),
                               ),
                             ),
 
@@ -583,7 +597,7 @@ class _RideConfirmationPageState extends State<RideConfirmationPage>
                       ),
                       SizedBox(height: 8),
                       Text(
-                        '오른쪽으로 끝까지 밀어서 예약 확정',
+                        'app.ride_confirmation.cancel'.tr(),
                         style: TextStyle(color: subtitleColor, fontSize: 12),
                       ),
                     ],
@@ -612,54 +626,57 @@ class _RideConfirmationPageState extends State<RideConfirmationPage>
     Color cardColor, {
     int flex = 1,
   }) {
-    return Expanded(
-      flex: flex,
-      child: Container(
-        height: 95,
-        decoration: BoxDecoration(
-          color: cardColor,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.03),
-              blurRadius: 8,
-              offset: Offset(0, 2),
-            ),
-          ],
-        ),
-        padding: EdgeInsets.symmetric(vertical: 12, horizontal: 12),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.start,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              padding: EdgeInsets.all(4),
-              decoration: BoxDecoration(
-                color: primaryColor.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(6),
+    return Container(
+      height: 110,
+      decoration: BoxDecoration(
+        color: cardColor,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 8,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      padding: EdgeInsets.all(16),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: primaryColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(icon, color: primaryColor, size: 16),
               ),
-              child: Icon(icon, color: primaryColor, size: 14),
-            ),
-            SizedBox(height: 8),
-            Text(label, style: TextStyle(fontSize: 11, color: subtitleColor)),
-            SizedBox(height: 4),
-            Expanded(
-              child: Container(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  value,
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.bold,
-                    color: textColor,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                  maxLines: 2,
+              SizedBox(width: 8),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: subtitleColor,
+                  fontWeight: FontWeight.w500,
                 ),
               ),
+            ],
+          ),
+          SizedBox(height: 12),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: textColor,
             ),
-          ],
-        ),
+            overflow: TextOverflow.ellipsis,
+            maxLines: 1,
+          ),
+        ],
       ),
     );
   }
@@ -729,7 +746,7 @@ class _RideConfirmationPageState extends State<RideConfirmationPage>
                     ),
                     SizedBox(height: 20),
                     Text(
-                      '예약 정보를 처리 중입니다',
+                      'app.ride_confirmation.processing'.tr(),
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 16,
@@ -739,12 +756,12 @@ class _RideConfirmationPageState extends State<RideConfirmationPage>
                     ),
                     SizedBox(height: 12),
                     Text(
-                      '비슷한 일정의 여행자들과 그룹을 구성 중입니다',
+                      'app.ride_confirmation.finding_travelers'.tr(),
                       style: TextStyle(fontSize: 14, color: subtitleColor),
                     ),
                     SizedBox(height: 8),
                     Text(
-                      '4명의 여행자가 모이면 드라이버에게 표시되며,\n드라이버 수락 후 채팅방이 활성화됩니다',
+                      'app.ride_confirmation.driver_matching_info'.tr(),
                       textAlign: TextAlign.center,
                       style: TextStyle(fontSize: 12, color: subtitleColor),
                     ),

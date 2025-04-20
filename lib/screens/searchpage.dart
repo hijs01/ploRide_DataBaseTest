@@ -15,6 +15,7 @@ import 'package:cabrider/widgets/psu_locations_list.dart';
 import 'package:cabrider/data/airport_locations_list.dart';
 import 'package:cabrider/screens/homepage.dart';
 import 'package:cabrider/screens/location_map_page.dart'; // 지도 페이지 임포트
+import 'package:easy_localization/easy_localization.dart';
 
 // 커스텀 Route 클래스 정의
 class LeftToRightPageRoute<T> extends PageRouteBuilder<T> {
@@ -134,8 +135,8 @@ class _SearchPageState extends State<SearchPage> {
     // pickup과 destination이 모두 존재하는지 확인
     if (pickup == null || destination == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('출발지와 목적지를 모두 선택해주세요.'),
+        SnackBar(
+          content: Text('app.search.error.pickup_destination_required'.tr()),
           duration: Duration(seconds: 2),
         ),
       );
@@ -147,19 +148,18 @@ class _SearchPageState extends State<SearchPage> {
         destination.latitude == null ||
         destination.longitude == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('유효하지 않은 위치 정보입니다.'),
+        SnackBar(
+          content: Text('app.search.error.invalid_location'.tr()),
           duration: Duration(seconds: 2),
         ),
       );
       return;
     }
 
-    // 날짜와, 시간이 선택되었는지 확인
     if (selectedDate == null || selectedTime == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('날짜와 시간을 선택해주세요.'),
+        SnackBar(
+          content: Text('app.search.error.date_time_required'.tr()),
           duration: Duration(seconds: 2),
         ),
       );
@@ -196,9 +196,9 @@ class _SearchPageState extends State<SearchPage> {
       initialDate: selectedDate ?? now,
       firstDate: now,
       lastDate: DateTime(now.year + 1, now.month, now.day),
-      helpText: '탑승 날짜를 선택하세요',
-      cancelText: '취소',
-      confirmText: '확인',
+      helpText: 'app.search.date_picker.title'.tr(),
+      cancelText: 'app.common.cancel'.tr(),
+      confirmText: 'app.common.confirm'.tr(),
       builder: (BuildContext context, Widget? child) {
         return Theme(
           data:
@@ -245,9 +245,9 @@ class _SearchPageState extends State<SearchPage> {
     final TimeOfDay? picked = await showTimePicker(
       context: context,
       initialTime: selectedTime ?? now,
-      helpText: '탑승 시간을 선택하세요',
-      cancelText: '취소',
-      confirmText: '확인',
+      helpText: 'app.search.time_picker.title'.tr(),
+      cancelText: 'app.common.cancel'.tr(),
+      confirmText: 'app.common.confirm'.tr(),
       builder: (BuildContext context, Widget? child) {
         return Theme(
           data:
@@ -409,7 +409,7 @@ class _SearchPageState extends State<SearchPage> {
             },
           ),
           title: Text(
-            '탑승 정보',
+            'app.search.title'.tr(),
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w600,
@@ -594,7 +594,7 @@ class _SearchPageState extends State<SearchPage> {
                                   fontSize: 16,
                                 ),
                                 decoration: InputDecoration(
-                                  hintText: '출발 위치',
+                                  hintText: 'app.search.pickup'.tr(),
                                   hintStyle: TextStyle(
                                     color:
                                         isDarkMode
@@ -657,7 +657,7 @@ class _SearchPageState extends State<SearchPage> {
                                   fontSize: 16,
                                 ),
                                 decoration: InputDecoration(
-                                  hintText: '도착 위치',
+                                  hintText: 'app.search.destination'.tr(),
                                   hintStyle: TextStyle(
                                     color:
                                         isDarkMode
@@ -722,7 +722,7 @@ class _SearchPageState extends State<SearchPage> {
                                         fontSize: 15,
                                       ),
                                       decoration: InputDecoration(
-                                        hintText: '날짜',
+                                        hintText: 'app.search.date'.tr(),
                                         hintStyle: TextStyle(
                                           color:
                                               isDarkMode
@@ -784,7 +784,7 @@ class _SearchPageState extends State<SearchPage> {
                                         fontSize: 15,
                                       ),
                                       decoration: InputDecoration(
-                                        hintText: '시간',
+                                        hintText: 'app.search.time'.tr(),
                                         hintStyle: TextStyle(
                                           color:
                                               isDarkMode
@@ -841,7 +841,7 @@ class _SearchPageState extends State<SearchPage> {
                               ),
                               SizedBox(width: 16),
                               Text(
-                                '총 캐리어 개수',
+                                'app.search.luggage'.tr(),
                                 style: TextStyle(
                                   fontSize: 16,
                                   color: textColor,
@@ -933,26 +933,29 @@ class _SearchPageState extends State<SearchPage> {
                                 ),
                               ),
                               SizedBox(width: 16),
-                              Text(
-                                '총 인원수 (동반자 포함)',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  color: textColor,
+                              Expanded(
+                                child: Text(
+                                  'app.search.companions'.tr(),
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: textColor,
+                                    height: 1.2,
+                                  ),
+                                  maxLines: 2,
                                 ),
                               ),
-                              Spacer(),
                               Row(
+                                mainAxisSize: MainAxisSize.min,
                                 children: [
                                   IconButton(
-                                    icon: Icon(Icons.remove, color: textColor),
+                                    padding: EdgeInsets.zero,
+                                    constraints: BoxConstraints(),
+                                    icon: Icon(Icons.remove, color: textColor, size: 20),
                                     onPressed: () {
                                       setState(() {
                                         if (companionCount > 1) {
-                                          // 최소 2명(본인+1)
                                           companionCount--;
-                                          // 총 인원수가 줄어들 때 캐리어 개수도 자동 조정
-                                          int maxLuggage =
-                                              (companionCount + 1) * 2;
+                                          int maxLuggage = (companionCount + 1) * 2;
                                           if (luggageCount > maxLuggage) {
                                             luggageCount = maxLuggage;
                                           }
@@ -960,20 +963,23 @@ class _SearchPageState extends State<SearchPage> {
                                       });
                                     },
                                   ),
+                                  SizedBox(width: 8),
                                   Text(
-                                    '${companionCount + 1}명', // 본인 포함 총 인원수
+                                    '${companionCount + 1}',
                                     style: TextStyle(
-                                      fontSize: 16,
+                                      fontSize: 14,
                                       fontWeight: FontWeight.bold,
                                       color: textColor,
                                     ),
                                   ),
+                                  SizedBox(width: 8),
                                   IconButton(
-                                    icon: Icon(Icons.add, color: textColor),
+                                    padding: EdgeInsets.zero,
+                                    constraints: BoxConstraints(),
+                                    icon: Icon(Icons.add, color: textColor, size: 20),
                                     onPressed: () {
                                       setState(() {
                                         if (companionCount < 3) {
-                                          // 본인 포함 최대 4명
                                           companionCount++;
                                         }
                                       });
@@ -1020,7 +1026,7 @@ class _SearchPageState extends State<SearchPage> {
                               ),
                               SizedBox(width: 16),
                               Text(
-                                '총 캐리어 개수',
+                                'app.search.luggage'.tr(),
                                 style: TextStyle(
                                   fontSize: 16,
                                   color: textColor,
@@ -1106,7 +1112,7 @@ class _SearchPageState extends State<SearchPage> {
                       shadowColor: primaryColor.withOpacity(0.4),
                     ),
                     child: Text(
-                      '탑승 정보 확인',
+                      'app.search.confirm'.tr(),
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w600,
@@ -1138,7 +1144,7 @@ class _SearchPageState extends State<SearchPage> {
                       // PLORIDE 광고 배너
                       Container(
                         width: double.infinity,
-                        height: 150,
+                        height: 160,
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(12),
                           gradient: LinearGradient(
@@ -1162,9 +1168,10 @@ class _SearchPageState extends State<SearchPage> {
                               padding: EdgeInsets.all(20),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Text(
-                                    'PLORIDE',
+                                    'TAGO',
                                     style: TextStyle(
                                       color: Colors.white,
                                       fontWeight: FontWeight.bold,
@@ -1173,27 +1180,28 @@ class _SearchPageState extends State<SearchPage> {
                                   ),
                                   SizedBox(height: 8),
                                   Text(
-                                    '안전하고 편안한 공항 이동 서비스',
+                                    'app.search.banner.description'.tr(),
                                     style: TextStyle(
                                       color: Colors.white.withOpacity(0.9),
                                       fontSize: 16,
                                     ),
                                   ),
-                                  Spacer(),
+                                  Spacer(flex: 2),
                                   Container(
                                     padding: EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                      vertical: 6,
+                                      horizontal: 10,
+                                      vertical: 5,
                                     ),
                                     decoration: BoxDecoration(
                                       color: Colors.white.withOpacity(0.3),
-                                      borderRadius: BorderRadius.circular(20),
+                                      borderRadius: BorderRadius.circular(16),
                                     ),
                                     child: Text(
-                                      '지금 예약하기',
+                                      'app.search.banner.book_now'.tr(),
                                       style: TextStyle(
                                         color: Colors.white,
                                         fontWeight: FontWeight.bold,
+                                        fontSize: 13,
                                       ),
                                     ),
                                   ),
@@ -1206,7 +1214,7 @@ class _SearchPageState extends State<SearchPage> {
 
                       SizedBox(height: 24),
                       Text(
-                        '이용 팁',
+                        'app.search.tips.title'.tr(),
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
@@ -1216,24 +1224,24 @@ class _SearchPageState extends State<SearchPage> {
                       SizedBox(height: 12),
                       _buildTipCard(
                         context,
-                        '미리 예약하세요',
-                        '공항 이동은 최소 3시간 전에 출발하는 것이 좋습니다',
+                        'app.search.tips.book_early'.tr(),
+                        'app.search.tips.book_early_desc'.tr(),
                         Icons.access_time,
                         isDarkMode,
                       ),
                       SizedBox(height: 8),
                       _buildTipCard(
                         context,
-                        '캐리어를 준비하세요',
-                        '캐리어 개수에 따라 적절한 차량이 배정됩니다',
+                        'app.search.tips.prepare_luggage'.tr(),
+                        'app.search.tips.prepare_luggage_desc'.tr(),
                         Icons.luggage,
                         isDarkMode,
                       ),
                       SizedBox(height: 8),
                       _buildTipCard(
                         context,
-                        '도착 시간에 주의하세요',
-                        '교통 상황을 고려하여 충분한 여유 시간을 두세요',
+                        'app.search.tips.arrival_time'.tr(),
+                        'app.search.tips.arrival_time_desc'.tr(),
                         Icons.timer,
                         isDarkMode,
                       ),
@@ -1319,7 +1327,7 @@ class _SearchPageState extends State<SearchPage> {
                 Padding(
                   padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   child: Text(
-                    '출발 위치 선택',
+                    'app.search.popup.select_pickup'.tr(),
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
@@ -1339,14 +1347,14 @@ class _SearchPageState extends State<SearchPage> {
                     child: Icon(Icons.school, color: Color(0xFF3F51B5)),
                   ),
                   title: Text(
-                    'Penn State University',
+                    'app.search.popup.psu_option'.tr(),
                     style: TextStyle(
                       fontWeight: FontWeight.w500,
                       color: textColor,
                     ),
                   ),
                   subtitle: Text(
-                    '대학 캠퍼스에서 출발',
+                    'app.search.popup.psu_subtitle'.tr(),
                     style: TextStyle(
                       color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
                     ),
@@ -1377,14 +1385,14 @@ class _SearchPageState extends State<SearchPage> {
                     child: Icon(Icons.flight, color: Color(0xFF3F51B5)),
                   ),
                   title: Text(
-                    'Airport',
+                    'app.search.popup.airport_option'.tr(),
                     style: TextStyle(
                       fontWeight: FontWeight.w500,
                       color: textColor,
                     ),
                   ),
                   subtitle: Text(
-                    '공항에서 출발',
+                    'app.search.popup.airport_subtitle'.tr(),
                     style: TextStyle(
                       color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
                     ),
@@ -1456,7 +1464,7 @@ class _SearchPageState extends State<SearchPage> {
                       Icon(Icons.flight, color: Color(0xFF3F51B5)),
                       SizedBox(width: 12),
                       Text(
-                        '공항 출발 위치',
+                        'app.search.popup.airport_pickup'.tr(),
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
@@ -1533,7 +1541,7 @@ class _SearchPageState extends State<SearchPage> {
                       Icon(Icons.location_on, color: Color(0xFF3F51B5)),
                       SizedBox(width: 12),
                       Text(
-                        'Penn State University 출발 위치',
+                        'app.search.popup.psu_locations'.tr(),
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
@@ -1621,7 +1629,7 @@ class _SearchPageState extends State<SearchPage> {
                 Padding(
                   padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   child: Text(
-                    '도착 위치 선택',
+                    'app.search.popup.select_destination'.tr(),
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
@@ -1641,14 +1649,14 @@ class _SearchPageState extends State<SearchPage> {
                     child: Icon(Icons.school, color: Color(0xFF3F51B5)),
                   ),
                   title: Text(
-                    'Penn State University',
+                    'app.search.popup.psu_option'.tr(),
                     style: TextStyle(
                       fontWeight: FontWeight.w500,
                       color: textColor,
                     ),
                   ),
                   subtitle: Text(
-                    '대학 캠퍼스로 도착',
+                    'app.search.popup.psu_destination_subtitle'.tr(),
                     style: TextStyle(
                       color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
                     ),
@@ -1669,14 +1677,14 @@ class _SearchPageState extends State<SearchPage> {
                     child: Icon(Icons.flight, color: Color(0xFF3F51B5)),
                   ),
                   title: Text(
-                    'Airport',
+                    'app.search.popup.airport_option'.tr(),
                     style: TextStyle(
                       fontWeight: FontWeight.w500,
                       color: textColor,
                     ),
                   ),
                   subtitle: Text(
-                    '공항으로 도착',
+                    'app.search.popup.airport_destination_subtitle'.tr(),
                     style: TextStyle(
                       color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
                     ),
@@ -1873,7 +1881,7 @@ class _SearchPageState extends State<SearchPage> {
                       Icon(Icons.flight_takeoff, color: Color(0xFF3F51B5)),
                       SizedBox(width: 12),
                       Text(
-                        '도착 공항 선택',
+                        'app.search.popup.airport_destination'.tr(),
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,

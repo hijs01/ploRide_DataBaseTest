@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:cabrider/datamodels/address.dart';
 import 'package:cabrider/brand_colors.dart';
+import 'package:easy_localization/easy_localization.dart';
 
 class LocationMapPage extends StatefulWidget {
   final Address address;
@@ -56,8 +57,11 @@ class _LocationMapPageState extends State<LocationMapPage> {
     // 위치 좌표가 없으면 오류 메시지 표시
     if (widget.address.latitude == null || widget.address.longitude == null) {
       return Scaffold(
-        appBar: AppBar(title: Text('위치 확인'), backgroundColor: primaryColor),
-        body: Center(child: Text('유효하지 않은 위치 정보입니다.')),
+        appBar: AppBar(
+          title: Text('app.search.location_map.title_error'.tr()),
+          backgroundColor: primaryColor
+        ),
+        body: Center(child: Text('app.search.location_map.invalid_location'.tr())),
       );
     }
 
@@ -74,7 +78,9 @@ class _LocationMapPageState extends State<LocationMapPage> {
         backgroundColor: primaryColor,
         elevation: 0,
         title: Text(
-          widget.isPickup ? '출발 위치 확인' : '도착 위치 확인',
+          widget.isPickup 
+            ? 'app.search.location_map.title_pickup'.tr()
+            : 'app.search.location_map.title_destination'.tr(),
           style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w600,
@@ -234,7 +240,7 @@ class _LocationMapPageState extends State<LocationMapPage> {
                   elevation: 0,
                 ),
                 child: Text(
-                  '위치 확인',
+                  'app.search.location_map.confirm'.tr(),
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
