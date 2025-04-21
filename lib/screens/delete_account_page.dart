@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cabrider/screens/loginpage.dart';
+import 'package:easy_localization/easy_localization.dart';
 
 class DeleteAccountPage extends StatefulWidget {
   static const String id = 'delete_account';
@@ -54,7 +55,7 @@ class _DeleteAccountPageState extends State<DeleteAccountPage> {
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('계정이 성공적으로 삭제되었습니다.'),
+            content: Text('app.account_deleted_success'.tr()),
             backgroundColor: Colors.green,
           ),
         );
@@ -69,13 +70,13 @@ class _DeleteAccountPageState extends State<DeleteAccountPage> {
         _showReauthenticateDialog();
       } else {
         setState(() {
-          _errorMessage = '계정 삭제 중 오류가 발생했습니다: ${e.message}';
+          _errorMessage = 'app.account_delete_error'.tr() + ': ${e.message}';
         });
       }
     } catch (e) {
       setState(() {
         _isLoading = false;
-        _errorMessage = '계정 삭제 중 오류가 발생했습니다: $e';
+        _errorMessage = 'app.account_delete_error'.tr() + ': $e';
       });
     }
   }
@@ -94,21 +95,21 @@ class _DeleteAccountPageState extends State<DeleteAccountPage> {
         return AlertDialog(
           backgroundColor: backgroundColor,
           title: Text(
-            '재인증 필요',
+            'app.reauthentication_required'.tr(),
             style: TextStyle(color: textColor, fontWeight: FontWeight.bold),
           ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                '보안상의 이유로 계정을 삭제하기 전에 다시 로그인해야 합니다.',
+                'app.reauthentication_message'.tr(),
                 style: TextStyle(color: textColor),
               ),
               SizedBox(height: 16),
               TextField(
                 controller: _passwordController,
                 decoration: InputDecoration(
-                  labelText: '비밀번호',
+                  labelText: 'app.password'.tr(),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
                   ),
@@ -128,7 +129,7 @@ class _DeleteAccountPageState extends State<DeleteAccountPage> {
                 Navigator.of(context).pop();
               },
               child: Text(
-                '취소',
+                'app.cancel'.tr(),
                 style: TextStyle(
                   color: isDarkMode ? Colors.grey[300] : Colors.grey[800],
                 ),
@@ -145,7 +146,7 @@ class _DeleteAccountPageState extends State<DeleteAccountPage> {
                   borderRadius: BorderRadius.circular(8),
                 ),
               ),
-              child: Text('확인'),
+              child: Text('app.confirm'.tr()),
             ),
           ],
           shape: RoundedRectangleBorder(
@@ -193,7 +194,7 @@ class _DeleteAccountPageState extends State<DeleteAccountPage> {
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('계정이 성공적으로 삭제되었습니다.'),
+            content: Text('app.account_deleted_success'.tr()),
             backgroundColor: Colors.green,
           ),
         );
@@ -201,7 +202,7 @@ class _DeleteAccountPageState extends State<DeleteAccountPage> {
     } catch (e) {
       setState(() {
         _isLoading = false;
-        _errorMessage = '재인증 중 오류가 발생했습니다. 비밀번호를 확인해주세요.';
+        _errorMessage = 'app.reauthentication_error'.tr();
       });
     }
   }
@@ -219,11 +220,11 @@ class _DeleteAccountPageState extends State<DeleteAccountPage> {
         return AlertDialog(
           backgroundColor: backgroundColor,
           title: Text(
-            '계정 삭제',
+            'app.delete_account'.tr(),
             style: TextStyle(color: textColor, fontWeight: FontWeight.bold),
           ),
           content: Text(
-            '정말로 계정을 삭제하시겠습니까? 이 작업은 되돌릴 수 없으며, 모든 개인 데이터가 영구적으로 삭제됩니다.',
+            'app.delete_account_confirmation'.tr(),
             style: TextStyle(height: 1.5, color: textColor),
           ),
           actions: [
@@ -232,7 +233,7 @@ class _DeleteAccountPageState extends State<DeleteAccountPage> {
                 Navigator.of(context).pop();
               },
               child: Text(
-                '취소',
+                'app.cancel'.tr(),
                 style: TextStyle(
                   color: isDarkMode ? Colors.grey[300] : Colors.grey[800],
                 ),
@@ -249,7 +250,7 @@ class _DeleteAccountPageState extends State<DeleteAccountPage> {
                   borderRadius: BorderRadius.circular(8),
                 ),
               ),
-              child: Text('삭제'),
+              child: Text('app.delete'.tr()),
             ),
           ],
           shape: RoundedRectangleBorder(
@@ -274,7 +275,7 @@ class _DeleteAccountPageState extends State<DeleteAccountPage> {
       backgroundColor: backgroundColor,
       appBar: AppBar(
         title: Text(
-          '계정 삭제',
+          'app.delete_account'.tr(),
           style: TextStyle(color: textColor, fontWeight: FontWeight.bold),
         ),
         backgroundColor: backgroundColor,
@@ -326,7 +327,7 @@ class _DeleteAccountPageState extends State<DeleteAccountPage> {
                               Icon(Icons.warning, color: dangerColor),
                               SizedBox(width: 8),
                               Text(
-                                '주의사항',
+                                'app.warning'.tr(),
                                 style: TextStyle(
                                   fontWeight: FontWeight.bold,
                                   fontSize: 18,
@@ -337,7 +338,7 @@ class _DeleteAccountPageState extends State<DeleteAccountPage> {
                           ),
                           SizedBox(height: 12),
                           Text(
-                            '계정을 삭제하면 다음 정보가 영구적으로 제거됩니다:',
+                            'app.delete_account_warning'.tr(),
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
                               fontSize: 16,
@@ -345,13 +346,16 @@ class _DeleteAccountPageState extends State<DeleteAccountPage> {
                             ),
                           ),
                           SizedBox(height: 12),
-                          _buildWarningItem('프로필 정보 및 설정', textColor),
-                          _buildWarningItem('ride 기록', textColor),
-                          _buildWarningItem('채팅 내역', textColor),
-                          _buildWarningItem('기타 개인 데이터', textColor),
+                          _buildWarningItem('app.profile_info'.tr(), textColor),
+                          _buildWarningItem('app.ride_history'.tr(), textColor),
+                          _buildWarningItem('app.chat_history'.tr(), textColor),
+                          _buildWarningItem(
+                            'app.personal_data'.tr(),
+                            textColor,
+                          ),
                           SizedBox(height: 12),
                           Text(
-                            '계정이 삭제되면 복구할 수 없으며, 새로 가입해야 합니다.',
+                            'app.account_deletion_notice'.tr(),
                             style: TextStyle(
                               fontStyle: FontStyle.italic,
                               color:
@@ -391,7 +395,7 @@ class _DeleteAccountPageState extends State<DeleteAccountPage> {
                         elevation: 3,
                       ),
                       child: Text(
-                        '계정 삭제',
+                        'app.delete_account'.tr(),
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
@@ -413,7 +417,7 @@ class _DeleteAccountPageState extends State<DeleteAccountPage> {
                         ),
                       ),
                       child: Text(
-                        '취소',
+                        'app.cancel'.tr(),
                         style: TextStyle(
                           fontSize: 16,
                           color:

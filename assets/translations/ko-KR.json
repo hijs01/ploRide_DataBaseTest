@@ -314,6 +314,24 @@
         "reset_error": "비밀번호 재설정 메일 발송 중 오류가 발생했습니다.",
         "account_not_found": "해당 이메일로 등록된 계정이 없습니다."
       }
-    }
+    },
+    "delete_account": "계정 삭제",
+    "reauthentication_required": "재인증 필요",
+    "reauthentication_message": "보안상의 이유로 계정을 삭제하기 전에 다시 로그인해야 합니다.",
+    "password": "비밀번호",
+    "cancel": "취소",
+    "confirm": "확인",
+    "delete": "삭제",
+    "account_deleted_success": "계정이 성공적으로 삭제되었습니다.",
+    "account_delete_error": "계정 삭제 중 오류가 발생했습니다",
+    "reauthentication_error": "재인증 중 오류가 발생했습니다. 비밀번호를 확인해주세요.",
+    "delete_account_confirmation": "정말로 계정을 삭제하시겠습니까? 이 작업은 되돌릴 수 없으며, 모든 개인 데이터가 영구적으로 삭제됩니다.",
+    "warning": "주의사항",
+    "delete_account_warning": "계정을 삭제하면 다음 정보가 영구적으로 제거됩니다:",
+    "profile_info": "프로필 정보 및 설정",
+    "ride_history": "라이드 기록",
+    "chat_history": "채팅 내역",
+    "personal_data": "기타 개인 데이터",
+    "account_deletion_notice": "계정이 삭제되면 복구할 수 없으며, 새로 가입해야 합니다."
   }
 } 

@@ -335,7 +335,25 @@
         "reset_error": "An error occurred while sending the password reset email.",
         "account_not_found": "No account found with this email."
       }
-    }
+    },
+    "delete_account": "Delete Account",
+    "reauthentication_required": "Reauthentication Required",
+    "reauthentication_message": "For security reasons, you need to log in again before deleting your account.",
+    "password": "Password",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "delete": "Delete",
+    "account_deleted_success": "Your account has been successfully deleted.",
+    "account_delete_error": "An error occurred while deleting your account",
+    "reauthentication_error": "Authentication failed. Please check your password.",
+    "delete_account_confirmation": "Are you sure you want to delete your account? This action cannot be undone, and all your personal data will be permanently deleted.",
+    "warning": "Warning",
+    "delete_account_warning": "When you delete your account, the following information will be permanently removed:",
+    "profile_info": "Profile information and settings",
+    "ride_history": "Ride history",
+    "chat_history": "Chat history",
+    "personal_data": "Other personal data",
+    "account_deletion_notice": "Once deleted, your account cannot be recovered and you will need to register again."
   },
   "errors": {
     "general": "An error occurred",

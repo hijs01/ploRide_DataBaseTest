@@ -2,12 +2,14 @@ import 'package:cabrider/brand_colors.dart';
 import 'package:cabrider/screens/loginpage.dart';
 import 'package:cabrider/screens/mainpage.dart';
 import 'package:cabrider/screens/email_verification_page.dart';
+import 'package:cabrider/screens/terms_agreement_page.dart';
 import 'package:cabrider/widgets/ProgressDialog.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'dart:io';
 
 class RegistrationPage extends StatefulWidget {
   static const String id = 'register';
@@ -148,6 +150,58 @@ class _RegistrationPageState extends State<RegistrationPage>
       });
       showSnackBar(e.toString(), isError: true);
     }
+  }
+
+  // 이용약관 동의 화면을 표시하는 함수
+  void _showTermsAgreement() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder:
+            (context) => TermsAgreementPage(
+              onAccept: () {
+                // 이용약관에 동의했을 때, 회원가입 진행
+                Navigator.pop(context); // 이용약관 페이지 닫기
+                // 이메일, 이름, 비밀번호 유효성 검사를 여기서 수행
+                _validateAndRegister();
+              },
+              onReject: () {
+                // 이용약관에 거절했을 때, 앱 강제 종료
+                exit(0); // 앱 즉시 종료
+              },
+            ),
+      ),
+    );
+  }
+
+  // 입력 유효성 검사 후 회원가입 처리
+  void _validateAndRegister() async {
+    var connectivityResult = await Connectivity().checkConnectivity();
+    if (connectivityResult == ConnectivityResult.none) {
+      showSnackBar('No internet connection', isError: true);
+      return;
+    }
+
+    // 이름 검증
+    if (fullnameController.text.length < 3) {
+      showSnackBar('Please enter your name', isError: true);
+      return;
+    }
+
+    // 이메일 형식 검증
+    final RegExp emailRegex = RegExp(r'^[a-zA-Z0-9._%+-]+@gmail\.com$');
+    if (!emailRegex.hasMatch(emailController.text)) {
+      showSnackBar('Only Gmail(@gmail.com) is allowed', isError: true);
+      return;
+    }
+
+    // 비밀번호 검증
+    if (passwordController.text.length < 6) {
+      showSnackBar('Password must be at least 6 characters', isError: true);
+      return;
+    }
+
+    registerUser(context);
   }
 
   @override
@@ -537,54 +591,9 @@ class _RegistrationPageState extends State<RegistrationPage>
                                   onTap:
                                       _isLoading
                                           ? null
-                                          : () async {
-                                            var connectivityResult =
-                                                await Connectivity()
-                                                    .checkConnectivity();
-                                            if (connectivityResult ==
-                                                ConnectivityResult.none) {
-                                              showSnackBar(
-                                                'No internet connection',
-                                                isError: true,
-                                              );
-                                              return;
-                                            }
-
-                                            // 이름 검증
-                                            if (fullnameController.text.length <
-                                                3) {
-                                              showSnackBar(
-                                                'Please enter your name',
-                                                isError: true,
-                                              );
-                                              return;
-                                            }
-
-                                            // 이메일 형식 검증
-                                            final RegExp emailRegex = RegExp(
-                                              r'^[a-zA-Z0-9._%+-]+@gmail\.com$',
-                                            );
-                                            if (!emailRegex.hasMatch(
-                                              emailController.text,
-                                            )) {
-                                              showSnackBar(
-                                                'Only Gmail(@gmail.com) is allowed',
-                                                isError: true,
-                                              );
-                                              return;
-                                            }
-
-                                            // 비밀번호 검증
-                                            if (passwordController.text.length <
-                                                6) {
-                                              showSnackBar(
-                                                'Password must be at least 6 characters',
-                                                isError: true,
-                                              );
-                                              return;
-                                            }
-
-                                            registerUser(context);
+                                          : () {
+                                            // 회원가입 버튼 클릭 시 이용약관 동의 화면을 표시
+                                            _showTermsAgreement();
                                           },
                                   child: Container(
                                     width: double.infinity,

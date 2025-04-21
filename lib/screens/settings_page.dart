@@ -540,8 +540,8 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
               _buildSettingItem(
                 icon: Icons.delete_forever,
-                title: '계정 삭제',
-                subtitle: '계정과 모든 데이터를 영구적으로 삭제합니다',
+                title: 'app.delete_account'.tr(),
+                subtitle: 'app.delete_account_confirmation'.tr(),
                 isDarkMode: isDarkMode,
                 isDestructive: true,
                 onTap: _navigateToDeleteAccount,
