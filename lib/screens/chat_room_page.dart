@@ -723,7 +723,8 @@ class _ChatRoomPageState extends State<ChatRoomPage>
                                     ),
                                   ),
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Row(
                                         children: [
@@ -811,7 +812,8 @@ class _ChatRoomPageState extends State<ChatRoomPage>
                                     ),
                                   ),
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Row(
                                         children: [
@@ -855,10 +857,13 @@ class _ChatRoomPageState extends State<ChatRoomPage>
                                         )
                                       else
                                         Container(
-                                          constraints: BoxConstraints(maxHeight: 150),
+                                          constraints: BoxConstraints(
+                                            maxHeight: 150,
+                                          ),
                                           child: ListView.builder(
                                             shrinkWrap: true,
-                                            physics: AlwaysScrollableScrollPhysics(),
+                                            physics:
+                                                AlwaysScrollableScrollPhysics(),
                                             itemCount: users.length,
                                             itemBuilder: (context, index) {
                                               final userId = users[index];
@@ -873,9 +878,10 @@ class _ChatRoomPageState extends State<ChatRoomPage>
                                                 future: _getUserName(userId),
                                                 builder: (context, snapshot) {
                                                   return Padding(
-                                                    padding: const EdgeInsets.only(
-                                                      bottom: 12.0,
-                                                    ),
+                                                    padding:
+                                                        const EdgeInsets.only(
+                                                          bottom: 12.0,
+                                                        ),
                                                     child: Row(
                                                       children: [
                                                         CircleAvatar(
@@ -883,23 +889,26 @@ class _ChatRoomPageState extends State<ChatRoomPage>
                                                           backgroundColor:
                                                               isDarkMode
                                                                   ? Color(
-                                                                      0xFF3A3A3C,
-                                                                    )
+                                                                    0xFF3A3A3C,
+                                                                  )
                                                                   : Color(
-                                                                      0xFFE5E5EA,
-                                                                    ),
+                                                                    0xFFE5E5EA,
+                                                                  ),
                                                           child: Text(
-                                                            (snapshot.data ?? '?')
+                                                            (snapshot.data ??
+                                                                    '?')
                                                                 .substring(0, 1)
                                                                 .toUpperCase(),
                                                             style: TextStyle(
                                                               color:
                                                                   isDarkMode
-                                                                      ? Colors.white
+                                                                      ? Colors
+                                                                          .white
                                                                       : Colors
                                                                           .black,
                                                               fontWeight:
-                                                                  FontWeight.w600,
+                                                                  FontWeight
+                                                                      .w600,
                                                             ),
                                                           ),
                                                         ),
@@ -924,17 +933,18 @@ class _ChatRoomPageState extends State<ChatRoomPage>
                                                                               .black,
                                                                 ),
                                                               ),
-                                                              SizedBox(height: 4),
+                                                              SizedBox(
+                                                                height: 4,
+                                                              ),
                                                               Row(
                                                                 children: [
                                                                   Container(
-                                                                    padding:
-                                                                        EdgeInsets.symmetric(
-                                                                          horizontal:
-                                                                              8,
-                                                                          vertical:
-                                                                              2,
-                                                                        ),
+                                                                    padding: EdgeInsets.symmetric(
+                                                                      horizontal:
+                                                                          8,
+                                                                      vertical:
+                                                                          2,
+                                                                    ),
                                                                     decoration: BoxDecoration(
                                                                       color:
                                                                           isDarkMode
@@ -957,14 +967,16 @@ class _ChatRoomPageState extends State<ChatRoomPage>
                                                                         Icon(
                                                                           Icons
                                                                               .people_rounded,
-                                                                          size: 14,
+                                                                          size:
+                                                                              14,
                                                                           color:
                                                                               isDarkMode
                                                                                   ? Colors.white70
                                                                                   : Colors.black54,
                                                                         ),
                                                                         SizedBox(
-                                                                          width: 4,
+                                                                          width:
+                                                                              4,
                                                                         ),
                                                                         Text(
                                                                           '${companionCount + 1}',
@@ -986,13 +998,12 @@ class _ChatRoomPageState extends State<ChatRoomPage>
                                                                     width: 8,
                                                                   ),
                                                                   Container(
-                                                                    padding:
-                                                                        EdgeInsets.symmetric(
-                                                                          horizontal:
-                                                                              8,
-                                                                          vertical:
-                                                                              2,
-                                                                        ),
+                                                                    padding: EdgeInsets.symmetric(
+                                                                      horizontal:
+                                                                          8,
+                                                                      vertical:
+                                                                          2,
+                                                                    ),
                                                                     decoration: BoxDecoration(
                                                                       color:
                                                                           isDarkMode
@@ -1015,14 +1026,16 @@ class _ChatRoomPageState extends State<ChatRoomPage>
                                                                         Icon(
                                                                           Icons
                                                                               .luggage_rounded,
-                                                                          size: 14,
+                                                                          size:
+                                                                              14,
                                                                           color:
                                                                               isDarkMode
                                                                                   ? Colors.white70
                                                                                   : Colors.black54,
                                                                         ),
                                                                         SizedBox(
-                                                                          width: 4,
+                                                                          width:
+                                                                              4,
                                                                         ),
                                                                         Text(
                                                                           '$luggageCount',
@@ -1076,7 +1089,8 @@ class _ChatRoomPageState extends State<ChatRoomPage>
                                     ),
                                   ),
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Row(
                                         children: [
@@ -1133,12 +1147,12 @@ class _ChatRoomPageState extends State<ChatRoomPage>
                                                   isDarkMode
                                                       ? Color(0xFF3A3A3C)
                                                       : Color(0xFFE5E5EA),
-                                              borderRadius: BorderRadius.circular(
-                                                10,
-                                              ),
+                                              borderRadius:
+                                                  BorderRadius.circular(10),
                                             ),
                                             child: Text(
-                                              context.locale.languageCode == 'ko'
+                                              context.locale.languageCode ==
+                                                      'ko'
                                                   ? '${data['member_count']}명 기준'
                                                   : 'Based on ${data['member_count']} people',
                                               style: TextStyle(
@@ -1823,6 +1837,8 @@ class _ChatRoomPageState extends State<ChatRoomPage>
                         roomData['luggage_count_total'] ?? 0;
                     final userLuggageCount =
                         roomData['user_luggage_counts']?[user.uid] ?? 0;
+                    final userCompanionCount =
+                        roomData['user_companion_counts']?[user.uid] ?? 0;
 
                     // 멤버 목록에서 제거
                     currentMembers.remove(user.uid);
@@ -1830,7 +1846,6 @@ class _ChatRoomPageState extends State<ChatRoomPage>
                     // 업데이트할 데이터 준비
                     Map<String, dynamic> updateData = {
                       'members': currentMembers,
-                      'member_count': currentMembers.length,
                       'updatedAt': FieldValue.serverTimestamp(),
                     };
 
@@ -1840,9 +1855,28 @@ class _ChatRoomPageState extends State<ChatRoomPage>
                           currentLuggageCount - userLuggageCount;
                     }
 
-                    // 사용자의 수화물 정보 제거
+                    // 사용자의 수화물 정보와 동반자 정보 제거
                     updateData['user_luggage_counts.${user.uid}'] =
                         FieldValue.delete();
+                    updateData['user_companion_counts.${user.uid}'] =
+                        FieldValue.delete();
+
+                    // 총 멤버 수 재계산 (실제 멤버 + 남은 동반자)
+                    Map<String, int> remainingCompanionCounts =
+                        Map<String, int>.from(
+                          roomData['user_companion_counts'] ?? {},
+                        );
+                    remainingCompanionCounts.remove(user.uid);
+                    int totalCompanions = remainingCompanionCounts.values.fold(
+                      0,
+                      (sum, count) => sum + count,
+                    );
+                    int newMemberCount =
+                        currentMembers.length + totalCompanions;
+                    updateData['member_count'] = newMemberCount;
+
+                    // available_for_driver 상태 업데이트
+                    updateData['available_for_driver'] = (newMemberCount == 4);
 
                     // 채팅방 정보 업데이트
                     await _firestore

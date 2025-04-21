@@ -1048,23 +1048,42 @@ class _RideConfirmationPageState extends State<RideConfirmationPage>
 
                   // 채팅방 멤버 수 확인
                   List<dynamic> members = roomData['members'] ?? [];
+                  Map<String, int> companionCounts = Map<String, int>.from(
+                    roomData['user_companion_counts'] ?? {},
+                  );
 
-                  // 시간 차이가 1시간 이내이고, 멤버 수가 4명 미만인 경우
-                  if (timeDifference.inHours <= 1 && members.length < 4) {
-                    chatRoomId = doc.id;
-                    chatRoomRef = FirebaseFirestore.instance
-                        .collection(chatRoomCollection)
-                        .doc(chatRoomId);
+                  // 총 멤버 수 계산 (실제 멤버 + 모든 동반자)
+                  int totalCompanions = companionCounts.values.fold(
+                    0,
+                    (sum, count) => sum + count,
+                  );
+                  int currentTotalMembers = members.length + totalCompanions;
+                  int potentialNewTotalMembers =
+                      currentTotalMembers + 1 + appData.companionCount;
 
-                    print(
-                      '비슷한 시간대의 채팅방을 찾았습니다: $chatRoomId (시간 차이: ${timeDifference.inMinutes}분)',
-                    );
-                    foundMatchingRoom = true;
-                    break;
-                  } else if (timeDifference.inHours <= 1 &&
-                      members.length >= 4) {
-                    print('채팅방이 가득 찼습니다. 새로운 채팅방을 생성합니다.');
-                    continue; // 다음 채팅방을 확인
+                  print(
+                    '채팅방 검사: 현재 인원 $currentTotalMembers명, 새 유저 참여 시 $potentialNewTotalMembers명',
+                  );
+
+                  // 시간 차이가 1시간 이내이고, 총 인원이 4명 이하인 경우에만 참여 가능
+                  if (timeDifference.inHours <= 1) {
+                    if (potentialNewTotalMembers <= 4) {
+                      chatRoomId = doc.id;
+                      chatRoomRef = FirebaseFirestore.instance
+                          .collection(chatRoomCollection)
+                          .doc(chatRoomId);
+
+                      print(
+                        '비슷한 시간대의 채팅방을 찾았습니다: $chatRoomId (시간 차이: ${timeDifference.inMinutes}분, 현재 인원: $currentTotalMembers명)',
+                      );
+                      foundMatchingRoom = true;
+                      break;
+                    } else {
+                      print(
+                        '채팅방이 가득 찼습니다. 새로운 채팅방을 생성합니다. (현재 인원: $currentTotalMembers명, 새 유저 참여 시: $potentialNewTotalMembers명)',
+                      );
+                      continue; // 다음 채팅방을 확인
+                    }
                   }
                 }
               }
@@ -1127,16 +1146,10 @@ class _RideConfirmationPageState extends State<RideConfirmationPage>
                   'user_companion_counts': updatedCompanionCounts,
                 };
 
-                // 총 인원이 4명을 초과하면 새로운 채팅방 생성
-                if (totalMembers > 4) {
-                  print('총 $totalMembers명으로 인원 초과. 새로운 채팅방을 생성합니다.');
-                  foundMatchingRoom = false; // 새로운 채팅방 생성 트리거
-                } else {
-                  // available_for_driver는 totalMembers가 정확히 4명일 때만 true
-                  updateData['available_for_driver'] = (totalMembers == 4);
-                  if (totalMembers == 4) {
-                    print('총 $totalMembers명이 모였습니다. 드라이버 앱에 표시됩니다.');
-                  }
+                // available_for_driver는 totalMembers가 정확히 4명일 때만 true
+                updateData['available_for_driver'] = (totalMembers == 4);
+                if (totalMembers == 4) {
+                  print('총 $totalMembers명이 모였습니다. 드라이버 앱에 표시됩니다.');
                 }
 
                 // 채팅방 업데이트
