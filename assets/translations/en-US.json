@@ -129,8 +129,11 @@
         "message_deleted": "Message deleted",
         "image_sent": "Image sent",
         "file_sent": "File sent",
+        "default_name": "Chat Room",
+        "enter_chat_room": "Enter Chat Room",
         "system": {
           "driver_accepted": "Driver has accepted your request.\nChat room is now active.",
+          "driver_accepted_title": "Match Complete!",
           "driver_arrived": "Driver has arrived at the pickup location.",
           "ride_started": "The journey has started.",
           "ride_completed": "The journey has completed.",
@@ -140,7 +143,10 @@
           "member_left": "$fullname has left the group.",
           "group_disbanded": "Group has been disbanded.",
           "chat_room_created": "New chat room has been created.",
-          "added_to_queue": "You have been added to the waiting queue."
+          "no_pickup_location": "No pickup location",
+          "no_destination": "No destination",
+          "no_date_info": "No date information",
+          "check_trip_details": "Check your trip details in the chat room."
         },
         "drawer": {
           "title": "Chat Room Info",
@@ -232,7 +238,8 @@
     },
     "common": {
       "cancel": "Cancel",
-      "confirm": "Confirm"
+      "confirm": "Confirm",
+      "later": "Later"
     },
     "ride_confirmation": {
       "title": "Confirm Ride Details",
@@ -279,7 +286,6 @@
       "ride": {
         "booking_complete": "Booking completed! Please communicate with other travelers in the chat room.",
         "booking_registered": "Booking information has been registered. Please wait for driver matching.",
-        "added_to_queue": "Your booking has been added to the queue. Chat room will be activated after driver acceptance.",
         "new_chat_room": "A new chat room has been created"
       },
       "location": {

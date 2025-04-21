@@ -127,8 +127,11 @@
         "message_deleted": "메시지가 삭제되었습니다",
         "image_sent": "이미지를 전송했습니다",
         "file_sent": "파일을 전송했습니다",
+        "default_name": "채팅방",
+        "enter_chat_room": "채팅방으로 입장",
         "system": {
           "driver_accepted": "드라이버가 요청을 수락했습니다.\n채팅방이 활성화되었습니다.",
+          "driver_accepted_title": "매칭 완료!",
           "driver_arrived": "드라이버가 픽업 위치에 도착했습니다.",
           "ride_started": "여행이 시작되었습니다.",
           "ride_completed": "여행이 완료되었습니다.",
@@ -138,7 +141,10 @@
           "member_left": "$fullname님이 그룹에서 나갔습니다.",
           "group_disbanded": "그룹이 해체되었습니다.",
           "chat_room_created": "새로운 채팅방이 생성되었습니다.",
-          "added_to_queue": "대기열에 추가되었습니다."
+          "no_pickup_location": "출발지 정보 없음",
+          "no_destination": "도착지 정보 없음",
+          "no_date_info": "날짜 정보 없음",
+          "check_trip_details": "채팅방에서 여행 정보를 확인하세요."
         },
         "drawer": {
           "title": "채팅방 정보",
@@ -211,7 +217,8 @@
     },
     "common": {
       "cancel": "취소",
-      "confirm": "확인"
+      "confirm": "확인",
+      "later": "나중에"
     },
     "ride_confirmation": {
       "title": "탑승 정보 확인",
@@ -258,7 +265,6 @@
       "ride": {
         "booking_complete": "예약이 완료되었습니다! 채팅방에서 다른 여행자들과 소통하세요.",
         "booking_registered": "예약 정보가 등록되었습니다. 드라이버 매칭을 기다려주세요.",
-        "added_to_queue": "예약이 대기열에 추가되었습니다. 드라이버 수락 후 채팅방이 활성화됩니다.",
         "new_chat_room": "새로운 채팅방이 생성되었습니다"
       },
       "location": {

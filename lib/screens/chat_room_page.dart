@@ -856,16 +856,10 @@ class _ChatRoomPageState extends State<ChatRoomPage>
                                           ),
                                         )
                                       else
-                                        Container(
-                                          constraints: BoxConstraints(
-                                            maxHeight: 150,
-                                          ),
-                                          child: ListView.builder(
-                                            shrinkWrap: true,
-                                            physics:
-                                                AlwaysScrollableScrollPhysics(),
-                                            itemCount: users.length,
-                                            itemBuilder: (context, index) {
+                                        Column(
+                                          children: List.generate(
+                                            users.length,
+                                            (index) {
                                               final userId = users[index];
                                               final companionCount =
                                                   data['user_companion_counts']?[userId] ??
@@ -902,13 +896,10 @@ class _ChatRoomPageState extends State<ChatRoomPage>
                                                             style: TextStyle(
                                                               color:
                                                                   isDarkMode
-                                                                      ? Colors
-                                                                          .white
-                                                                      : Colors
-                                                                          .black,
+                                                                      ? Colors.white
+                                                                      : Colors.black,
                                                               fontWeight:
-                                                                  FontWeight
-                                                                      .w600,
+                                                                  FontWeight.bold,
                                                             ),
                                                           ),
                                                         ),
@@ -916,8 +907,7 @@ class _ChatRoomPageState extends State<ChatRoomPage>
                                                         Expanded(
                                                           child: Column(
                                                             crossAxisAlignment:
-                                                                CrossAxisAlignment
-                                                                    .start,
+                                                                CrossAxisAlignment.start,
                                                             children: [
                                                               Text(
                                                                 snapshot.data ??
@@ -927,134 +917,90 @@ class _ChatRoomPageState extends State<ChatRoomPage>
                                                                   fontSize: 16,
                                                                   color:
                                                                       isDarkMode
-                                                                          ? Colors
-                                                                              .white
-                                                                          : Colors
-                                                                              .black,
+                                                                          ? Colors.white
+                                                                          : Colors.black,
                                                                 ),
                                                               ),
-                                                              SizedBox(
-                                                                height: 4,
-                                                              ),
-                                                              Row(
-                                                                children: [
-                                                                  Container(
-                                                                    padding: EdgeInsets.symmetric(
-                                                                      horizontal:
-                                                                          8,
-                                                                      vertical:
-                                                                          2,
-                                                                    ),
-                                                                    decoration: BoxDecoration(
-                                                                      color:
-                                                                          isDarkMode
-                                                                              ? Color(
-                                                                                0xFF3A3A3C,
-                                                                              )
-                                                                              : Color(
-                                                                                0xFFE5E5EA,
-                                                                              ),
-                                                                      borderRadius:
-                                                                          BorderRadius.circular(
-                                                                            10,
+                                                              if (companionCount > 0 ||
+                                                                  luggageCount > 0 ||
+                                                                  true)
+                                                                Row(
+                                                                  children: [
+                                                                    Container(
+                                                                      padding: EdgeInsets.symmetric(
+                                                                        horizontal: 8,
+                                                                        vertical: 2,
+                                                                      ),
+                                                                      decoration: BoxDecoration(
+                                                                        color: isDarkMode
+                                                                            ? Color(0xFF3A3A3C)
+                                                                            : Color(0xFFE5E5EA),
+                                                                        borderRadius: BorderRadius.circular(10),
+                                                                      ),
+                                                                      child: Row(
+                                                                        mainAxisSize: MainAxisSize.min,
+                                                                        children: [
+                                                                          Icon(
+                                                                            Icons.people_rounded,
+                                                                            size: 14,
+                                                                            color: isDarkMode
+                                                                                ? Colors.white70
+                                                                                : Colors.black54,
                                                                           ),
-                                                                    ),
-                                                                    child: Row(
-                                                                      mainAxisSize:
-                                                                          MainAxisSize
-                                                                              .min,
-                                                                      children: [
-                                                                        Icon(
-                                                                          Icons
-                                                                              .people_rounded,
-                                                                          size:
-                                                                              14,
-                                                                          color:
-                                                                              isDarkMode
+                                                                          SizedBox(width: 4),
+                                                                          Text(
+                                                                            '${companionCount + 1}',
+                                                                            style: TextStyle(
+                                                                              color: isDarkMode
                                                                                   ? Colors.white70
                                                                                   : Colors.black54,
-                                                                        ),
-                                                                        SizedBox(
-                                                                          width:
-                                                                              4,
-                                                                        ),
-                                                                        Text(
-                                                                          '${companionCount + 1}',
-                                                                          style: TextStyle(
-                                                                            color:
-                                                                                isDarkMode
-                                                                                    ? Colors.white70
-                                                                                    : Colors.black54,
-                                                                            fontSize:
-                                                                                12,
-                                                                            fontWeight:
-                                                                                FontWeight.w500,
+                                                                              fontSize: 12,
+                                                                              fontWeight: FontWeight.w500,
+                                                                            ),
                                                                           ),
+                                                                        ],
+                                                                      ),
+                                                                    ),
+                                                                    if (luggageCount > 0) ...[
+                                                                      SizedBox(width: 8),
+                                                                      Container(
+                                                                        padding: EdgeInsets.symmetric(
+                                                                          horizontal: 8,
+                                                                          vertical: 2,
                                                                         ),
-                                                                      ],
-                                                                    ),
-                                                                  ),
-                                                                  SizedBox(
-                                                                    width: 8,
-                                                                  ),
-                                                                  Container(
-                                                                    padding: EdgeInsets.symmetric(
-                                                                      horizontal:
-                                                                          8,
-                                                                      vertical:
-                                                                          2,
-                                                                    ),
-                                                                    decoration: BoxDecoration(
-                                                                      color:
-                                                                          isDarkMode
-                                                                              ? Color(
-                                                                                0xFF3A3A3C,
-                                                                              )
-                                                                              : Color(
-                                                                                0xFFE5E5EA,
-                                                                              ),
-                                                                      borderRadius:
-                                                                          BorderRadius.circular(
-                                                                            10,
-                                                                          ),
-                                                                    ),
-                                                                    child: Row(
-                                                                      mainAxisSize:
-                                                                          MainAxisSize
-                                                                              .min,
-                                                                      children: [
-                                                                        Icon(
-                                                                          Icons
-                                                                              .luggage_rounded,
-                                                                          size:
-                                                                              14,
-                                                                          color:
-                                                                              isDarkMode
+                                                                        decoration: BoxDecoration(
+                                                                          color: isDarkMode
+                                                                              ? Color(0xFF3A3A3C)
+                                                                              : Color(0xFFE5E5EA),
+                                                                          borderRadius: BorderRadius.circular(10),
+                                                                        ),
+                                                                        child: Row(
+                                                                          mainAxisSize: MainAxisSize.min,
+                                                                          children: [
+                                                                            Icon(
+                                                                              Icons.luggage_rounded,
+                                                                              size: 14,
+                                                                              color: isDarkMode
                                                                                   ? Colors.white70
                                                                                   : Colors.black54,
-                                                                        ),
-                                                                        SizedBox(
-                                                                          width:
-                                                                              4,
-                                                                        ),
-                                                                        Text(
-                                                                          '$luggageCount',
-                                                                          style: TextStyle(
-                                                                            color:
-                                                                                isDarkMode
+                                                                            ),
+                                                                            SizedBox(width: 4),
+                                                                            Text(
+                                                                              '$luggageCount',
+                                                                              style: TextStyle(
+                                                                                color: isDarkMode
                                                                                     ? Colors.white70
                                                                                     : Colors.black54,
-                                                                            fontSize:
-                                                                                12,
-                                                                            fontWeight:
-                                                                                FontWeight.w500,
-                                                                          ),
+                                                                                fontSize: 12,
+                                                                                fontWeight: FontWeight.w500,
+                                                                              ),
+                                                                            ),
+                                                                          ],
                                                                         ),
-                                                                      ],
-                                                                    ),
-                                                                  ),
-                                                                ],
-                                                              ),
+                                                                      ),
+                                                                    ],
+                                                                  ],
+                                                                ),
                                                             ],
                                                           ),
                                                         ),
@@ -1663,27 +1609,14 @@ class _ChatRoomPageState extends State<ChatRoomPage>
         departure.toLowerCase().contains('newark') ||
         departure.toLowerCase().contains('jfk') ||
         departure.toLowerCase().contains('lga')) {
-      if (departure.contains('(') && departure.contains(')')) {
-        departure =
-            departure
-                .substring(departure.indexOf('(') + 1, departure.indexOf(')'))
-                .trim();
-      }
+      departure = departure.split(' ')[0].toUpperCase();
     }
 
     if (destination.toLowerCase().contains('airport') ||
         destination.toLowerCase().contains('newark') ||
-        destination.contains('jfk') ||
-        destination.contains('lga')) {
-      if (destination.contains('(') && destination.contains(')')) {
-        destination =
-            destination
-                .substring(
-                  destination.indexOf('(') + 1,
-                  destination.indexOf(')'),
-                )
-                .trim();
-      }
+        destination.toLowerCase().contains('jfk') ||
+        destination.toLowerCase().contains('lga')) {
+      destination = destination.split(' ')[0].toUpperCase();
     }
 
     return Row(
@@ -1694,19 +1627,18 @@ class _ChatRoomPageState extends State<ChatRoomPage>
             departure,
             style: TextStyle(
               color: isDarkMode ? Colors.white : Colors.black,
+              fontWeight: FontWeight.bold,
               fontSize: 16,
-              fontWeight: FontWeight.w500,
             ),
-            overflow: TextOverflow.visible,
-            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
         ),
         Padding(
-          padding: EdgeInsets.symmetric(horizontal: 4),
+          padding: EdgeInsets.symmetric(horizontal: 8),
           child: Icon(
             Icons.arrow_forward,
-            color: isDarkMode ? Colors.white : Colors.black,
             size: 16,
+            color: isDarkMode ? Colors.white : Colors.black,
           ),
         ),
         Flexible(
@@ -1714,11 +1646,10 @@ class _ChatRoomPageState extends State<ChatRoomPage>
             destination,
             style: TextStyle(
               color: isDarkMode ? Colors.white : Colors.black,
+              fontWeight: FontWeight.bold,
               fontSize: 16,
-              fontWeight: FontWeight.w500,
             ),
-            overflow: TextOverflow.visible,
-            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
         ),
       ],
@@ -2194,10 +2125,6 @@ class _ChatRoomPageState extends State<ChatRoomPage>
       translatedMessage = 'app.chat.room.system.group_created'.tr();
     } else if (text.contains('그룹이 해체되었습니다')) {
       translatedMessage = 'app.chat.room.system.group_disbanded'.tr();
-    } else if (text.contains('대기열에 추가되었습니다')) {
-      translatedMessage = 'app.chat.room.system.added_to_queue'.tr();
-    } else if (text == 'app.chat.room.system.added_to_queue') {
-      translatedMessage = 'app.chat.room.system.added_to_queue'.tr();
     } else if (text == 'app.chat.room.system.driver_accepted') {
       translatedMessage = 'app.chat.room.system.driver_accepted'.tr();
     } else if (text == 'app.chat.room.system.chat_room_created') {

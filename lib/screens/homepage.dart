@@ -43,22 +43,32 @@ class _HomePageState extends State<HomePage> {
     try {
       final prefs = await SharedPreferences.getInstance();
       final String? shownPopupsJson = prefs.getString('shown_popups');
-
+      
+      print('SharedPreferences 상태:');
+      print('- shownPopupsJson: $shownPopupsJson');
+      
       if (shownPopupsJson != null) {
         final List<dynamic> decodedList = json.decode(shownPopupsJson);
         setState(() {
           _shownPopups = Set<String>.from(decodedList);
         });
         print('로드된 팝업 목록: $_shownPopups');
+      } else {
+        print('저장된 팝업 목록이 없음');
+        setState(() {
+          _shownPopups = {};
+        });
       }
-
-      // 팝업 목록을 로드한 후에 리스너 설정
+      
       if (mounted) {
         setupChatRoomListener();
         _isListenerSetup = true;
       }
     } catch (e) {
       print('팝업 목록 로드 오류: $e');
+      setState(() {
+        _shownPopups = {};
+      });
     }
   }
 
@@ -117,355 +127,319 @@ class _HomePageState extends State<HomePage> {
 
   // 채팅방 리스너 설정 함수를 public으로 변경
   Future<void> setupChatRoomListener() async {
+    print('채팅방 리스너 설정 시작');
     final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
+    if (user == null) {
+      print('사용자가 로그인되어 있지 않음');
+      return;
+    }
 
     try {
-      // 최근 추가된 채팅방 찾기
-      QuerySnapshot chatRooms =
-          await FirebaseFirestore.instance
-              .collection('users')
-              .doc(user.uid)
-              .collection('chatRooms')
-              .orderBy('joined_at', descending: true)
-              .limit(1)
-              .get();
+      QuerySnapshot chatRooms = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .collection('chatRooms')
+          .orderBy('joined_at', descending: true)
+          .limit(1)
+          .get();
 
-      if (chatRooms.docs.isNotEmpty) {
-        Map<String, dynamic> chatRoomData =
-            chatRooms.docs.first.data() as Map<String, dynamic>;
-        String chatRoomCollection = chatRoomData['chat_room_collection'] ?? '';
-        String chatRoomId = chatRoomData['chat_room_id'] ?? '';
+      if (chatRooms.docs.isEmpty) {
+        print('채팅방이 없음');
+        return;
+      }
 
-        // psuToAirport나 airportToPsu 컬렉션인 경우에만 리스너 설정
-        if ((chatRoomCollection == 'psuToAirport' ||
-                chatRoomCollection == 'airportToPsu') &&
-            chatRoomId.isNotEmpty) {
-          // 원본 채팅방 문서 확인
-          DocumentSnapshot chatRoomDoc =
-              await FirebaseFirestore.instance
-                  .collection(chatRoomCollection)
-                  .doc(chatRoomId)
-                  .get();
+      Map<String, dynamic> chatRoomData = chatRooms.docs.first.data() as Map<String, dynamic>;
+      String chatRoomCollection = chatRoomData['chat_room_collection'] ?? '';
+      String chatRoomId = chatRoomData['chat_room_id'] ?? '';
 
-          if (chatRoomDoc.exists) {
-            Map<String, dynamic> data =
-                chatRoomDoc.data() as Map<String, dynamic>;
-            List<dynamic> members = data['members'] ?? [];
+      print('채팅방 정보:');
+      print('- collection: $chatRoomCollection');
+      print('- id: $chatRoomId');
 
-            // 사용자가 실제로 채팅방의 멤버인 경우에만 리스너 설정
-            if (members.contains(user.uid)) {
-              print('채팅방 리스너 설정: $chatRoomCollection/$chatRoomId');
+      if ((chatRoomCollection == 'psuToAirport' || chatRoomCollection == 'airportToPsu') &&
+          chatRoomId.isNotEmpty) {
+        
+        DocumentSnapshot chatRoomDoc = await FirebaseFirestore.instance
+            .collection(chatRoomCollection)
+            .doc(chatRoomId)
+            .get();
 
-              // 원본 채팅방 문서 리스너 설정
-              FirebaseFirestore.instance
-                  .collection(chatRoomCollection)
-                  .doc(chatRoomId)
-                  .snapshots()
-                  .listen(
-                    (documentSnapshot) async {
-                      if (documentSnapshot.exists) {
-                        Map<String, dynamic> data =
-                            documentSnapshot.data() as Map<String, dynamic>;
-                        bool driverAccepted = data['driver_accepted'] ?? false;
-                        String driverId = data['driver_id'] ?? '';
-                        bool chatActivated = data['chat_activated'] ?? false;
-                        List<dynamic> members = data['members'] ?? [];
+        if (!chatRoomDoc.exists) {
+          print('채팅방 문서가 존재하지 않음');
+          return;
+        }
 
-                        print(
-                          '채팅방 상태 업데이트: driver_accepted=$driverAccepted, chat_activated=$chatActivated',
-                        );
+        Map<String, dynamic> data = chatRoomDoc.data() as Map<String, dynamic>;
+        List<dynamic> members = data['members'] ?? [];
 
-                        // driver_accepted가 true이고 사용자가 채팅방 멤버인 경우에만 팝업 표시
-                        // 추가 조건: 앱이 시작된 후 일정 시간이 지났는지 확인 (즉시 팝업 방지)
-                        if (driverAccepted == true &&
-                            mounted &&
-                            !_shownPopups.contains(chatRoomId) &&
-                            members.contains(user.uid)) {
-                          // 앱 시작 후 일정 시간 지연 (즉시 팝업 방지)
-                          await Future.delayed(Duration(seconds: 2));
+        if (!members.contains(user.uid)) {
+          print('사용자가 채팅방 멤버가 아님');
+          return;
+        }
 
-                          // 지연 후에도 여전히 조건이 충족되는지 확인
-                          if (!mounted || _shownPopups.contains(chatRoomId)) {
-                            return;
-                          }
+        print('채팅방 리스너 설정: $chatRoomCollection/$chatRoomId');
 
-                          print('드라이버 수락 감지: 팝업 표시');
+        FirebaseFirestore.instance
+            .collection(chatRoomCollection)
+            .doc(chatRoomId)
+            .snapshots()
+            .listen(
+              (documentSnapshot) async {
+                if (!documentSnapshot.exists) {
+                  print('채팅방 문서가 삭제됨');
+                  return;
+                }
 
-                          // 팝업 표시 후 Set에 추가하고 저장
-                          setState(() {
-                            _shownPopups.add(chatRoomId);
-                          });
-                          _saveShownPopups(); // SharedPreferences에 저장
+                Map<String, dynamic> data = documentSnapshot.data() as Map<String, dynamic>;
+                bool driverAccepted = data['driver_accepted'] ?? false;
+                String driverId = data['driver_id'] ?? '';
+                bool chatActivated = data['chat_activated'] ?? false;
+                List<dynamic> members = data['members'] ?? [];
 
-                          // UI 업데이트를 위해 setState 사용
-                          setState(() {
-                            // 팝업 표시
-                            showDialog(
-                              context: context,
-                              barrierDismissible: false,
-                              builder: (BuildContext context) {
-                                return AlertDialog(
-                                  title: Text('매칭 완료!'),
-                                  content: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text('드라이버와 매칭이 완료되었습니다.'),
-                                      SizedBox(height: 12),
-                                      // 여정 정보 표시
-                                      Container(
-                                        padding: EdgeInsets.all(12),
-                                        decoration: BoxDecoration(
-                                          color: Colors.grey[100],
-                                          borderRadius: BorderRadius.circular(
-                                            8,
-                                          ),
-                                        ),
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            // 출발지
-                                            Row(
-                                              children: [
-                                                Icon(
-                                                  Icons.location_on,
-                                                  color: Colors.green,
-                                                  size: 16,
-                                                ),
-                                                SizedBox(width: 8),
-                                                Expanded(
-                                                  child: Text(
-                                                    data['pickup_info']?['address'] ??
-                                                        '출발지 정보 없음',
-                                                    style: TextStyle(
-                                                      fontSize: 14,
-                                                    ),
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                            SizedBox(height: 8),
-                                            // 도착지
-                                            Row(
-                                              children: [
-                                                Icon(
-                                                  Icons.location_on,
-                                                  color: Colors.red,
-                                                  size: 16,
-                                                ),
-                                                SizedBox(width: 8),
-                                                Expanded(
-                                                  child: Text(
-                                                    data['destination_info']?['address'] ??
-                                                        '도착지 정보 없음',
-                                                    style: TextStyle(
-                                                      fontSize: 14,
-                                                    ),
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                            SizedBox(height: 8),
-                                            // 날짜
-                                            Row(
-                                              children: [
-                                                Icon(
-                                                  Icons.calendar_today,
-                                                  color: Colors.blue,
-                                                  size: 16,
-                                                ),
-                                                SizedBox(width: 8),
-                                                Text(
-                                                  data['ride_date'] != null
-                                                      ? DateFormat(
-                                                        'yyyy년 MM월 dd일',
-                                                      ).format(
-                                                        (data['ride_date']
-                                                                as Timestamp)
-                                                            .toDate(),
-                                                      )
-                                                      : '날짜 정보 없음',
-                                                  style: TextStyle(
-                                                    fontSize: 14,
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      SizedBox(height: 12),
-                                      Text('채팅방에서 여행 정보를 확인하세요.'),
-                                    ],
-                                  ),
-                                  actions: [
-                                    TextButton(
-                                      onPressed: () {
-                                        Navigator.pop(context); // 다이얼로그 닫기
-                                      },
-                                      child: Text('나중에'),
-                                    ),
-                                    ElevatedButton(
-                                      onPressed: () async {
-                                        Navigator.pop(context); // 다이얼로그 닫기
+                print('채팅방 상태 업데이트:');
+                print('- driverAccepted: $driverAccepted');
+                print('- chatActivated: $chatActivated');
+                print('- members: $members');
+                print('- current user: ${user.uid}');
+                print('- shown popups: $_shownPopups');
 
-                                        // 채팅방 정보 가져오기
-                                        DocumentSnapshot chatRoomDoc =
-                                            await FirebaseFirestore.instance
-                                                .collection(chatRoomCollection)
-                                                .doc(chatRoomId)
-                                                .get();
+                if (driverAccepted && 
+                    mounted && 
+                    !_shownPopups.contains(chatRoomId) && 
+                    members.contains(user.uid)) {
+                  print('팝업 표시 조건 충족');
+                  
+                  // 지연 시간을 1초로 줄임
+                  await Future.delayed(Duration(seconds: 1));
+                  
+                  if (!mounted || _shownPopups.contains(chatRoomId)) {
+                    print('팝업 표시 조건이 변경됨');
+                    return;
+                  }
 
-                                        if (chatRoomDoc.exists) {
-                                          Map<String, dynamic> data =
-                                              chatRoomDoc.data()
-                                                  as Map<String, dynamic>;
-                                          String chatRoomName =
-                                              data['chat_room_name'] ?? '채팅방';
+                  print('팝업 표시 시작');
+                  
+                  if (!mounted) return;
 
-                                          // 채팅방으로 이동
-                                          Navigator.push(
-                                            context,
-                                            MaterialPageRoute(
-                                              builder:
-                                                  (context) => ChatRoomPage(
-                                                    chatRoomId: chatRoomId,
-                                                    chatRoomName: chatRoomName,
-                                                    chatRoomCollection:
-                                                        chatRoomCollection,
-                                                  ),
-                                            ),
-                                          );
-                                        }
-                                      },
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: Colors.blue,
-                                        foregroundColor: Colors.white,
-                                      ),
-                                      child: Text('채팅방으로 입장'),
-                                    ),
-                                  ],
-                                );
-                              },
-                            );
-                          });
-                        }
+                  // 채팅방 활성화 처리 및 시스템 메시지 추가
+                  if (!chatActivated) {
+                    print('채팅방 활성화 처리 시작');
+                    // 원본 채팅방 문서에 chat_activated 필드 업데이트
+                    await FirebaseFirestore.instance
+                        .collection(chatRoomCollection)
+                        .doc(chatRoomId)
+                        .update({
+                          'chat_activated': true,
+                          'chat_visible': true,
+                        });
 
-                        // driver_accepted 상태가 변경되고 chat_activated가 false인 경우에만 처리
-                        if (driverAccepted && !chatActivated) {
-                          print('채팅방 활성화 처리 시작');
-                          // 원본 채팅방 문서에 chat_activated 필드 업데이트
+                    // 채팅방의 모든 멤버 가져오기
+                    DocumentSnapshot roomSnapshot =
+                        await FirebaseFirestore.instance
+                            .collection(chatRoomCollection)
+                            .doc(chatRoomId)
+                            .get();
+
+                    if (roomSnapshot.exists) {
+                      Map<String, dynamic> roomData =
+                          roomSnapshot.data() as Map<String, dynamic>;
+                      List<dynamic> members = roomData['members'] ?? [];
+
+                      // 각 멤버의 채팅방 정보 업데이트
+                      for (String memberId in members) {
+                        String memberSafeDocId =
+                            "${chatRoomCollection}_$chatRoomId"
+                                .replaceAll('/', '_');
+
+                        await FirebaseFirestore.instance
+                            .collection('users')
+                            .doc(memberId)
+                            .collection('chatRooms')
+                            .doc(memberSafeDocId)
+                            .update({
+                              'driver_accepted': true,
+                              'driver_id': driverId,
+                              'chat_visible': true,
+                            });
+                      }
+
+                      // 채팅방에 시스템 메시지 추가 (중복 방지를 위해 이전 메시지 확인)
+                      QuerySnapshot existingMessages =
                           await FirebaseFirestore.instance
                               .collection(chatRoomCollection)
                               .doc(chatRoomId)
-                              .update({
-                                'chat_activated': true,
-                                'chat_visible': true,
-                              });
+                              .collection('messages')
+                              .where(
+                                'text',
+                                isEqualTo:
+                                    'app.chat.room.system.driver_accepted',
+                              )
+                              .get();
 
-                          // 채팅방의 모든 멤버 가져오기
-                          DocumentSnapshot roomSnapshot =
-                              await FirebaseFirestore.instance
+                      if (existingMessages.docs.isEmpty) {
+                        await FirebaseFirestore.instance
+                            .collection(chatRoomCollection)
+                            .doc(chatRoomId)
+                            .collection('messages')
+                            .add({
+                              'text':
+                                  'app.chat.room.system.driver_accepted',
+                              'sender_id': 'system',
+                              'sender_name': '시스템',
+                              'timestamp': FieldValue.serverTimestamp(),
+                              'type': 'system',
+                            });
+                        print('시스템 메시지 추가됨: 드라이버 수락');
+                      } else {
+                        print('이미 시스템 메시지가 존재함: 드라이버 수락');
+                      }
+                    }
+                  }
+
+                  showDialog(
+                    context: context,
+                    barrierDismissible: false,
+                    builder: (context) {
+                      return AlertDialog(
+                        title: Text('app.chat.room.system.driver_accepted_title'.tr()),
+                        content: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('app.chat.room.system.driver_accepted'.tr()),
+                            SizedBox(height: 16),
+                            Container(
+                              padding: EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Colors.grey[100],
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Icon(
+                                        Icons.location_on,
+                                        color: Colors.green,
+                                        size: 16,
+                                      ),
+                                      SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          data['pickup_info']?['address'] ??
+                                              'app.chat.room.system.no_pickup_location'.tr(),
+                                          style: TextStyle(fontSize: 14),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  SizedBox(height: 8),
+                                  Row(
+                                    children: [
+                                      Icon(
+                                        Icons.location_on,
+                                        color: Colors.red,
+                                        size: 16,
+                                      ),
+                                      SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          data['destination_info']?['address'] ??
+                                              'app.chat.room.system.no_destination'.tr(),
+                                          style: TextStyle(fontSize: 14),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  SizedBox(height: 8),
+                                  Row(
+                                    children: [
+                                      Icon(
+                                        Icons.calendar_today,
+                                        color: Colors.blue,
+                                        size: 16,
+                                      ),
+                                      SizedBox(width: 8),
+                                      Text(
+                                        data['ride_date'] != null
+                                            ? DateFormat(
+                                                context.locale.languageCode == 'ko'
+                                                    ? 'yyyy년 MM월 dd일'
+                                                    : 'MMMM dd, yyyy',
+                                              ).format(
+                                                (data['ride_date'] as Timestamp).toDate(),
+                                              )
+                                            : 'app.chat.room.system.no_date_info'.tr(),
+                                        style: TextStyle(fontSize: 14),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                            SizedBox(height: 12),
+                            Text('app.chat.room.system.check_trip_details'.tr()),
+                          ],
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () {
+                              Navigator.pop(context);
+                            },
+                            child: Text('app.common.later'.tr()),
+                          ),
+                          TextButton(
+                            onPressed: () async {
+                              Navigator.pop(context);
+                              
+                              DocumentSnapshot chatRoomDoc = await FirebaseFirestore.instance
                                   .collection(chatRoomCollection)
                                   .doc(chatRoomId)
                                   .get();
 
-                          if (roomSnapshot.exists) {
-                            Map<String, dynamic> roomData =
-                                roomSnapshot.data() as Map<String, dynamic>;
-                            List<dynamic> members = roomData['members'] ?? [];
+                              if (chatRoomDoc.exists) {
+                                Map<String, dynamic> data = chatRoomDoc.data() as Map<String, dynamic>;
+                                String chatRoomName = data['chat_room_name'] ?? 'app.chat.room.default_name'.tr();
 
-                            // 각 멤버의 채팅방 정보 업데이트
-                            for (String memberId in members) {
-                              String memberSafeDocId =
-                                  "${chatRoomCollection}_$chatRoomId"
-                                      .replaceAll('/', '_');
-
-                              await FirebaseFirestore.instance
-                                  .collection('users')
-                                  .doc(memberId)
-                                  .collection('chatRooms')
-                                  .doc(memberSafeDocId)
-                                  .update({
-                                    'driver_accepted': true,
-                                    'driver_id': driverId,
-                                    'chat_visible': true,
-                                  });
-                            }
-
-                            // 채팅방에 시스템 메시지 추가 (중복 방지를 위해 이전 메시지 확인)
-                            QuerySnapshot existingMessages =
-                                await FirebaseFirestore.instance
-                                    .collection(chatRoomCollection)
-                                    .doc(chatRoomId)
-                                    .collection('messages')
-                                    .where(
-                                      'text',
-                                      isEqualTo:
-                                          'app.chat.room.system.driver_accepted'
-                                              .tr(),
-                                    )
-                                    .get();
-
-                            if (existingMessages.docs.isEmpty) {
-                              await FirebaseFirestore.instance
-                                  .collection(chatRoomCollection)
-                                  .doc(chatRoomId)
-                                  .collection('messages')
-                                  .add({
-                                    'text':
-                                        'app.chat.room.system.driver_accepted',
-                                    'sender_id': 'system',
-                                    'sender_name': '시스템',
-                                    'timestamp': FieldValue.serverTimestamp(),
-                                    'type': 'system',
-                                  });
-                            }
-
-                            // 새로운 채팅방 생성 메시지 추가
-                            await FirebaseFirestore.instance
-                                .collection(chatRoomCollection)
-                                .doc(chatRoomId)
-                                .collection('messages')
-                                .add({
-                                  'text':
-                                      'app.chat.room.system.chat_room_created',
-                                  'sender_id': 'system',
-                                  'sender_name': '시스템',
-                                  'timestamp': FieldValue.serverTimestamp(),
-                                  'type': 'system',
-                                });
-
-                            // 대기열 추가 메시지 추가
-                            await FirebaseFirestore.instance
-                                .collection(chatRoomCollection)
-                                .doc(chatRoomId)
-                                .collection('messages')
-                                .add({
-                                  'text': 'app.chat.room.system.added_to_queue',
-                                  'sender_id': 'system',
-                                  'sender_name': '시스템',
-                                  'timestamp': FieldValue.serverTimestamp(),
-                                  'type': 'system',
-                                });
-                          }
-
-                          print('드라이버가 수락했습니다. 채팅방이 활성화됩니다.');
-                        }
-                      }
-                    },
-                    onError: (error) {
-                      print('채팅방 리스너 오류: $error');
+                                if (!mounted) return;
+                                
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => ChatRoomPage(
+                                      chatRoomId: chatRoomId,
+                                      chatRoomName: chatRoomName,
+                                      chatRoomCollection: chatRoomCollection,
+                                    ),
+                                  ),
+                                );
+                              }
+                            },
+                            child: Text(
+                              'app.chat.room.enter_chat_room'.tr(),
+                              style: const TextStyle(
+                                color: Colors.blue,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
+                      );
                     },
                   );
-            } else {
-              print('사용자가 채팅방의 멤버가 아닙니다. 리스너를 설정하지 않습니다.');
-            }
-          }
-        }
+
+                  setState(() {
+                    _shownPopups.add(chatRoomId);
+                  });
+                  await _saveShownPopups();
+                  print('팝업 표시 완료 및 저장됨');
+                }
+              },
+              onError: (error) {
+                print('채팅방 리스너 오류: $error');
+              },
+            );
       }
     } catch (e) {
       print('채팅방 리스너 설정 오류: $e');
