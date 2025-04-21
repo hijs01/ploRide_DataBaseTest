@@ -701,487 +701,492 @@ class _ChatRoomPageState extends State<ChatRoomPage>
                           final users = data['members'] as List<dynamic>? ?? [];
                           final driver = data['driver_id'] as String? ?? '';
 
-                          return Column(
-                            children: [
-                              // 드라이버 섹션
-                              Container(
-                                margin: EdgeInsets.fromLTRB(16, 16, 16, 8),
-                                padding: EdgeInsets.all(16),
-                                decoration: BoxDecoration(
-                                  color:
-                                      isDarkMode
-                                          ? Color(0xFF2C2C2E)
-                                          : Colors.white,
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(
+                          return SingleChildScrollView(
+                            child: Column(
+                              children: [
+                                // 드라이버 섹션
+                                Container(
+                                  margin: EdgeInsets.fromLTRB(16, 16, 16, 8),
+                                  padding: EdgeInsets.all(16),
+                                  decoration: BoxDecoration(
                                     color:
                                         isDarkMode
-                                            ? Color(0xFF3A3A3C)
-                                            : Color(0xFFE5E5EA),
-                                    width: 1,
+                                            ? Color(0xFF2C2C2E)
+                                            : Colors.white,
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color:
+                                          isDarkMode
+                                              ? Color(0xFF3A3A3C)
+                                              : Color(0xFFE5E5EA),
+                                      width: 1,
+                                    ),
                                   ),
-                                ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      children: [
-                                        Icon(
-                                          Icons.drive_eta,
-                                          color:
-                                              isDarkMode
-                                                  ? Colors.white70
-                                                  : Colors.black54,
-                                          size: 18,
-                                        ),
-                                        SizedBox(width: 8),
-                                        Text(
-                                          'app.chat.room.drawer.driver'.tr(),
-                                          style: TextStyle(
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.w600,
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Icon(
+                                            Icons.drive_eta,
                                             color:
                                                 isDarkMode
-                                                    ? Colors.white
-                                                    : Colors.black,
+                                                    ? Colors.white70
+                                                    : Colors.black54,
+                                            size: 18,
                                           ),
-                                        ),
-                                      ],
-                                    ),
-                                    SizedBox(height: 12),
-                                    FutureBuilder<String>(
-                                      future: _getUserName(driver),
-                                      builder: (context, snapshot) {
-                                        return Row(
-                                          children: [
-                                            CircleAvatar(
-                                              radius: 20,
-                                              backgroundColor:
+                                          SizedBox(width: 8),
+                                          Text(
+                                            'app.chat.room.drawer.driver'.tr(),
+                                            style: TextStyle(
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.w600,
+                                              color:
                                                   isDarkMode
-                                                      ? Color(0xFF3A3A3C)
-                                                      : Color(0xFFE5E5EA),
-                                              child: Icon(
-                                                Icons.person,
+                                                      ? Colors.white
+                                                      : Colors.black,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      SizedBox(height: 12),
+                                      FutureBuilder<String>(
+                                        future: _getUserName(driver),
+                                        builder: (context, snapshot) {
+                                          return Row(
+                                            children: [
+                                              CircleAvatar(
+                                                radius: 20,
+                                                backgroundColor:
+                                                    isDarkMode
+                                                        ? Color(0xFF3A3A3C)
+                                                        : Color(0xFFE5E5EA),
+                                                child: Icon(
+                                                  Icons.person,
+                                                  color:
+                                                      isDarkMode
+                                                          ? Colors.white70
+                                                          : Colors.black54,
+                                                ),
+                                              ),
+                                              SizedBox(width: 12),
+                                              Expanded(
+                                                child: Text(
+                                                  snapshot.data ??
+                                                      'app.chat.room.drawer.loading'
+                                                          .tr(),
+                                                  style: TextStyle(
+                                                    fontSize: 16,
+                                                    color:
+                                                        isDarkMode
+                                                            ? Colors.white
+                                                            : Colors.black,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          );
+                                        },
+                                      ),
+                                    ],
+                                  ),
+                                ),
+
+                                // 라이더 섹션
+                                Container(
+                                  margin: EdgeInsets.fromLTRB(16, 8, 16, 8),
+                                  padding: EdgeInsets.all(16),
+                                  decoration: BoxDecoration(
+                                    color:
+                                        isDarkMode
+                                            ? Color(0xFF2C2C2E)
+                                            : Colors.white,
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color:
+                                          isDarkMode
+                                              ? Color(0xFF3A3A3C)
+                                              : Color(0xFFE5E5EA),
+                                      width: 1,
+                                    ),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Icon(
+                                            Icons.people_outline,
+                                            color:
+                                                isDarkMode
+                                                    ? Colors.white70
+                                                    : Colors.black54,
+                                            size: 18,
+                                          ),
+                                          SizedBox(width: 8),
+                                          Text(
+                                            'app.chat.room.drawer.riders'.tr(),
+                                            style: TextStyle(
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.w600,
+                                              color:
+                                                  isDarkMode
+                                                      ? Colors.white
+                                                      : Colors.black,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      SizedBox(height: 12),
+                                      if (users.isEmpty)
+                                        Center(
+                                          child: Padding(
+                                            padding: const EdgeInsets.all(8.0),
+                                            child: Text(
+                                              'No riders yet',
+                                              style: TextStyle(
                                                 color:
                                                     isDarkMode
                                                         ? Colors.white70
                                                         : Colors.black54,
                                               ),
                                             ),
-                                            SizedBox(width: 12),
-                                            Expanded(
-                                              child: Text(
-                                                snapshot.data ??
-                                                    'app.chat.room.drawer.loading'
-                                                        .tr(),
-                                                style: TextStyle(
-                                                  fontSize: 16,
-                                                  color:
-                                                      isDarkMode
-                                                          ? Colors.white
-                                                          : Colors.black,
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        );
-                                      },
-                                    ),
-                                  ],
-                                ),
-                              ),
-
-                              // 라이더 섹션
-                              Container(
-                                margin: EdgeInsets.fromLTRB(16, 8, 16, 8),
-                                padding: EdgeInsets.all(16),
-                                decoration: BoxDecoration(
-                                  color:
-                                      isDarkMode
-                                          ? Color(0xFF2C2C2E)
-                                          : Colors.white,
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(
-                                    color:
-                                        isDarkMode
-                                            ? Color(0xFF3A3A3C)
-                                            : Color(0xFFE5E5EA),
-                                    width: 1,
-                                  ),
-                                ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      children: [
-                                        Icon(
-                                          Icons.people_outline,
-                                          color:
-                                              isDarkMode
-                                                  ? Colors.white70
-                                                  : Colors.black54,
-                                          size: 18,
-                                        ),
-                                        SizedBox(width: 8),
-                                        Text(
-                                          'app.chat.room.drawer.riders'.tr(),
-                                          style: TextStyle(
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.w600,
-                                            color:
-                                                isDarkMode
-                                                    ? Colors.white
-                                                    : Colors.black,
                                           ),
-                                        ),
-                                      ],
-                                    ),
-                                    SizedBox(height: 12),
-                                    if (users.isEmpty)
-                                      Center(
-                                        child: Padding(
-                                          padding: const EdgeInsets.all(8.0),
-                                          child: Text(
-                                            'No riders yet',
-                                            style: TextStyle(
-                                              color:
-                                                  isDarkMode
-                                                      ? Colors.white70
-                                                      : Colors.black54,
-                                            ),
-                                          ),
-                                        ),
-                                      )
-                                    else
-                                      ListView.builder(
-                                        shrinkWrap: true,
-                                        physics: NeverScrollableScrollPhysics(),
-                                        itemCount: users.length,
-                                        itemBuilder: (context, index) {
-                                          final userId = users[index];
-                                          final companionCount =
-                                              data['user_companion_counts']?[userId] ??
-                                              0;
-                                          final luggageCount =
-                                              data['user_luggage_counts']?[userId] ??
-                                              0;
+                                        )
+                                      else
+                                        Container(
+                                          constraints: BoxConstraints(maxHeight: 150),
+                                          child: ListView.builder(
+                                            shrinkWrap: true,
+                                            physics: AlwaysScrollableScrollPhysics(),
+                                            itemCount: users.length,
+                                            itemBuilder: (context, index) {
+                                              final userId = users[index];
+                                              final companionCount =
+                                                  data['user_companion_counts']?[userId] ??
+                                                  0;
+                                              final luggageCount =
+                                                  data['user_luggage_counts']?[userId] ??
+                                                  0;
 
-                                          return FutureBuilder<String>(
-                                            future: _getUserName(userId),
-                                            builder: (context, snapshot) {
-                                              return Padding(
-                                                padding: const EdgeInsets.only(
-                                                  bottom: 12.0,
-                                                ),
-                                                child: Row(
-                                                  children: [
-                                                    CircleAvatar(
-                                                      radius: 20,
-                                                      backgroundColor:
-                                                          isDarkMode
-                                                              ? Color(
-                                                                0xFF3A3A3C,
-                                                              )
-                                                              : Color(
-                                                                0xFFE5E5EA,
-                                                              ),
-                                                      child: Text(
-                                                        (snapshot.data ?? '?')
-                                                            .substring(0, 1)
-                                                            .toUpperCase(),
-                                                        style: TextStyle(
-                                                          color:
-                                                              isDarkMode
-                                                                  ? Colors.white
-                                                                  : Colors
-                                                                      .black,
-                                                          fontWeight:
-                                                              FontWeight.w600,
-                                                        ),
-                                                      ),
+                                              return FutureBuilder<String>(
+                                                future: _getUserName(userId),
+                                                builder: (context, snapshot) {
+                                                  return Padding(
+                                                    padding: const EdgeInsets.only(
+                                                      bottom: 12.0,
                                                     ),
-                                                    SizedBox(width: 12),
-                                                    Expanded(
-                                                      child: Column(
-                                                        crossAxisAlignment:
-                                                            CrossAxisAlignment
-                                                                .start,
-                                                        children: [
-                                                          Text(
-                                                            snapshot.data ??
-                                                                'app.chat.room.drawer.loading'
-                                                                    .tr(),
+                                                    child: Row(
+                                                      children: [
+                                                        CircleAvatar(
+                                                          radius: 20,
+                                                          backgroundColor:
+                                                              isDarkMode
+                                                                  ? Color(
+                                                                      0xFF3A3A3C,
+                                                                    )
+                                                                  : Color(
+                                                                      0xFFE5E5EA,
+                                                                    ),
+                                                          child: Text(
+                                                            (snapshot.data ?? '?')
+                                                                .substring(0, 1)
+                                                                .toUpperCase(),
                                                             style: TextStyle(
-                                                              fontSize: 16,
                                                               color:
                                                                   isDarkMode
-                                                                      ? Colors
-                                                                          .white
+                                                                      ? Colors.white
                                                                       : Colors
                                                                           .black,
+                                                              fontWeight:
+                                                                  FontWeight.w600,
                                                             ),
                                                           ),
-                                                          SizedBox(height: 4),
-                                                          Row(
+                                                        ),
+                                                        SizedBox(width: 12),
+                                                        Expanded(
+                                                          child: Column(
+                                                            crossAxisAlignment:
+                                                                CrossAxisAlignment
+                                                                    .start,
                                                             children: [
-                                                              Container(
-                                                                padding:
-                                                                    EdgeInsets.symmetric(
-                                                                      horizontal:
-                                                                          8,
-                                                                      vertical:
-                                                                          2,
-                                                                    ),
-                                                                decoration: BoxDecoration(
+                                                              Text(
+                                                                snapshot.data ??
+                                                                    'app.chat.room.drawer.loading'
+                                                                        .tr(),
+                                                                style: TextStyle(
+                                                                  fontSize: 16,
                                                                   color:
                                                                       isDarkMode
-                                                                          ? Color(
-                                                                            0xFF3A3A3C,
-                                                                          )
-                                                                          : Color(
-                                                                            0xFFE5E5EA,
-                                                                          ),
-                                                                  borderRadius:
-                                                                      BorderRadius.circular(
-                                                                        10,
-                                                                      ),
-                                                                ),
-                                                                child: Row(
-                                                                  mainAxisSize:
-                                                                      MainAxisSize
-                                                                          .min,
-                                                                  children: [
-                                                                    Icon(
-                                                                      Icons
-                                                                          .people_rounded,
-                                                                      size: 14,
-                                                                      color:
-                                                                          isDarkMode
-                                                                              ? Colors.white70
-                                                                              : Colors.black54,
-                                                                    ),
-                                                                    SizedBox(
-                                                                      width: 4,
-                                                                    ),
-                                                                    Text(
-                                                                      '${companionCount + 1}',
-                                                                      style: TextStyle(
-                                                                        color:
-                                                                            isDarkMode
-                                                                                ? Colors.white70
-                                                                                : Colors.black54,
-                                                                        fontSize:
-                                                                            12,
-                                                                        fontWeight:
-                                                                            FontWeight.w500,
-                                                                      ),
-                                                                    ),
-                                                                  ],
+                                                                          ? Colors
+                                                                              .white
+                                                                          : Colors
+                                                                              .black,
                                                                 ),
                                                               ),
-                                                              SizedBox(
-                                                                width: 8,
-                                                              ),
-                                                              Container(
-                                                                padding:
-                                                                    EdgeInsets.symmetric(
-                                                                      horizontal:
-                                                                          8,
-                                                                      vertical:
-                                                                          2,
-                                                                    ),
-                                                                decoration: BoxDecoration(
-                                                                  color:
-                                                                      isDarkMode
-                                                                          ? Color(
-                                                                            0xFF3A3A3C,
-                                                                          )
-                                                                          : Color(
-                                                                            0xFFE5E5EA,
-                                                                          ),
-                                                                  borderRadius:
-                                                                      BorderRadius.circular(
-                                                                        10,
-                                                                      ),
-                                                                ),
-                                                                child: Row(
-                                                                  mainAxisSize:
-                                                                      MainAxisSize
-                                                                          .min,
-                                                                  children: [
-                                                                    Icon(
-                                                                      Icons
-                                                                          .luggage_rounded,
-                                                                      size: 14,
+                                                              SizedBox(height: 4),
+                                                              Row(
+                                                                children: [
+                                                                  Container(
+                                                                    padding:
+                                                                        EdgeInsets.symmetric(
+                                                                          horizontal:
+                                                                              8,
+                                                                          vertical:
+                                                                              2,
+                                                                        ),
+                                                                    decoration: BoxDecoration(
                                                                       color:
                                                                           isDarkMode
-                                                                              ? Colors.white70
-                                                                              : Colors.black54,
+                                                                              ? Color(
+                                                                                0xFF3A3A3C,
+                                                                              )
+                                                                              : Color(
+                                                                                0xFFE5E5EA,
+                                                                              ),
+                                                                      borderRadius:
+                                                                          BorderRadius.circular(
+                                                                            10,
+                                                                          ),
                                                                     ),
-                                                                    SizedBox(
-                                                                      width: 4,
+                                                                    child: Row(
+                                                                      mainAxisSize:
+                                                                          MainAxisSize
+                                                                              .min,
+                                                                      children: [
+                                                                        Icon(
+                                                                          Icons
+                                                                              .people_rounded,
+                                                                          size: 14,
+                                                                          color:
+                                                                              isDarkMode
+                                                                                  ? Colors.white70
+                                                                                  : Colors.black54,
+                                                                        ),
+                                                                        SizedBox(
+                                                                          width: 4,
+                                                                        ),
+                                                                        Text(
+                                                                          '${companionCount + 1}',
+                                                                          style: TextStyle(
+                                                                            color:
+                                                                                isDarkMode
+                                                                                    ? Colors.white70
+                                                                                    : Colors.black54,
+                                                                            fontSize:
+                                                                                12,
+                                                                            fontWeight:
+                                                                                FontWeight.w500,
+                                                                          ),
+                                                                        ),
+                                                                      ],
                                                                     ),
-                                                                    Text(
-                                                                      '$luggageCount',
-                                                                      style: TextStyle(
-                                                                        color:
-                                                                            isDarkMode
-                                                                                ? Colors.white70
-                                                                                : Colors.black54,
-                                                                        fontSize:
-                                                                            12,
-                                                                        fontWeight:
-                                                                            FontWeight.w500,
-                                                                      ),
+                                                                  ),
+                                                                  SizedBox(
+                                                                    width: 8,
+                                                                  ),
+                                                                  Container(
+                                                                    padding:
+                                                                        EdgeInsets.symmetric(
+                                                                          horizontal:
+                                                                              8,
+                                                                          vertical:
+                                                                              2,
+                                                                        ),
+                                                                    decoration: BoxDecoration(
+                                                                      color:
+                                                                          isDarkMode
+                                                                              ? Color(
+                                                                                0xFF3A3A3C,
+                                                                              )
+                                                                              : Color(
+                                                                                0xFFE5E5EA,
+                                                                              ),
+                                                                      borderRadius:
+                                                                          BorderRadius.circular(
+                                                                            10,
+                                                                          ),
                                                                     ),
-                                                                  ],
-                                                                ),
+                                                                    child: Row(
+                                                                      mainAxisSize:
+                                                                          MainAxisSize
+                                                                              .min,
+                                                                      children: [
+                                                                        Icon(
+                                                                          Icons
+                                                                              .luggage_rounded,
+                                                                          size: 14,
+                                                                          color:
+                                                                              isDarkMode
+                                                                                  ? Colors.white70
+                                                                                  : Colors.black54,
+                                                                        ),
+                                                                        SizedBox(
+                                                                          width: 4,
+                                                                        ),
+                                                                        Text(
+                                                                          '$luggageCount',
+                                                                          style: TextStyle(
+                                                                            color:
+                                                                                isDarkMode
+                                                                                    ? Colors.white70
+                                                                                    : Colors.black54,
+                                                                            fontSize:
+                                                                                12,
+                                                                            fontWeight:
+                                                                                FontWeight.w500,
+                                                                          ),
+                                                                        ),
+                                                                      ],
+                                                                    ),
+                                                                  ),
+                                                                ],
                                                               ),
                                                             ],
                                                           ),
-                                                        ],
-                                                      ),
+                                                        ),
+                                                      ],
                                                     ),
-                                                  ],
-                                                ),
+                                                  );
+                                                },
                                               );
                                             },
-                                          );
-                                        },
-                                      ),
-                                  ],
+                                          ),
+                                        ),
+                                    ],
+                                  ),
                                 ),
-                              ),
 
-                              // 가격 정보 섹션
-                              Container(
-                                margin: EdgeInsets.fromLTRB(16, 8, 16, 8),
-                                padding: EdgeInsets.all(16),
-                                decoration: BoxDecoration(
-                                  color:
-                                      isDarkMode
-                                          ? Color(0xFF2C2C2E)
-                                          : Colors.white,
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(
+                                // 가격 정보 섹션
+                                Container(
+                                  margin: EdgeInsets.fromLTRB(16, 8, 16, 8),
+                                  padding: EdgeInsets.all(16),
+                                  decoration: BoxDecoration(
                                     color:
                                         isDarkMode
-                                            ? Color(0xFF3A3A3C)
-                                            : Color(0xFFE5E5EA),
-                                    width: 1,
-                                  ),
-                                ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      children: [
-                                        Icon(
-                                          Icons.payments_outlined,
-                                          color:
-                                              isDarkMode
-                                                  ? Colors.white70
-                                                  : Colors.black54,
-                                          size: 18,
-                                        ),
-                                        SizedBox(width: 8),
-                                        Text(
-                                          'app.chat.room.drawer.total_price'
-                                              .tr(),
-                                          style: TextStyle(
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.w600,
-                                            color:
-                                                isDarkMode
-                                                    ? Colors.white
-                                                    : Colors.black,
-                                          ),
-                                        ),
-                                      ],
+                                            ? Color(0xFF2C2C2E)
+                                            : Colors.white,
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color:
+                                          isDarkMode
+                                              ? Color(0xFF3A3A3C)
+                                              : Color(0xFFE5E5EA),
+                                      width: 1,
                                     ),
-                                    SizedBox(height: 12),
-                                    Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Text(
-                                          data['member_count'] <= 2
-                                              ? '\$500'
-                                              : data['member_count'] == 3
-                                              ? '\$440'
-                                              : '\$500',
-                                          style: TextStyle(
-                                            fontSize: 24,
-                                            fontWeight: FontWeight.bold,
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Icon(
+                                            Icons.payments_outlined,
                                             color:
                                                 isDarkMode
-                                                    ? Colors.white
-                                                    : Colors.black,
+                                                    ? Colors.white70
+                                                    : Colors.black54,
+                                            size: 18,
                                           ),
-                                        ),
-                                        Container(
-                                          padding: EdgeInsets.symmetric(
-                                            horizontal: 8,
-                                            vertical: 4,
-                                          ),
-                                          decoration: BoxDecoration(
-                                            color:
-                                                isDarkMode
-                                                    ? Color(0xFF3A3A3C)
-                                                    : Color(0xFFE5E5EA),
-                                            borderRadius: BorderRadius.circular(
-                                              10,
-                                            ),
-                                          ),
-                                          child: Text(
-                                            context.locale.languageCode == 'ko'
-                                                ? '${data['member_count']}명 기준'
-                                                : 'Based on ${data['member_count']} people',
+                                          SizedBox(width: 8),
+                                          Text(
+                                            'app.chat.room.drawer.total_price'
+                                                .tr(),
                                             style: TextStyle(
-                                              fontSize: 12,
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.w600,
                                               color:
                                                   isDarkMode
-                                                      ? Colors.white70
-                                                      : Colors.black54,
-                                              fontWeight: FontWeight.w500,
+                                                      ? Colors.white
+                                                      : Colors.black,
                                             ),
                                           ),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
+                                        ],
+                                      ),
+                                      SizedBox(height: 12),
+                                      Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Text(
+                                            data['member_count'] <= 2
+                                                ? '\$500'
+                                                : data['member_count'] == 3
+                                                ? '\$440'
+                                                : '\$500',
+                                            style: TextStyle(
+                                              fontSize: 24,
+                                              fontWeight: FontWeight.bold,
+                                              color:
+                                                  isDarkMode
+                                                      ? Colors.white
+                                                      : Colors.black,
+                                            ),
+                                          ),
+                                          Container(
+                                            padding: EdgeInsets.symmetric(
+                                              horizontal: 8,
+                                              vertical: 4,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color:
+                                                  isDarkMode
+                                                      ? Color(0xFF3A3A3C)
+                                                      : Color(0xFFE5E5EA),
+                                              borderRadius: BorderRadius.circular(
+                                                10,
+                                              ),
+                                            ),
+                                            child: Text(
+                                              context.locale.languageCode == 'ko'
+                                                  ? '${data['member_count']}명 기준'
+                                                  : 'Based on ${data['member_count']} people',
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                color:
+                                                    isDarkMode
+                                                        ? Colors.white70
+                                                        : Colors.black54,
+                                                fontWeight: FontWeight.w500,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
                                 ),
-                              ),
 
-                              // 나가기 버튼
-                              Padding(
-                                padding: const EdgeInsets.fromLTRB(
-                                  16,
-                                  8,
-                                  16,
-                                  16,
-                                ),
-                                child: ElevatedButton(
-                                  onPressed: () => _showExitDialog(context),
-                                  style: ElevatedButton.styleFrom(
-                                    minimumSize: Size(double.infinity, 50),
-                                    backgroundColor: Colors.red,
-                                    foregroundColor: Colors.white,
-                                    elevation: 0,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12),
+                                // 나가기 버튼
+                                Padding(
+                                  padding: const EdgeInsets.fromLTRB(
+                                    16,
+                                    8,
+                                    16,
+                                    16,
+                                  ),
+                                  child: ElevatedButton(
+                                    onPressed: () => _showExitDialog(context),
+                                    style: ElevatedButton.styleFrom(
+                                      minimumSize: Size(double.infinity, 50),
+                                      backgroundColor: Colors.red,
+                                      foregroundColor: Colors.white,
+                                      elevation: 0,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                    ),
+                                    child: Text(
+                                      'app.chat.room.drawer.leave_room'.tr(),
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w600,
+                                      ),
                                     ),
                                   ),
-                                  child: Text(
-                                    'app.chat.room.drawer.leave_room'.tr(),
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           );
                         } catch (e) {
                           print('Error loading chat room data: $e');
