@@ -98,7 +98,8 @@ class _HomePageState extends State<HomePage> {
     try {
       final user = _auth.currentUser;
       if (user != null) {
-        final userDoc = await _firestore.collection('users').doc(user.uid).get();
+        final userDoc =
+            await _firestore.collection('users').doc(user.uid).get();
         if (userDoc.exists) {
           final userData = userDoc.data();
           setState(() {
@@ -404,7 +405,8 @@ class _HomePageState extends State<HomePage> {
                                     .where(
                                       'text',
                                       isEqualTo:
-                                          'app.chat.room.system.driver_accepted'.tr(),
+                                          'app.chat.room.system.driver_accepted'
+                                              .tr(),
                                     )
                                     .get();
 
@@ -414,7 +416,8 @@ class _HomePageState extends State<HomePage> {
                                   .doc(chatRoomId)
                                   .collection('messages')
                                   .add({
-                                    'text': 'app.chat.room.system.driver_accepted',
+                                    'text':
+                                        'app.chat.room.system.driver_accepted',
                                     'sender_id': 'system',
                                     'sender_name': '시스템',
                                     'timestamp': FieldValue.serverTimestamp(),
@@ -428,7 +431,8 @@ class _HomePageState extends State<HomePage> {
                                 .doc(chatRoomId)
                                 .collection('messages')
                                 .add({
-                                  'text': 'app.chat.room.system.chat_room_created',
+                                  'text':
+                                      'app.chat.room.system.chat_room_created',
                                   'sender_id': 'system',
                                   'sender_name': '시스템',
                                   'timestamp': FieldValue.serverTimestamp(),
@@ -571,7 +575,9 @@ class _HomePageState extends State<HomePage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'app.home.welcome_prefix'.tr() + ' $_username' + 'app.home.welcome_suffix'.tr(),
+                        'app.home.welcome_prefix'.tr() +
+                            ' $_username' +
+                            'app.home.welcome_suffix'.tr(),
                         style: TextStyle(
                           fontSize: 28,
                           fontWeight: FontWeight.bold,
@@ -716,7 +722,9 @@ class _HomePageState extends State<HomePage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'app.home.welcome_prefix'.tr() + ' $_username' + 'app.home.welcome_suffix'.tr(),
+                        'app.home.welcome_prefix'.tr() +
+                            ' $_username' +
+                            'app.home.welcome_suffix'.tr(),
                         style: TextStyle(
                           fontSize: 28,
                           fontWeight: FontWeight.bold,
@@ -799,7 +807,10 @@ class _HomePageState extends State<HomePage> {
                           Text(
                             'View Profile',
                             style: TextStyle(
-                              color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                              color:
+                                  isDarkMode
+                                      ? Colors.grey[400]
+                                      : Colors.grey[600],
                             ),
                           ),
                         ],
@@ -945,31 +956,33 @@ class _HomeContentState extends State<HomeContent> {
       print('사용자 ID: ${currentUser.uid}로 이용 내역 조회 시작');
 
       // psuToAirport 여정 로드
-      final psuToAirportSnapshot = await _firestore
-          .collection('psuToAirport')
-          .where('members', arrayContains: currentUser.uid)
-          .get();
+      final psuToAirportSnapshot =
+          await _firestore
+              .collection('psuToAirport')
+              .where('members', arrayContains: currentUser.uid)
+              .get();
 
       // airportToPsu 여정 로드
-      final airportToPsuSnapshot = await _firestore
-          .collection('airportToPsu')
-          .where('members', arrayContains: currentUser.uid)
-          .get();
+      final airportToPsuSnapshot =
+          await _firestore
+              .collection('airportToPsu')
+              .where('members', arrayContains: currentUser.uid)
+              .get();
 
       // 두 컬렉션의 결과를 합치고 시간순으로 정렬
       List<Map<String, dynamic>> allTrips = [];
-      
-      allTrips.addAll(psuToAirportSnapshot.docs.map((doc) => {
-        ...doc.data(),
-        'id': doc.id,
-        'collection': 'psuToAirport',
-      }));
-      
-      allTrips.addAll(airportToPsuSnapshot.docs.map((doc) => {
-        ...doc.data(),
-        'id': doc.id,
-        'collection': 'airportToPsu',
-      }));
+
+      allTrips.addAll(
+        psuToAirportSnapshot.docs.map(
+          (doc) => {...doc.data(), 'id': doc.id, 'collection': 'psuToAirport'},
+        ),
+      );
+
+      allTrips.addAll(
+        airportToPsuSnapshot.docs.map(
+          (doc) => {...doc.data(), 'id': doc.id, 'collection': 'airportToPsu'},
+        ),
+      );
 
       // ride_date 기준으로 정렬 (히스토리 페이지와 동일하게)
       allTrips.sort((a, b) {
@@ -1090,7 +1103,8 @@ class _HomeContentState extends State<HomeContent> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                _reservedTrip!['pickup_info']?['address'] ?? 'app.home.pickup_location'.tr(),
+                                _reservedTrip!['pickup_info']?['address'] ??
+                                    'app.home.pickup_location'.tr(),
                                 style: TextStyle(
                                   color: textColor,
                                   fontSize: 15,
@@ -1098,7 +1112,8 @@ class _HomeContentState extends State<HomeContent> {
                               ),
                               SizedBox(height: 16),
                               Text(
-                                _reservedTrip!['destination_info']?['address'] ?? 'app.home.destination'.tr(),
+                                _reservedTrip!['destination_info']?['address'] ??
+                                    'app.home.destination'.tr(),
                                 style: TextStyle(
                                   color: textColor,
                                   fontSize: 15,
@@ -1151,7 +1166,8 @@ class _HomeContentState extends State<HomeContent> {
                                 _getStatusIcon(_reservedTrip!['status']),
                                 SizedBox(width: 4),
                                 Text(
-                                  'app.home.status.${_reservedTrip!['status']}'.tr(),
+                                  'app.home.status.${_reservedTrip!['status']}'
+                                      .tr(),
                                   style: TextStyle(
                                     color: _getStatusColor(
                                       _reservedTrip!['status'],
@@ -1181,11 +1197,7 @@ class _HomeContentState extends State<HomeContent> {
                 padding: EdgeInsets.all(16),
                 child: Row(
                   children: [
-                    Icon(
-                      Icons.error_outline,
-                      color: Colors.orange,
-                      size: 24,
-                    ),
+                    Icon(Icons.error_outline, color: Colors.orange, size: 24),
                     SizedBox(width: 12),
                     Text(
                       'app.home.no_recent_rides'.tr(),
@@ -1223,8 +1235,8 @@ class _HomeContentState extends State<HomeContent> {
                       children: [
                         SizedBox(height: 16),
                         Text(
-                          context.locale.languageCode == 'ko' 
-                              ? 'PLO 와 함께할 용사' 
+                          context.locale.languageCode == 'ko'
+                              ? 'PLO 와 함께할 용사'
                               : 'Join PLO Gang',
                           style: TextStyle(
                             color: Colors.white,
@@ -1280,19 +1292,29 @@ class _HomeContentState extends State<HomeContent> {
     if (timestamp is Timestamp) {
       final date = timestamp.toDate();
       final locale = context.locale.languageCode;
-      
+
       if (locale == 'ko') {
         return '${date.year}년 ${date.month}월 ${date.day}일 ${date.hour}:${date.minute.toString().padLeft(2, '0')}';
       } else {
         // 영어 형식으로 날짜 변환
         final months = [
-          'January', 'February', 'March', 'April', 'May', 'June',
-          'July', 'August', 'September', 'October', 'November', 'December'
+          'January',
+          'February',
+          'March',
+          'April',
+          'May',
+          'June',
+          'July',
+          'August',
+          'September',
+          'October',
+          'November',
+          'December',
         ];
         String period = date.hour < 12 ? 'AM' : 'PM';
         int hour = date.hour % 12;
         if (hour == 0) hour = 12;
-        
+
         return '${months[date.month - 1]} ${date.day}, ${date.year} ${hour}:${date.minute.toString().padLeft(2, '0')} $period';
       }
     }

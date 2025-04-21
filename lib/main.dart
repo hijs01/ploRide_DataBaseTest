@@ -12,6 +12,7 @@ import 'package:cabrider/screens/settings_page.dart';
 import 'package:cabrider/screens/rideconfirmation/rideconfirmation_page.dart';
 import 'package:cabrider/screens/email_verification_page.dart';
 import 'package:cabrider/screens/chat_room_page.dart';
+import 'package:cabrider/screens/delete_account_page.dart';
 import 'package:cabrider/globalvariable.dart';
 import 'package:provider/provider.dart';
 import 'package:cabrider/dataprovider/appdata.dart';
@@ -306,10 +307,7 @@ void main() async {
   await _initializeFirebase();
   runApp(
     EasyLocalization(
-      supportedLocales: const [
-        Locale('ko', 'KR'),
-        Locale('en', 'US'),
-      ],
+      supportedLocales: const [Locale('ko', 'KR'), Locale('en', 'US')],
       path: 'assets/translations',
       fallbackLocale: const Locale('ko', 'KR'),
       child: ChangeNotifierProvider(
@@ -375,6 +373,7 @@ class MyApp extends StatelessWidget {
         HomePage.id: (context) => HomePage(),
         SettingsPage.id: (context) => SettingsPage(),
         EmailVerificationPage.id: (context) => EmailVerificationPage(email: ''),
+        DeleteAccountPage.id: (context) => DeleteAccountPage(),
         'rideconfirmation': (context) => RideConfirmationPage(),
       },
     );

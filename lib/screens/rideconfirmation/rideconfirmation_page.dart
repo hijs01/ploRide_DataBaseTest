@@ -179,10 +179,21 @@ class _RideConfirmationPageState extends State<RideConfirmationPage>
     if (appData.rideDate != null) {
       // 영어 형식으로 날짜 변환
       final months = [
-        'January', 'February', 'March', 'April', 'May', 'June',
-        'July', 'August', 'September', 'October', 'November', 'December'
+        'January',
+        'February',
+        'March',
+        'April',
+        'May',
+        'June',
+        'July',
+        'August',
+        'September',
+        'October',
+        'November',
+        'December',
       ];
-      formattedDate = "${months[appData.rideDate!.month - 1]} ${appData.rideDate!.day}, ${appData.rideDate!.year}";
+      formattedDate =
+          "${months[appData.rideDate!.month - 1]} ${appData.rideDate!.day}, ${appData.rideDate!.year}";
     }
 
     if (appData.rideTime != null) {
@@ -190,7 +201,8 @@ class _RideConfirmationPageState extends State<RideConfirmationPage>
       String period = appData.rideTime!.hour < 12 ? 'AM' : 'PM';
       int hour = appData.rideTime!.hour % 12;
       if (hour == 0) hour = 12;
-      formattedTime = "$hour:${appData.rideTime!.minute.toString().padLeft(2, '0')} $period";
+      formattedTime =
+          "$hour:${appData.rideTime!.minute.toString().padLeft(2, '0')} $period";
     }
 
     return Scaffold(
@@ -301,7 +313,9 @@ class _RideConfirmationPageState extends State<RideConfirmationPage>
                                       ),
                                       SizedBox(height: 2),
                                       Text(
-                                        pickup?.placeName ?? 'app.ride_confirmation.error.invalid_location'.tr(),
+                                        pickup?.placeName ??
+                                            'app.ride_confirmation.error.invalid_location'
+                                                .tr(),
                                         style: TextStyle(
                                           fontSize: 14,
                                           fontWeight: FontWeight.bold,
@@ -319,7 +333,8 @@ class _RideConfirmationPageState extends State<RideConfirmationPage>
                                         CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        'app.ride_confirmation.destination'.tr(),
+                                        'app.ride_confirmation.destination'
+                                            .tr(),
                                         style: TextStyle(
                                           fontSize: 12,
                                           color: subtitleColor,
@@ -327,7 +342,9 @@ class _RideConfirmationPageState extends State<RideConfirmationPage>
                                       ),
                                       SizedBox(height: 2),
                                       Text(
-                                        destination?.placeName ?? 'app.ride_confirmation.error.invalid_location'.tr(),
+                                        destination?.placeName ??
+                                            'app.ride_confirmation.error.invalid_location'
+                                                .tr(),
                                         style: TextStyle(
                                           fontSize: 14,
                                           fontWeight: FontWeight.bold,
@@ -360,7 +377,10 @@ class _RideConfirmationPageState extends State<RideConfirmationPage>
                               context,
                               Icons.calendar_today_outlined,
                               'app.ride_confirmation.date'.tr(),
-                              formattedDate.isEmpty ? 'app.ride_confirmation.error.invalid_date_time'.tr() : formattedDate,
+                              formattedDate.isEmpty
+                                  ? 'app.ride_confirmation.error.invalid_date_time'
+                                      .tr()
+                                  : formattedDate,
                               primaryColor,
                               textColor,
                               subtitleColor,
@@ -373,7 +393,10 @@ class _RideConfirmationPageState extends State<RideConfirmationPage>
                               context,
                               Icons.access_time,
                               'app.ride_confirmation.time'.tr(),
-                              formattedTime.isEmpty ? 'app.ride_confirmation.error.invalid_date_time'.tr() : formattedTime,
+                              formattedTime.isEmpty
+                                  ? 'app.ride_confirmation.error.invalid_date_time'
+                                      .tr()
+                                  : formattedTime,
                               primaryColor,
                               textColor,
                               subtitleColor,
@@ -456,8 +479,8 @@ class _RideConfirmationPageState extends State<RideConfirmationPage>
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Text(
-                              context.locale.languageCode == 'ko' 
-                                  ? '주의!' 
+                              context.locale.languageCode == 'ko'
+                                  ? '주의!'
                                   : 'Warning!',
                               style: TextStyle(
                                 fontSize: 13,
@@ -494,7 +517,9 @@ class _RideConfirmationPageState extends State<RideConfirmationPage>
                         child: Row(
                           children: [
                             Text(
-                              context.locale.languageCode == 'ko' ? '현금결제' : 'Cash',
+                              context.locale.languageCode == 'ko'
+                                  ? '현금결제'
+                                  : 'Cash',
                               style: TextStyle(
                                 fontSize: 13,
                                 color: Colors.white,
@@ -545,8 +570,8 @@ class _RideConfirmationPageState extends State<RideConfirmationPage>
                             // 안내 텍스트
                             Center(
                               child: Text(
-                                context.locale.languageCode == 'ko' 
-                                    ? '슬라이드하여 탑승 확정' 
+                                context.locale.languageCode == 'ko'
+                                    ? '슬라이드하여 탑승 확정'
                                     : 'Slide to confirm ride!',
                                 style: TextStyle(
                                   color:

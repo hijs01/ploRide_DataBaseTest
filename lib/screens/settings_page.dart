@@ -10,6 +10,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:cabrider/screens/delete_account_page.dart';
 
 class SettingsPage extends StatefulWidget {
   static const String id = 'settings';
@@ -38,7 +39,7 @@ class _SettingsPageState extends State<SettingsPage> {
       'https://www.instagram.com/psu_plo?utm_source=ig_web_button_share_sheet&igsh=ZDNlZDc0MzIxNw==';
 
   // PLO 개발자 정보
-  final List<String> _developers = ['김태현', '박지성', '김기성', '송우주', '이정수', '홍인기'];
+  final List<String> _developers = ['김태현', '박지성', '김기성', '송우주', '이정수', '설정민'];
 
   // 언어 옵션
   final List<Map<String, String>> languages = [
@@ -58,16 +59,18 @@ class _SettingsPageState extends State<SettingsPage> {
     User? currentUser = FirebaseAuth.instance.currentUser;
     if (currentUser != null) {
       try {
-        final userDoc = await FirebaseFirestore.instance
-            .collection('users')
-            .doc(currentUser.uid)
-            .get();
+        final userDoc =
+            await FirebaseFirestore.instance
+                .collection('users')
+                .doc(currentUser.uid)
+                .get();
 
         if (userDoc.exists) {
           final userData = userDoc.data();
           setState(() {
             _userEmail = currentUser.email ?? '';
-            _userName = userData?['fullname'] ?? currentUser.email!.split('@')[0];
+            _userName =
+                userData?['fullname'] ?? currentUser.email!.split('@')[0];
           });
         } else {
           setState(() {
@@ -90,12 +93,14 @@ class _SettingsPageState extends State<SettingsPage> {
     final prefs = await SharedPreferences.getInstance();
     final languageCode = prefs.getString('language_code') ?? 'ko';
     final countryCode = prefs.getString('country_code') ?? 'KR';
-    
+
     setState(() {
-      selectedLanguage = languages.firstWhere(
-        (lang) => lang['code'] == languageCode && lang['country'] == countryCode,
-        orElse: () => languages.first,
-      )['name']!;
+      selectedLanguage =
+          languages.firstWhere(
+            (lang) =>
+                lang['code'] == languageCode && lang['country'] == countryCode,
+            orElse: () => languages.first,
+          )['name']!;
     });
   }
 
@@ -104,13 +109,15 @@ class _SettingsPageState extends State<SettingsPage> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('language_code', languageCode);
     await prefs.setString('country_code', countryCode);
-    
+
     setState(() {
-      selectedLanguage = languages.firstWhere(
-        (lang) => lang['code'] == languageCode && lang['country'] == countryCode,
-      )['name']!;
+      selectedLanguage =
+          languages.firstWhere(
+            (lang) =>
+                lang['code'] == languageCode && lang['country'] == countryCode,
+          )['name']!;
     });
-    
+
     context.setLocale(Locale(languageCode, countryCode));
   }
 
@@ -293,24 +300,30 @@ class _SettingsPageState extends State<SettingsPage> {
               children: [
                 Text(
                   'app.language'.tr(),
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                 ),
                 SizedBox(height: 20),
-                ...languages.map((language) => ListTile(
-                  title: Text(language['name'] ?? ''),
-                  trailing: selectedLanguage == language['name']
-                      ? Icon(Icons.check, color: Colors.blue)
-                      : null,
-                  onTap: () {
-                    if (language['code'] != null && language['country'] != null) {
-                      _changeLanguage(language['code']!, language['country']!);
-                    }
-                    Navigator.pop(context);
-                  },
-                )).toList(),
+                ...languages
+                    .map(
+                      (language) => ListTile(
+                        title: Text(language['name'] ?? ''),
+                        trailing:
+                            selectedLanguage == language['name']
+                                ? Icon(Icons.check, color: Colors.blue)
+                                : null,
+                        onTap: () {
+                          if (language['code'] != null &&
+                              language['country'] != null) {
+                            _changeLanguage(
+                              language['code']!,
+                              language['country']!,
+                            );
+                          }
+                          Navigator.pop(context);
+                        },
+                      ),
+                    )
+                    .toList(),
               ],
             ),
           ),
@@ -355,6 +368,14 @@ class _SettingsPageState extends State<SettingsPage> {
         ),
       );
     }
+  }
+
+  // 계정 삭제 페이지로 이동
+  void _navigateToDeleteAccount() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => DeleteAccountPage()),
+    );
   }
 
   @override
@@ -486,7 +507,6 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
 
           // 기타 섹션 제거하고 개발자 정보 섹션 추가
-
           _buildSectionCard(
             title: 'app.about'.tr(),
             icon: Icons.code,
@@ -516,6 +536,19 @@ class _SettingsPageState extends State<SettingsPage> {
                   Icons.arrow_forward_ios,
                   size: 16,
                   color: isDarkMode ? Colors.grey : Colors.grey[600],
+                ),
+              ),
+              _buildSettingItem(
+                icon: Icons.delete_forever,
+                title: '계정 삭제',
+                subtitle: '계정과 모든 데이터를 영구적으로 삭제합니다',
+                isDarkMode: isDarkMode,
+                isDestructive: true,
+                onTap: _navigateToDeleteAccount,
+                trailing: Icon(
+                  Icons.arrow_forward_ios,
+                  size: 16,
+                  color: Colors.red,
                 ),
               ),
               _buildSettingItem(

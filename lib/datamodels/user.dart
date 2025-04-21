@@ -57,10 +57,10 @@ class User {
             .collection('users')
             .doc(currentUser.uid)
             .set({
-          'fcm_token': token,
-          'last_updated': FieldValue.serverTimestamp(),
-        }, SetOptions(merge: true));  // merge: true로 설정하여 기존 데이터 유지
-        
+              'fcm_token': token,
+              'last_updated': FieldValue.serverTimestamp(),
+            }, SetOptions(merge: true)); // merge: true로 설정하여 기존 데이터 유지
+
         print('FCM 토큰이 Firestore에 업데이트되었습니다: $token');
       }
     }

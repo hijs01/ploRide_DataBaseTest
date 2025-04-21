@@ -156,33 +156,41 @@ class _HistoryPageState extends State<HistoryPage> {
       if (currentUser == null) return;
 
       // psuToAirport 여정 로드
-      final psuToAirportSnapshot = await _firestore
-          .collection('psuToAirport')
-          .where('members', arrayContains: currentUser.uid)
-          .get();
+      final psuToAirportSnapshot =
+          await _firestore
+              .collection('psuToAirport')
+              .where('members', arrayContains: currentUser.uid)
+              .get();
 
       // airportToPsu 여정 로드
-      final airportToPsuSnapshot = await _firestore
-          .collection('airportToPsu')
-          .where('members', arrayContains: currentUser.uid)
-          .get();
+      final airportToPsuSnapshot =
+          await _firestore
+              .collection('airportToPsu')
+              .where('members', arrayContains: currentUser.uid)
+              .get();
 
       setState(() {
-        _psuToAirportTrips = psuToAirportSnapshot.docs
-            .map((doc) => {
-                  ...doc.data(),
-                  'id': doc.id,
-                  'collection': 'psuToAirport',
-                })
-            .toList();
-        
-        _airportToPsuTrips = airportToPsuSnapshot.docs
-            .map((doc) => {
-                  ...doc.data(),
-                  'id': doc.id,
-                  'collection': 'airportToPsu',
-                })
-            .toList();
+        _psuToAirportTrips =
+            psuToAirportSnapshot.docs
+                .map(
+                  (doc) => {
+                    ...doc.data(),
+                    'id': doc.id,
+                    'collection': 'psuToAirport',
+                  },
+                )
+                .toList();
+
+        _airportToPsuTrips =
+            airportToPsuSnapshot.docs
+                .map(
+                  (doc) => {
+                    ...doc.data(),
+                    'id': doc.id,
+                    'collection': 'airportToPsu',
+                  },
+                )
+                .toList();
       });
 
       print('PSU → Airport 여정 수: ${_psuToAirportTrips.length}');
@@ -245,7 +253,8 @@ class _HistoryPageState extends State<HistoryPage> {
 
   @override
   Widget build(BuildContext context) {
-    final isDarkMode = MediaQuery.of(context).platformBrightness == Brightness.dark;
+    final isDarkMode =
+        MediaQuery.of(context).platformBrightness == Brightness.dark;
     final textColor = isDarkMode ? Colors.white : Colors.black;
     final backgroundColor = isDarkMode ? Color(0xFF000000) : Color(0xFFF2F2F7);
     final cardColor = isDarkMode ? Color(0xFF1C1C1E) : Colors.white;
@@ -355,7 +364,7 @@ class _HistoryPageState extends State<HistoryPage> {
                     },
                   ),
                 ],
-                
+
                 // 여정이 없는 경우 메시지 표시
                 if (_psuToAirportTrips.isEmpty && _airportToPsuTrips.isEmpty)
                   Center(
@@ -366,7 +375,10 @@ class _HistoryPageState extends State<HistoryPage> {
                           Icon(
                             Icons.history,
                             size: 70,
-                            color: isDarkMode ? Colors.grey[700] : Colors.grey[300],
+                            color:
+                                isDarkMode
+                                    ? Colors.grey[700]
+                                    : Colors.grey[300],
                           ),
                           SizedBox(height: 20),
                           Text(
@@ -374,7 +386,10 @@ class _HistoryPageState extends State<HistoryPage> {
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w500,
-                              color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                              color:
+                                  isDarkMode
+                                      ? Colors.grey[400]
+                                      : Colors.grey[600],
                             ),
                           ),
                         ],
@@ -416,7 +431,10 @@ class _HistoryPageState extends State<HistoryPage> {
     Color textColor,
   ) {
     final driverAccepted = status == '확정됨';
-    final updatedStatus = driverAccepted ? 'app.history.status.accepted'.tr() : 'app.history.status.pending'.tr();
+    final updatedStatus =
+        driverAccepted
+            ? 'app.history.status.accepted'.tr()
+            : 'app.history.status.pending'.tr();
     final statusColor = _getStatusColor(updatedStatus);
     final isCancelled = status == '취소됨';
 
@@ -455,7 +473,7 @@ class _HistoryPageState extends State<HistoryPage> {
               ),
             ),
             SizedBox(height: 16),
-            
+
             // 경로 표시 - 세로 레이아웃으로 변경
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -483,7 +501,7 @@ class _HistoryPageState extends State<HistoryPage> {
                     ),
                   ],
                 ),
-                
+
                 // 화살표
                 Padding(
                   padding: EdgeInsets.symmetric(vertical: 8),
@@ -493,7 +511,7 @@ class _HistoryPageState extends State<HistoryPage> {
                     size: 20,
                   ),
                 ),
-                
+
                 // 도착지
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -519,14 +537,11 @@ class _HistoryPageState extends State<HistoryPage> {
                 ),
               ],
             ),
-            
+
             SizedBox(height: 16),
-            Divider(
-              color: textColor.withOpacity(0.1),
-              height: 1,
-            ),
+            Divider(color: textColor.withOpacity(0.1), height: 1),
             SizedBox(height: 12),
-            
+
             // 날짜 정보
             Row(
               children: [
@@ -623,7 +638,8 @@ class _HistoryPageState extends State<HistoryPage> {
       print('채팅방 상태 확인 중: $tripId');
 
       // 해당 tripId가 속한 채팅방 컬렉션 찾기
-      final chatRoomDoc = await _firestore.collection(collection).doc(tripId).get();
+      final chatRoomDoc =
+          await _firestore.collection(collection).doc(tripId).get();
 
       if (chatRoomDoc.exists) {
         final chatRoomData = chatRoomDoc.data() as Map<String, dynamic>;
