@@ -11,7 +11,7 @@ const {onRequest} = require('firebase-functions/v2/https');
 const {onValueCreated, onValueUpdated} = require('firebase-functions/v2/database');
 const {onDocumentCreated, onDocumentUpdated} = require('firebase-functions/v2/firestore');
 const logger = require('firebase-functions/logger');
-const functions = require('firebase-functions');
+const functions = require('firebase-functions/v2');
 const admin = require('firebase-admin');
 
 admin.initializeApp();
@@ -391,3 +391,140 @@ exports.sendChatNotification = functions.https.onRequest(async (req, res) => {
     res.status(500).send({ error: error.message });
   }
 });
+
+// 공통 알림 로직을 함수로 분리
+async function handleMessageNotification(newData, previousData, documentPath) {
+    // lastMessage가 변경되었을 때만 실행
+    if (newData.lastMessage === previousData.lastMessage) {
+        return null;
+    }
+    
+    try {
+        const driverId = newData.driver_id;
+        const senderId = newData.last_message_sender_id;
+        
+        console.log(`[${documentPath}] 메시지 정보:`, {
+            senderId,
+            driverId,
+            lastMessage: newData.lastMessage,
+            senderName: newData.last_message_sender_name,
+            members: newData.members
+        });
+        
+        // 메시지 발신자가 드라이버인지 확인
+        const isFromDriver = senderId === driverId;
+        console.log(`[${documentPath}] 드라이버가 보낸 메시지인가:`, isFromDriver);
+        
+        // 수신자 정보 설정
+        let receiverId, receiverCollection;
+        if (isFromDriver) {
+            // 드라이버가 보낸 경우 -> 사용자에게 전송
+            receiverId = newData.members[0];
+            receiverCollection = 'users';
+        } else {
+            // 사용자가 보낸 경우 -> 드라이버에게 전송
+            receiverId = driverId;
+            receiverCollection = 'drivers';
+        }
+        
+        console.log(`[${documentPath}] 수신자 정보:`, {
+            receiverId,
+            receiverCollection,
+            isFromDriver
+        });
+        
+        // 수신자 문서 가져오기
+        const receiverDoc = await admin.firestore().collection(receiverCollection).doc(receiverId).get();
+        
+        if (!receiverDoc.exists) {
+            console.log(`[${documentPath}] 수신자 문서 없음:`, receiverCollection, receiverId);
+            return null;
+        }
+        
+        const receiverData = receiverDoc.data();
+        console.log(`[${documentPath}] 수신자 데이터:`, receiverData);
+        
+        // 토큰 확인 (fcm_token 또는 token 필드 체크)
+        const receiverToken = receiverData.fcm_token || receiverData.token;
+        
+        if (!receiverToken) {
+            console.log(`[${documentPath}] 수신자 토큰 없음:`, receiverCollection, receiverId);
+            return null;
+        }
+        
+        console.log(`[${documentPath}] 사용할 토큰:`, receiverToken);
+        
+        const senderName = newData.last_message_sender_name || '알 수 없음';
+        
+        const message = {
+            token: receiverToken,
+            notification: {
+                title: `${senderName}님의 메시지`,
+                body: newData.lastMessage,
+                badge: 1
+            },
+            apns: {
+                headers: {
+                    'apns-priority': '10',
+                    'apns-push-type': 'alert',
+                    'apns-topic': 'com.plo.cabrider',
+                    'apns-expiration': '0'
+                },
+                payload: {
+                    aps: {
+                        alert: {
+                            title: `${senderName}님의 메시지`,
+                            body: newData.lastMessage,
+                            'launch-image': 'default'
+                        },
+                        badge: 1,
+                        sound: 'default',
+                        'mutable-content': 1,
+                        'content-available': 1,
+                        'category': 'NEW_MESSAGE_CATEGORY'
+                    },
+                    messageData: {
+                        type: 'chat_message',
+                        senderId: senderId,
+                        chatId: documentPath
+                    }
+                }
+            }
+        };
+
+        console.log(`[${documentPath}] 전송할 메시지:`, JSON.stringify(message, null, 2));
+        
+        const response = await admin.messaging().send(message);
+        console.log(`[${documentPath}] 알림 전송 완료:`, {
+            isFromDriver,
+            receiverType: isFromDriver ? '사용자' : '드라이버',
+            response
+        });
+        
+    } catch (error) {
+        console.error(`[${documentPath}] 에러:`, error);
+        console.error(`[${documentPath}] 에러 상세:`, {
+            errorCode: error.code,
+            errorMessage: error.message,
+            errorDetails: error.details
+        });
+    }
+}
+
+// 모든 채팅 메시지에 대한 알림 처리
+exports.sendChatMessageNotification = functions.firestore
+    .onDocumentUpdated('{collection}/{documentId}', async (event) => {
+        const collection = event.params.collection;
+        const documentId = event.params.documentId;
+        
+        // 채팅 관련 컬렉션인지 확인
+        if (!collection.includes('To')) {
+            return null;
+        }
+        
+        return handleMessageNotification(
+            event.data.after.data(),
+            event.data.before.data(),
+            `${collection}/${documentId}`
+        );
+    });

@@ -1,5 +1,5 @@
-import 'package:cabrider/brand_colors.dart';
-import 'package:cabrider/helpers/privacy_policy.dart';
+import 'package:TAGO/brand_colors.dart';
+import 'package:TAGO/helpers/privacy_policy.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:io';

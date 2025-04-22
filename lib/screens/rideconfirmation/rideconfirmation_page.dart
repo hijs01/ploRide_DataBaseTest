@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:cabrider/dataprovider/appdata.dart';
-import 'package:cabrider/datamodels/address.dart';
+import 'package:TAGO/dataprovider/appdata.dart';
+import 'package:TAGO/datamodels/address.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart' show FirebaseException;
-import 'package:cabrider/globalvariable.dart';
+import 'package:TAGO/globalvariable.dart';
 // 알림 관련 임포트 주석 처리
 // import 'package:cabrider/helpers/helpermethods.dart';
-import 'package:cabrider/screens/homepage.dart';
+import 'package:TAGO/screens/homepage.dart';
 import 'package:easy_localization/easy_localization.dart';
 
 class RideConfirmationPage extends StatefulWidget {

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:cabrider/datamodels/address.dart';
-import 'package:cabrider/brand_colors.dart';
+import 'package:TAGO/datamodels/address.dart';
+import 'package:TAGO/brand_colors.dart';
 import 'package:easy_localization/easy_localization.dart';
 
 class LocationMapPage extends StatefulWidget {
@@ -59,9 +59,11 @@ class _LocationMapPageState extends State<LocationMapPage> {
       return Scaffold(
         appBar: AppBar(
           title: Text('app.search.location_map.title_error'.tr()),
-          backgroundColor: primaryColor
+          backgroundColor: primaryColor,
         ),
-        body: Center(child: Text('app.search.location_map.invalid_location'.tr())),
+        body: Center(
+          child: Text('app.search.location_map.invalid_location'.tr()),
+        ),
       );
     }
 
@@ -78,9 +80,9 @@ class _LocationMapPageState extends State<LocationMapPage> {
         backgroundColor: primaryColor,
         elevation: 0,
         title: Text(
-          widget.isPickup 
-            ? 'app.search.location_map.title_pickup'.tr()
-            : 'app.search.location_map.title_destination'.tr(),
+          widget.isPickup
+              ? 'app.search.location_map.title_pickup'.tr()
+              : 'app.search.location_map.title_destination'.tr(),
           style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w600,

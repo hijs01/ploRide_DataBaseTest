@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cabrider/screens/homepage.dart';
-import 'package:cabrider/screens/chat_page.dart';
-import 'package:cabrider/screens/settings_page.dart';
+import 'package:TAGO/screens/homepage.dart';
+import 'package:TAGO/screens/chat_page.dart';
+import 'package:TAGO/screens/settings_page.dart';
 import 'package:intl/intl.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:easy_localization/easy_localization.dart';

@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:cabrider/screens/mainpage.dart';
-import 'package:cabrider/screens/searchpage.dart';
-import 'package:cabrider/screens/settings_page.dart';
-import 'package:cabrider/screens/chat_page.dart';
-import 'package:cabrider/screens/history_page.dart';
-import 'package:cabrider/screens/chat_room_page.dart';
+import 'package:TAGO/screens/mainpage.dart';
+import 'package:TAGO/screens/searchpage.dart';
+import 'package:TAGO/screens/settings_page.dart';
+import 'package:TAGO/screens/chat_page.dart';
+import 'package:TAGO/screens/history_page.dart';
+import 'package:TAGO/screens/chat_room_page.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -43,10 +43,10 @@ class _HomePageState extends State<HomePage> {
     try {
       final prefs = await SharedPreferences.getInstance();
       final String? shownPopupsJson = prefs.getString('shown_popups');
-      
+
       print('SharedPreferences 상태:');
       print('- shownPopupsJson: $shownPopupsJson');
-      
+
       if (shownPopupsJson != null) {
         final List<dynamic> decodedList = json.decode(shownPopupsJson);
         setState(() {
@@ -59,7 +59,7 @@ class _HomePageState extends State<HomePage> {
           _shownPopups = {};
         });
       }
-      
+
       if (mounted) {
         setupChatRoomListener();
         _isListenerSetup = true;
@@ -135,20 +135,22 @@ class _HomePageState extends State<HomePage> {
     }
 
     try {
-      QuerySnapshot chatRooms = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .collection('chatRooms')
-          .orderBy('joined_at', descending: true)
-          .limit(1)
-          .get();
+      QuerySnapshot chatRooms =
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(user.uid)
+              .collection('chatRooms')
+              .orderBy('joined_at', descending: true)
+              .limit(1)
+              .get();
 
       if (chatRooms.docs.isEmpty) {
         print('채팅방이 없음');
         return;
       }
 
-      Map<String, dynamic> chatRoomData = chatRooms.docs.first.data() as Map<String, dynamic>;
+      Map<String, dynamic> chatRoomData =
+          chatRooms.docs.first.data() as Map<String, dynamic>;
       String chatRoomCollection = chatRoomData['chat_room_collection'] ?? '';
       String chatRoomId = chatRoomData['chat_room_id'] ?? '';
 
@@ -156,13 +158,14 @@ class _HomePageState extends State<HomePage> {
       print('- collection: $chatRoomCollection');
       print('- id: $chatRoomId');
 
-      if ((chatRoomCollection == 'psuToAirport' || chatRoomCollection == 'airportToPsu') &&
+      if ((chatRoomCollection == 'psuToAirport' ||
+              chatRoomCollection == 'airportToPsu') &&
           chatRoomId.isNotEmpty) {
-        
-        DocumentSnapshot chatRoomDoc = await FirebaseFirestore.instance
-            .collection(chatRoomCollection)
-            .doc(chatRoomId)
-            .get();
+        DocumentSnapshot chatRoomDoc =
+            await FirebaseFirestore.instance
+                .collection(chatRoomCollection)
+                .doc(chatRoomId)
+                .get();
 
         if (!chatRoomDoc.exists) {
           print('채팅방 문서가 존재하지 않음');
@@ -190,7 +193,8 @@ class _HomePageState extends State<HomePage> {
                   return;
                 }
 
-                Map<String, dynamic> data = documentSnapshot.data() as Map<String, dynamic>;
+                Map<String, dynamic> data =
+                    documentSnapshot.data() as Map<String, dynamic>;
                 bool driverAccepted = data['driver_accepted'] ?? false;
                 String driverId = data['driver_id'] ?? '';
                 bool chatActivated = data['chat_activated'] ?? false;
@@ -203,22 +207,22 @@ class _HomePageState extends State<HomePage> {
                 print('- current user: ${user.uid}');
                 print('- shown popups: $_shownPopups');
 
-                if (driverAccepted && 
-                    mounted && 
-                    !_shownPopups.contains(chatRoomId) && 
+                if (driverAccepted &&
+                    mounted &&
+                    !_shownPopups.contains(chatRoomId) &&
                     members.contains(user.uid)) {
                   print('팝업 표시 조건 충족');
-                  
+
                   // 지연 시간을 1초로 줄임
                   await Future.delayed(Duration(seconds: 1));
-                  
+
                   if (!mounted || _shownPopups.contains(chatRoomId)) {
                     print('팝업 표시 조건이 변경됨');
                     return;
                   }
 
                   print('팝업 표시 시작');
-                  
+
                   if (!mounted) return;
 
                   // 채팅방 활성화 처리 및 시스템 메시지 추가
@@ -228,10 +232,7 @@ class _HomePageState extends State<HomePage> {
                     await FirebaseFirestore.instance
                         .collection(chatRoomCollection)
                         .doc(chatRoomId)
-                        .update({
-                          'chat_activated': true,
-                          'chat_visible': true,
-                        });
+                        .update({'chat_activated': true, 'chat_visible': true});
 
                     // 채팅방의 모든 멤버 가져오기
                     DocumentSnapshot roomSnapshot =
@@ -248,8 +249,10 @@ class _HomePageState extends State<HomePage> {
                       // 각 멤버의 채팅방 정보 업데이트
                       for (String memberId in members) {
                         String memberSafeDocId =
-                            "${chatRoomCollection}_$chatRoomId"
-                                .replaceAll('/', '_');
+                            "${chatRoomCollection}_$chatRoomId".replaceAll(
+                              '/',
+                              '_',
+                            );
 
                         await FirebaseFirestore.instance
                             .collection('users')
@@ -282,8 +285,7 @@ class _HomePageState extends State<HomePage> {
                             .doc(chatRoomId)
                             .collection('messages')
                             .add({
-                              'text':
-                                  'app.chat.room.system.driver_accepted',
+                              'text': 'app.chat.room.system.driver_accepted',
                               'sender_id': 'system',
                               'sender_name': '시스템',
                               'timestamp': FieldValue.serverTimestamp(),
@@ -301,7 +303,9 @@ class _HomePageState extends State<HomePage> {
                     barrierDismissible: false,
                     builder: (context) {
                       return AlertDialog(
-                        title: Text('app.chat.room.system.driver_accepted_title'.tr()),
+                        title: Text(
+                          'app.chat.room.system.driver_accepted_title'.tr(),
+                        ),
                         content: Column(
                           mainAxisSize: MainAxisSize.min,
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -328,7 +332,8 @@ class _HomePageState extends State<HomePage> {
                                       Expanded(
                                         child: Text(
                                           data['pickup_info']?['address'] ??
-                                              'app.chat.room.system.no_pickup_location'.tr(),
+                                              'app.chat.room.system.no_pickup_location'
+                                                  .tr(),
                                           style: TextStyle(fontSize: 14),
                                         ),
                                       ),
@@ -346,7 +351,8 @@ class _HomePageState extends State<HomePage> {
                                       Expanded(
                                         child: Text(
                                           data['destination_info']?['address'] ??
-                                              'app.chat.room.system.no_destination'.tr(),
+                                              'app.chat.room.system.no_destination'
+                                                  .tr(),
                                           style: TextStyle(fontSize: 14),
                                         ),
                                       ),
@@ -364,13 +370,16 @@ class _HomePageState extends State<HomePage> {
                                       Text(
                                         data['ride_date'] != null
                                             ? DateFormat(
-                                                context.locale.languageCode == 'ko'
-                                                    ? 'yyyy년 MM월 dd일'
-                                                    : 'MMMM dd, yyyy',
-                                              ).format(
-                                                (data['ride_date'] as Timestamp).toDate(),
-                                              )
-                                            : 'app.chat.room.system.no_date_info'.tr(),
+                                              context.locale.languageCode ==
+                                                      'ko'
+                                                  ? 'yyyy년 MM월 dd일'
+                                                  : 'MMMM dd, yyyy',
+                                            ).format(
+                                              (data['ride_date'] as Timestamp)
+                                                  .toDate(),
+                                            )
+                                            : 'app.chat.room.system.no_date_info'
+                                                .tr(),
                                         style: TextStyle(fontSize: 14),
                                       ),
                                     ],
@@ -379,7 +388,9 @@ class _HomePageState extends State<HomePage> {
                               ),
                             ),
                             SizedBox(height: 12),
-                            Text('app.chat.room.system.check_trip_details'.tr()),
+                            Text(
+                              'app.chat.room.system.check_trip_details'.tr(),
+                            ),
                           ],
                         ),
                         actions: [
@@ -392,26 +403,32 @@ class _HomePageState extends State<HomePage> {
                           TextButton(
                             onPressed: () async {
                               Navigator.pop(context);
-                              
-                              DocumentSnapshot chatRoomDoc = await FirebaseFirestore.instance
-                                  .collection(chatRoomCollection)
-                                  .doc(chatRoomId)
-                                  .get();
+
+                              DocumentSnapshot chatRoomDoc =
+                                  await FirebaseFirestore.instance
+                                      .collection(chatRoomCollection)
+                                      .doc(chatRoomId)
+                                      .get();
 
                               if (chatRoomDoc.exists) {
-                                Map<String, dynamic> data = chatRoomDoc.data() as Map<String, dynamic>;
-                                String chatRoomName = data['chat_room_name'] ?? 'app.chat.room.default_name'.tr();
+                                Map<String, dynamic> data =
+                                    chatRoomDoc.data() as Map<String, dynamic>;
+                                String chatRoomName =
+                                    data['chat_room_name'] ??
+                                    'app.chat.room.default_name'.tr();
 
                                 if (!mounted) return;
-                                
+
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
-                                    builder: (context) => ChatRoomPage(
-                                      chatRoomId: chatRoomId,
-                                      chatRoomName: chatRoomName,
-                                      chatRoomCollection: chatRoomCollection,
-                                    ),
+                                    builder:
+                                        (context) => ChatRoomPage(
+                                          chatRoomId: chatRoomId,
+                                          chatRoomName: chatRoomName,
+                                          chatRoomCollection:
+                                              chatRoomCollection,
+                                        ),
                                   ),
                                 );
                               }

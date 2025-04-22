@@ -1,19 +1,19 @@
 import 'dart:math';
 import 'dart:convert';
 
-import 'package:cabrider/datamodels/address.dart';
-import 'package:cabrider/datamodels/directiondetails.dart';
-import 'package:cabrider/dataprovider/appdata.dart';
+import 'package:TAGO/datamodels/address.dart';
+import 'package:TAGO/datamodels/directiondetails.dart';
+import 'package:TAGO/dataprovider/appdata.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
-import 'package:cabrider/globalvariable.dart';
-import 'package:cabrider/helpers/requesthelper.dart';
+import 'package:TAGO/globalvariable.dart';
+import 'package:TAGO/helpers/requesthelper.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart' as auth;
-import 'package:cabrider/datamodels/user.dart';
+import 'package:TAGO/datamodels/user.dart';
 import 'package:flutter/foundation.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_geofire/flutter_geofire.dart';

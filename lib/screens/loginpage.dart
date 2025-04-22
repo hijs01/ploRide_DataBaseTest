@@ -1,15 +1,15 @@
-import 'package:cabrider/brand_colors.dart';
-import 'package:cabrider/screens/homepage.dart';
-import 'package:cabrider/screens/registrationpage.dart';
-import 'package:cabrider/screens/email_verification_page.dart';
-import 'package:cabrider/widgets/ProgressDialog.dart';
+import 'package:TAGO/brand_colors.dart';
+import 'package:TAGO/screens/homepage.dart';
+import 'package:TAGO/screens/registrationpage.dart';
+import 'package:TAGO/screens/email_verification_page.dart';
+import 'package:TAGO/widgets/ProgressDialog.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
-import 'package:cabrider/helpers/RequestHelper.dart';
+import 'package:TAGO/helpers/RequestHelper.dart';
 
 class Loginpage extends StatefulWidget {
   static const String id = 'login';
@@ -285,7 +285,10 @@ class _LoginpageState extends State<Loginpage>
                               if (connectivityResult ==
                                   ConnectivityResult.none) {
                                 Navigator.pop(context);
-                                showSnackBar('No internet connection', isError: true);
+                                showSnackBar(
+                                  'No internet connection',
+                                  isError: true,
+                                );
                                 return;
                               }
 
@@ -308,7 +311,8 @@ class _LoginpageState extends State<Loginpage>
                               String errorMessage =
                                   'An error occurred while sending the password reset email.';
                               if (e.code == 'user-not-found') {
-                                errorMessage = 'No account found with this email.';
+                                errorMessage =
+                                    'No account found with this email.';
                               }
 
                               showSnackBar(errorMessage, isError: true);

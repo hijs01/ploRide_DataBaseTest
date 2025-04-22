@@ -1,20 +1,20 @@
 // 섹션7 31강 코드
 
-import 'package:cabrider/brand_colors.dart';
-import 'package:cabrider/dataprovider/appdata.dart';
-import 'package:cabrider/globalvariable.dart'; // globalvariable 강의에선 이거 임포트 돼있길래 일단 써놨음
-import 'package:cabrider/helpers/requesthelper.dart';
-import 'package:cabrider/widgets/PredictionTile.dart';
+import 'package:TAGO/brand_colors.dart';
+import 'package:TAGO/dataprovider/appdata.dart';
+import 'package:TAGO/globalvariable.dart'; // globalvariable 강의에선 이거 임포트 돼있길래 일단 써놨음
+import 'package:TAGO/helpers/requesthelper.dart';
+import 'package:TAGO/widgets/PredictionTile.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart'; //provider 임포트인데 그전 강의에서 설치하는듯? 그전 강의에 없는거면 임포트 주소 바꾸기
-import 'package:cabrider/datamodels/prediction.dart';
-import 'package:cabrider/widgets/BrandDivider.dart';
-import 'package:cabrider/datamodels/address.dart';
+import 'package:TAGO/datamodels/prediction.dart';
+import 'package:TAGO/widgets/BrandDivider.dart';
+import 'package:TAGO/datamodels/address.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:cabrider/widgets/psu_locations_list.dart';
-import 'package:cabrider/data/airport_locations_list.dart';
-import 'package:cabrider/screens/homepage.dart';
-import 'package:cabrider/screens/location_map_page.dart'; // 지도 페이지 임포트
+import 'package:TAGO/widgets/psu_locations_list.dart';
+import 'package:TAGO/data/airport_locations_list.dart';
+import 'package:TAGO/screens/homepage.dart';
+import 'package:TAGO/screens/location_map_page.dart'; // 지도 페이지 임포트
 import 'package:easy_localization/easy_localization.dart';
 
 // 커스텀 Route 클래스 정의
@@ -950,12 +950,17 @@ class _SearchPageState extends State<SearchPage> {
                                   IconButton(
                                     padding: EdgeInsets.zero,
                                     constraints: BoxConstraints(),
-                                    icon: Icon(Icons.remove, color: textColor, size: 20),
+                                    icon: Icon(
+                                      Icons.remove,
+                                      color: textColor,
+                                      size: 20,
+                                    ),
                                     onPressed: () {
                                       setState(() {
                                         if (companionCount > 1) {
                                           companionCount--;
-                                          int maxLuggage = (companionCount + 1) * 2;
+                                          int maxLuggage =
+                                              (companionCount + 1) * 2;
                                           if (luggageCount > maxLuggage) {
                                             luggageCount = maxLuggage;
                                           }
@@ -976,7 +981,11 @@ class _SearchPageState extends State<SearchPage> {
                                   IconButton(
                                     padding: EdgeInsets.zero,
                                     constraints: BoxConstraints(),
-                                    icon: Icon(Icons.add, color: textColor, size: 20),
+                                    icon: Icon(
+                                      Icons.add,
+                                      color: textColor,
+                                      size: 20,
+                                    ),
                                     onPressed: () {
                                       setState(() {
                                         if (companionCount < 3) {

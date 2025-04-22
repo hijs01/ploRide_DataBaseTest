@@ -1,12 +1,12 @@
-import 'package:cabrider/brand_colors.dart';
-import 'package:cabrider/widgets/ProgressDialog.dart';
+import 'package:TAGO/brand_colors.dart';
+import 'package:TAGO/widgets/ProgressDialog.dart';
 import 'package:flutter/material.dart';
-import 'package:cabrider/datamodels/prediction.dart';
-import 'package:cabrider/helpers/requesthelper.dart';
-import 'package:cabrider/datamodels/address.dart';
-import 'package:cabrider/dataprovider/appdata.dart';
+import 'package:TAGO/datamodels/prediction.dart';
+import 'package:TAGO/helpers/requesthelper.dart';
+import 'package:TAGO/datamodels/address.dart';
+import 'package:TAGO/dataprovider/appdata.dart';
 import 'package:provider/provider.dart';
-import 'package:cabrider/globalvariable.dart';
+import 'package:TAGO/globalvariable.dart';
 
 class PredictionTile extends StatelessWidget {
   final Prediction prediction;

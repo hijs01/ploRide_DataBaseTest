@@ -3,22 +3,23 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:cabrider/screens/loginpage.dart';
-import 'package:cabrider/screens/registrationpage.dart';
-import 'package:cabrider/screens/mainpage.dart';
-import 'package:cabrider/screens/searchpage.dart';
-import 'package:cabrider/screens/homepage.dart';
-import 'package:cabrider/screens/settings_page.dart';
-import 'package:cabrider/screens/rideconfirmation/rideconfirmation_page.dart';
-import 'package:cabrider/screens/email_verification_page.dart';
-import 'package:cabrider/screens/chat_room_page.dart';
-import 'package:cabrider/screens/delete_account_page.dart';
-import 'package:cabrider/globalvariable.dart';
+import 'package:TAGO/screens/loginpage.dart';
+import 'package:TAGO/screens/registrationpage.dart';
+import 'package:TAGO/screens/mainpage.dart';
+import 'package:TAGO/screens/searchpage.dart';
+import 'package:TAGO/screens/homepage.dart';
+import 'package:TAGO/screens/settings_page.dart';
+import 'package:TAGO/screens/rideconfirmation/rideconfirmation_page.dart';
+import 'package:TAGO/screens/email_verification_page.dart';
+import 'package:TAGO/screens/chat_room_page.dart';
+import 'package:TAGO/screens/delete_account_page.dart';
+import 'package:TAGO/globalvariable.dart';
 import 'package:provider/provider.dart';
-import 'package:cabrider/dataprovider/appdata.dart';
-import 'package:cabrider/helpers/helpermethods.dart';
+import 'package:TAGO/dataprovider/appdata.dart';
+import 'package:TAGO/helpers/helpermethods.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:easy_localization/easy_localization.dart';
+import 'package:TAGO/services/push_notification_service.dart';
 
 // 백그라운드 메시지 핸들러
 @pragma('vm:entry-point')
@@ -305,6 +306,11 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await EasyLocalization.ensureInitialized();
   await _initializeFirebase();
+
+  // 푸시 알림 서비스 초기화
+  final pushNotificationService = PushNotificationService();
+  await pushNotificationService.initialize();
+
   runApp(
     EasyLocalization(
       supportedLocales: const [Locale('ko', 'KR'), Locale('en', 'US')],

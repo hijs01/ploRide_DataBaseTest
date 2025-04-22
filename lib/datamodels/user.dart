@@ -1,7 +1,8 @@
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:firebase_auth/firebase_auth.dart' as auth;
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:cabrider/globalvariable.dart';
+import 'package:TAGO/globalvariable.dart';
+import 'dart:io';
 
 class User {
   late String fullName;
@@ -47,22 +48,19 @@ class User {
   }
 
   // FCM 토큰 업데이트 - Firestore 사용
-  static Future<void> updateFcmToken() async {
-    final currentUser = auth.FirebaseAuth.instance.currentUser;
-    if (currentUser != null) {
+  Future<void> updateFcmToken() async {
+    try {
       String? token = await FirebaseMessaging.instance.getToken();
       if (token != null) {
-        // Firestore에 토큰 저장
-        await FirebaseFirestore.instance
-            .collection('users')
-            .doc(currentUser.uid)
-            .set({
-              'fcm_token': token,
-              'last_updated': FieldValue.serverTimestamp(),
-            }, SetOptions(merge: true)); // merge: true로 설정하여 기존 데이터 유지
-
-        print('FCM 토큰이 Firestore에 업데이트되었습니다: $token');
+        await FirebaseFirestore.instance.collection('users').doc(id).update({
+          'fcm_token': token,
+          'token_updated_at': FieldValue.serverTimestamp(),
+          'platform': Platform.isIOS ? 'ios' : 'android',
+        });
+        print('FCM 토큰이 성공적으로 업데이트되었습니다: $token');
       }
+    } catch (e) {
+      print('FCM 토큰 업데이트 중 오류 발생: $e');
     }
   }
 }

@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cabrider/screens/homepage.dart';
-import 'package:cabrider/screens/settings_page.dart';
-import 'package:cabrider/screens/chat_room_page.dart';
-import 'package:cabrider/screens/history_page.dart';
+import 'package:TAGO/screens/homepage.dart';
+import 'package:TAGO/screens/settings_page.dart';
+import 'package:TAGO/screens/chat_room_page.dart';
+import 'package:TAGO/screens/history_page.dart';
 import 'package:intl/intl.dart';
 import 'dart:async'; // StreamSubscription을 위한 임포트 추가
-import 'package:cabrider/themes/app_themes.dart'; // 앱 테마 가져오기
+import 'package:TAGO/themes/app_themes.dart'; // 앱 테마 가져오기
 import 'package:easy_localization/easy_localization.dart';
 
 class ChatPage extends StatefulWidget {
@@ -402,46 +402,46 @@ class _ChatPageState extends State<ChatPage> {
         body:
             _isLoading
                 ? Center(
-                    child: CircularProgressIndicator(
-                      valueColor: AlwaysStoppedAnimation<Color>(accentColor),
-                    ),
-                  )
+                  child: CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(accentColor),
+                  ),
+                )
                 : _chatRooms.isEmpty
                 ? Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.chat_bubble_outline,
-                          size: 64,
-                          color: textColor.withOpacity(0.5),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.chat_bubble_outline,
+                        size: 64,
+                        color: textColor.withOpacity(0.5),
+                      ),
+                      SizedBox(height: 16),
+                      Text(
+                        'app.chat.no_chats'.tr(),
+                        style: TextStyle(
+                          fontSize: 18,
+                          color: textColor.withOpacity(0.7),
                         ),
-                        SizedBox(height: 16),
-                        Text(
-                          'app.chat.no_chats'.tr(),
-                          style: TextStyle(
-                            fontSize: 18,
-                            color: textColor.withOpacity(0.7),
-                          ),
-                        ),
-                      ],
-                    ),
-                  )
-                : ListView.builder(
-                    itemCount: _chatRooms.length,
-                    padding: EdgeInsets.symmetric(vertical: 8),
-                    itemBuilder: (context, index) {
-                      final chatRoom = _chatRooms[index];
-                      return _buildChatRoomCard(
-                        context,
-                        chatRoom,
-                        cardColor,
-                        textColor,
-                        accentColor,
-                        secondaryColor,
-                      );
-                    },
+                      ),
+                    ],
                   ),
+                )
+                : ListView.builder(
+                  itemCount: _chatRooms.length,
+                  padding: EdgeInsets.symmetric(vertical: 8),
+                  itemBuilder: (context, index) {
+                    final chatRoom = _chatRooms[index];
+                    return _buildChatRoomCard(
+                      context,
+                      chatRoom,
+                      cardColor,
+                      textColor,
+                      accentColor,
+                      secondaryColor,
+                    );
+                  },
+                ),
         bottomNavigationBar: BottomNavigationBar(
           items: const <BottomNavigationBarItem>[
             BottomNavigationBarItem(icon: Icon(Icons.home), label: ''),
@@ -473,7 +473,7 @@ class _ChatPageState extends State<ChatPage> {
     final departureTime = (chatRoom['departureTime'] as Timestamp).toDate();
     final formattedDate = DateFormat('MMM d', 'en_US').format(departureTime);
     final formattedTime = DateFormat('HH:mm').format(departureTime);
-    
+
     // Pre-translate strings to avoid issues
     final membersText = 'app.chat.members'.tr();
     final acceptedText = 'app.chat.status.accepted'.tr();
@@ -494,11 +494,12 @@ class _ChatPageState extends State<ChatPage> {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => ChatRoomPage(
-                chatRoomId: chatRoom['id'],
-                chatRoomName: chatRoom['name'],
-                chatRoomCollection: chatRoom['collection'],
-              ),
+              builder:
+                  (context) => ChatRoomPage(
+                    chatRoomId: chatRoom['id'],
+                    chatRoomName: chatRoom['name'],
+                    chatRoomCollection: chatRoom['collection'],
+                  ),
             ),
           );
         },
@@ -515,24 +516,26 @@ class _ChatPageState extends State<ChatPage> {
                   Container(
                     padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: chatRoom['isConfirmed']
-                          ? secondaryColor
-                          : Colors.grey.withOpacity(0.3),
+                      color:
+                          chatRoom['isConfirmed']
+                              ? secondaryColor
+                              : Colors.grey.withOpacity(0.3),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
                       chatRoom['isConfirmed'] ? acceptedText : pendingText,
                       style: TextStyle(
-                        color: chatRoom['isConfirmed']
-                            ? Colors.white
-                            : textColor.withOpacity(0.7),
+                        color:
+                            chatRoom['isConfirmed']
+                                ? Colors.white
+                                : textColor.withOpacity(0.7),
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                   ),
                   SizedBox(width: 8),
-                  
+
                   // Time information - simplified
                   Text(
                     '$formattedDate $formattedTime',
@@ -542,9 +545,9 @@ class _ChatPageState extends State<ChatPage> {
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),
-                  
+
                   Spacer(),
-                  
+
                   // Member count
                   Container(
                     padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -653,11 +656,20 @@ class _ChatPageState extends State<ChatPage> {
     final difference = now.difference(messageTime);
 
     if (difference.inDays > 0) {
-      return 'app.chat.time_ago.days_ago'.tr(args: [difference.inDays.toString()], namedArgs: {'days': difference.inDays.toString()});
+      return 'app.chat.time_ago.days_ago'.tr(
+        args: [difference.inDays.toString()],
+        namedArgs: {'days': difference.inDays.toString()},
+      );
     } else if (difference.inHours > 0) {
-      return 'app.chat.time_ago.hours_ago'.tr(args: [difference.inHours.toString()], namedArgs: {'hours': difference.inHours.toString()});
+      return 'app.chat.time_ago.hours_ago'.tr(
+        args: [difference.inHours.toString()],
+        namedArgs: {'hours': difference.inHours.toString()},
+      );
     } else if (difference.inMinutes > 0) {
-      return 'app.chat.time_ago.minutes_ago'.tr(args: [difference.inMinutes.toString()], namedArgs: {'minutes': difference.inMinutes.toString()});
+      return 'app.chat.time_ago.minutes_ago'.tr(
+        args: [difference.inMinutes.toString()],
+        namedArgs: {'minutes': difference.inMinutes.toString()},
+      );
     } else {
       return 'app.chat.time_ago.just_now'.tr();
     }

@@ -1,9 +1,9 @@
-import 'package:cabrider/brand_colors.dart';
-import 'package:cabrider/screens/loginpage.dart';
-import 'package:cabrider/screens/mainpage.dart';
-import 'package:cabrider/screens/email_verification_page.dart';
-import 'package:cabrider/screens/terms_agreement_page.dart';
-import 'package:cabrider/widgets/ProgressDialog.dart';
+import 'package:TAGO/brand_colors.dart';
+import 'package:TAGO/screens/loginpage.dart';
+import 'package:TAGO/screens/mainpage.dart';
+import 'package:TAGO/screens/email_verification_page.dart';
+import 'package:TAGO/screens/terms_agreement_page.dart';
+import 'package:TAGO/widgets/ProgressDialog.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';

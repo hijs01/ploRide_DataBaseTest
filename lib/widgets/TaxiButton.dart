@@ -1,13 +1,10 @@
-import 'package:cabrider/brand_colors.dart';
+import 'package:TAGO/brand_colors.dart';
 import 'package:flutter/material.dart';
 
 class TaxiButton extends StatelessWidget {
-
   final String text;
   final Color color;
   final Function onPressed;
-
-  
 
   const TaxiButton({
     super.key,
@@ -15,16 +12,12 @@ class TaxiButton extends StatelessWidget {
     required this.color,
     required this.onPressed,
   });
-  
-
 
   @override
   Widget build(BuildContext context) {
     return ElevatedButton(
       style: ElevatedButton.styleFrom(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(25),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
         backgroundColor: color,
         foregroundColor: Colors.white,
       ),
@@ -34,14 +27,10 @@ class TaxiButton extends StatelessWidget {
         child: Center(
           child: Text(
             text,
-            style: TextStyle(
-              fontSize: 18,
-              fontFamily: 'Brand-Bold',
-            ),
+            style: TextStyle(fontSize: 18, fontFamily: 'Brand-Bold'),
           ),
         ),
       ),
     );
   }
 }
-

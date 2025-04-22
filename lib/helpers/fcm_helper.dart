@@ -1,20 +1,22 @@
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:cabrider/globalvariable.dart';
+import 'package:TAGO/globalvariable.dart';
 
 class FCMHelper {
   // 드라이버에게 알림 보내기
-  static Future<void> sendNotificationToDriver(String driverId, {
+  static Future<void> sendNotificationToDriver(
+    String driverId, {
     required String title,
     required String body,
     Map<String, String>? data,
   }) async {
     try {
       // 드라이버 문서에서 token 가져오기
-      final driverDoc = await FirebaseFirestore.instance
-          .collection('drivers')
-          .doc(driverId)
-          .get();
+      final driverDoc =
+          await FirebaseFirestore.instance
+              .collection('drivers')
+              .doc(driverId)
+              .get();
 
       if (!driverDoc.exists) {
         print('드라이버를 찾을 수 없습니다.');

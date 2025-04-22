@@ -1,4 +1,4 @@
-import 'package:cabrider/brand_colors.dart';
+import 'package:TAGO/brand_colors.dart';
 import 'package:flutter/material.dart';
 
 class TaxiOutlineButton extends StatelessWidget {

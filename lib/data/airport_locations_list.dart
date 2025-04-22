@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:cabrider/dataprovider/appdata.dart';
-import 'package:cabrider/datamodels/address.dart';
+import 'package:TAGO/dataprovider/appdata.dart';
+import 'package:TAGO/datamodels/address.dart';
 
 class AirportLocationsList extends StatelessWidget {
   final bool isDarkMode;

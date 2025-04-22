@@ -1,7 +1,7 @@
 import 'dart:async';
-import 'package:cabrider/brand_colors.dart';
-import 'package:cabrider/screens/homepage.dart';
-import 'package:cabrider/screens/loginpage.dart';
+import 'package:TAGO/brand_colors.dart';
+import 'package:TAGO/screens/homepage.dart';
+import 'package:TAGO/screens/loginpage.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';

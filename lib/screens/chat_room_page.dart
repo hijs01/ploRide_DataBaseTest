@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:easy_localization/easy_localization.dart';
 
@@ -49,6 +50,7 @@ class _ChatRoomPageState extends State<ChatRoomPage>
   static const int _messageLimit = 20;
   String? _driverName;
   final Map<String, String> _systemMessageCache = {};
+  StreamSubscription? _membersSubscription;
 
   @override
   void initState() {
@@ -334,52 +336,75 @@ class _ChatRoomPageState extends State<ChatRoomPage>
 
   // 멤버 목록 실시간 업데이트 리스너
   void _setupMembersListener() {
-    _firestore
+    _membersSubscription = _firestore
         .collection(widget.chatRoomCollection)
         .doc(widget.chatRoomId)
         .snapshots()
         .listen((snapshot) {
+          if (!mounted) return; // 위젯이 dispose된 경우 setState 호출하지 않음
+
           if (!snapshot.exists) return;
 
           final data = snapshot.data();
           if (data != null && data.containsKey('members')) {
             final List<String> members = List<String>.from(data['members']);
             print('멤버 목록 업데이트: $members');
-            setState(() {
-              _roomMembers = members;
-            });
+            if (mounted) {
+              // 한번 더 확인
+              setState(() {
+                _roomMembers = members;
+              });
+            }
           }
         });
   }
 
   // 로컬 알림 표시 메서드 수정
-  Future<void> _showLocalNotification(String title, String message) async {
+  Future<void> _showLocalNotification(
+    String title,
+    String body,
+    String chatRoomId,
+  ) async {
     try {
-      const androidPlatformChannelSpecifics = AndroidNotificationDetails(
+      print('로컬 알림 표시 시도: $title - $body');
+
+      // Android 알림 설정
+      final androidDetails = AndroidNotificationDetails(
         'chat_messages',
         'Chat Messages',
         channelDescription: 'Notifications for new chat messages',
         importance: Importance.max,
         priority: Priority.high,
         showWhen: true,
+        enableVibration: true,
+        playSound: true,
       );
-      const iOSPlatformChannelSpecifics = DarwinNotificationDetails(
+      print('Android 알림 설정 완료');
+
+      // iOS 알림 설정
+      const iosDetails = DarwinNotificationDetails(
         presentAlert: true,
         presentBadge: true,
         presentSound: true,
+        badgeNumber: 1,
       );
-      const platformChannelSpecifics = NotificationDetails(
-        android: androidPlatformChannelSpecifics,
-        iOS: iOSPlatformChannelSpecifics,
+      print('iOS 알림 설정 완료');
+
+      final details = NotificationDetails(
+        android: androidDetails,
+        iOS: iosDetails,
       );
 
+      // 알림 표시
       await flutterLocalNotificationsPlugin.show(
-        0,
+        DateTime.now().millisecond,
         title,
-        message,
-        platformChannelSpecifics,
+        body,
+        details,
+        payload: chatRoomId,
       );
-      print('로컬 알림 표시 완료: $title - $message');
+
+      print('로컬 알림 표시 완료');
     } catch (e) {
       print('로컬 알림 표시 중 오류 발생: $e');
     }
@@ -387,8 +412,10 @@ class _ChatRoomPageState extends State<ChatRoomPage>
 
   // 다른 채팅방 멤버들에게 알림 보내기 메서드 수정
   Future<void> _sendNotificationToOtherMembers(String messageText) async {
+    if (!mounted) return;
+
     try {
-      print('=== 알림 전송 시작 ===');
+      print('=== FCM 알림 전송 시작 ===');
 
       // 채팅방 정보 가져오기
       final roomDoc =
@@ -403,151 +430,331 @@ class _ChatRoomPageState extends State<ChatRoomPage>
       }
 
       final roomData = roomDoc.data()!;
-      final String? driverId = roomData['driver_id'];
 
-      print('채팅방 운전자 ID: $driverId');
-      print('현재 사용자 ID: $_currentUserId');
+      // 운전자 포함하여 모든 멤버의 토큰 수집
+      List<String> tokens = [];
 
-      // 수신자 목록 생성 (멤버들 + 운전자)
-      Set<String> receivers = Set<String>.from(_roomMembers);
+      // 1. 운전자 토큰 수집
+      if (roomData['driver_id'] != null) {
+        final driverDoc =
+            await _firestore
+                .collection('drivers')
+                .doc(roomData['driver_id'])
+                .get();
 
-      // 운전자가 있고, 멤버 목록에 없으면 추가
-      if (driverId != null && !receivers.contains(driverId)) {
-        receivers.add(driverId);
+        if (driverDoc.exists) {
+          final driverToken = driverDoc.get('token');
+          if (driverToken != null && driverToken.isNotEmpty) {
+            tokens.add(driverToken);
+            print('운전자 토큰 추가: $driverToken');
+          }
+        }
       }
 
-      // 현재 사용자 제외
-      receivers.remove(_currentUserId);
+      // 2. 일반 사용자 토큰 수집
+      final members = List<String>.from(roomData['members'] ?? []);
+      for (String userId in members) {
+        if (userId != _currentUserId) {
+          // 현재 사용자 제외
+          final userDoc =
+              await _firestore.collection('users').doc(userId).get();
 
-      final otherMembers = receivers.toList();
-      print('수신자 목록: $otherMembers');
+          if (userDoc.exists) {
+            // fcm_token이나 token 필드 모두 확인
+            String? userToken = userDoc.get('fcm_token');
+            if (userToken == null || userToken.isEmpty) {
+              userToken = userDoc.get('token');
+            }
 
-      if (otherMembers.isEmpty) {
-        print('수신자가 없어 알림을 보내지 않습니다.');
+            if (userToken != null && userToken.isNotEmpty) {
+              tokens.add(userToken);
+              print('사용자 토큰 추가: $userToken (사용자: $userId)');
+            }
+          }
+        }
+      }
+
+      if (tokens.isEmpty) {
+        print('전송할 토큰이 없습니다.');
         return;
       }
 
-      // 발신자 이름 가져오기
+      print('수집된 토큰 목록: $tokens');
+
+      // 발신자 정보 가져오기
       String senderName = '알 수 없는 사용자';
       try {
-        final userDoc =
-            await _firestore.collection('users').doc(_currentUserId).get();
-        if (userDoc.exists) {
-          senderName = userDoc.data()?['fullname'] ?? senderName;
+        // 먼저 drivers 컬렉션에서 확인
+        final driverDoc =
+            await _firestore.collection('drivers').doc(_currentUserId).get();
+
+        if (driverDoc.exists) {
+          senderName = driverDoc.data()?['fullname'] ?? '알 수 없는 사용자';
+        } else {
+          // drivers에 없으면 users 컬렉션에서 확인
+          final userDoc =
+              await _firestore.collection('users').doc(_currentUserId).get();
+
+          if (userDoc.exists) {
+            senderName = userDoc.data()?['fullname'] ?? '알 수 없는 사용자';
+          }
         }
       } catch (e) {
-        print('사용자 이름 조회 오류: $e');
+        print('발신자 정보 조회 중 오류: $e');
       }
 
+      print('발신자 이름: $senderName');
+
       // Cloud Function 호출
-      final functionRegion = 'us-central1';
-      final projectId = 'geetaxi-aa379';
-      final url =
-          'https://$functionRegion-$projectId.cloudfunctions.net/sendChatNotification';
-
-      final requestData = {
-        'chatRoomId': widget.chatRoomId,
-        'chatRoomName': widget.chatRoomName,
-        'messageText': messageText,
-        'senderName': senderName,
-        'senderId': _currentUserId,
-        'receiverIds': otherMembers,
-      };
-
-      print('전송할 데이터: ${jsonEncode(requestData)}');
-
       final response = await http.post(
-        Uri.parse(url),
-        body: jsonEncode(requestData),
+        Uri.parse(
+          'https://us-central1-geetaxi-aa379.cloudfunctions.net/sendChatNotification',
+        ),
         headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'tokens': tokens,
+          'notification': {
+            'title': '새 메시지',
+            'body': '$senderName: $messageText',
+            'sound': 'default',
+          },
+          'data': {
+            'type': 'chat_message',
+            'chatRoomId': widget.chatRoomId,
+            'chatRoomCollection': widget.chatRoomCollection,
+            'senderId': _currentUserId,
+            'senderName': senderName,
+            'messageText': messageText,
+            'click_action': 'FLUTTER_NOTIFICATION_CLICK',
+            'badge': '1',
+          },
+          'android': {
+            'priority': 'high',
+            'notification': {
+              'channel_id': 'chat_messages',
+              'priority': 'max',
+              'default_sound': true,
+              'default_vibrate_timings': true,
+            },
+          },
+          'apns': {
+            'headers': {'apns-priority': '10'},
+            'payload': {
+              'aps': {'sound': 'default', 'badge': 1, 'content-available': 1},
+            },
+          },
+        }),
       );
 
-      print('응답 상태 코드: ${response.statusCode}');
-      print('응답 내용: ${response.body}');
-    } catch (e) {
-      print('채팅 알림 전송 중 오류 발생: $e');
-    } finally {
-      print('=== 알림 전송 종료 ===');
+      print('FCM 응답: ${response.statusCode} - ${response.body}');
+
+      // 앱이 포그라운드 상태일 때만 로컬 알림 표시
+      if (mounted && await _isAppInForeground()) {
+        await _showLocalNotification(
+          '새 메시지',
+          '$senderName: $messageText',
+          widget.chatRoomId,
+        );
+      }
+    } catch (e, stackTrace) {
+      print('알림 전송 중 오류 발생: $e');
+      print('스택 트레이스: $stackTrace');
     }
   }
 
-  Future<void> _sendMessage() async {
-    if (_messageController.text.trim().isEmpty) return;
-
-    setState(() {
-      _isSending = true;
-    });
-
-    final messageText = _messageController.text.trim();
-    final user = _auth.currentUser;
-    String senderName = user?.displayName ?? '알 수 없는 사용자';
-
-    // 사용자 프로필에서 이름 가져오기
-    try {
-      final userDoc =
-          await _firestore.collection('users').doc(_currentUserId).get();
-      if (userDoc.exists) {
-        final userData = userDoc.data();
-        senderName = userData?['fullname'] ?? senderName;
-      }
-    } catch (e) {
-      print('사용자 이름 조회 오류: $e');
+  // 앱이 포그라운드 상태인지 확인
+  Future<bool> _isAppInForeground() async {
+    if (Platform.isIOS) {
+      return true; // iOS에서는 항상 true 반환
     }
+    return true; // Android에서도 일단 true 반환 (필요시 실제 상태 체크 로직 추가)
+  }
 
-    // 메시지 전송 전에 텍스트 필드 초기화
-    _messageController.clear();
+  // 채팅방 문서 변경 감지 설정
+  void _setupChatRoomListener() {
+    String? previousLastMessage;
 
-    final message = {
-      'text': messageText,
-      'sender_id': _currentUserId,
-      'sender_name': senderName,
-      'timestamp': FieldValue.serverTimestamp(),
-      'type': 'user',
-    };
+    _chatRoomSubscription = _firestore
+        .collection(widget.chatRoomCollection)
+        .doc(widget.chatRoomId)
+        .snapshots()
+        .listen((snapshot) async {
+          if (!mounted || !snapshot.exists) return;
 
+          final data = snapshot.data();
+          if (data != null) {
+            // lastMessage 변경 확인
+            String? currentLastMessage = data['lastMessage'] as String?;
+            String? senderId = data['last_message_sender_id'] as String?;
+
+            if (currentLastMessage != null &&
+                currentLastMessage != previousLastMessage &&
+                senderId != _currentUserId) {
+              previousLastMessage = currentLastMessage;
+
+              // FCM 알림 전송
+              await _sendFCMNotification(
+                currentLastMessage,
+                senderId ?? '',
+                '알 수 없는 사용자',
+              );
+            }
+
+            if (mounted) {
+              setState(() {
+                _chatRoomData = data;
+
+                // 드라이버 정보 업데이트
+                if (data['driver_id'] != null) {
+                  _firestore
+                      .collection('drivers')
+                      .doc(data['driver_id'])
+                      .get()
+                      .then((driverDoc) {
+                        if (mounted && driverDoc.exists) {
+                          setState(() {
+                            _driverName =
+                                driverDoc.data()?['fullname'] ?? '알 수 없는 사용자';
+                          });
+                        }
+                      });
+                } else {
+                  _driverName = null;
+                }
+              });
+            }
+          }
+        });
+  }
+
+  // FCM 알림 전송 메서드
+  Future<void> _sendFCMNotification(
+    String messageText,
+    String senderId,
+    String senderName,
+  ) async {
     try {
-      // 메시지 추가
-      final messageRef = await _firestore
-          .collection(widget.chatRoomCollection)
-          .doc(widget.chatRoomId)
-          .collection('messages')
-          .add(message);
+      print('=== FCM 알림 전송 시작 ===');
+      print('메시지: $messageText');
+      print('발신자 ID: $senderId');
 
-      // 마지막 메시지 업데이트
-      await _firestore
-          .collection(widget.chatRoomCollection)
-          .doc(widget.chatRoomId)
-          .update({
-            'lastMessage': messageText,
-            'last_message': messageText,
-            'last_message_time': FieldValue.serverTimestamp(),
-            'last_message_sender_id': _currentUserId,
-            'last_message_sender_name': senderName,
-            'timestamp': FieldValue.serverTimestamp(),
-          });
+      // 채팅방 정보 가져오기
+      final roomDoc =
+          await _firestore
+              .collection(widget.chatRoomCollection)
+              .doc(widget.chatRoomId)
+              .get();
 
-      // 새 메시지를 로컬 상태에 추가
-      if (mounted) {
-        setState(() {
-          _messages.add(messageRef as QueryDocumentSnapshot);
-          _isSending = false;
-        });
+      if (!roomDoc.exists) {
+        print('채팅방을 찾을 수 없습니다.');
+        return;
       }
 
-      // 다른 멤버들에게 알림 전송
-      await _sendNotificationToOtherMembers(messageText);
+      final roomData = roomDoc.data()!;
 
-      // 메시지 전송 후 스크롤을 아래로 이동
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _scrollToBottom();
-      });
-    } catch (e) {
-      print('Error sending message: $e');
-      if (mounted) {
-        setState(() {
-          _isSending = false;
-        });
+      // 토큰 수집
+      List<String> tokens = [];
+
+      // 1. 운전자 토큰 수집
+      if (roomData['driver_id'] != null && roomData['driver_id'] != senderId) {
+        final driverDoc =
+            await _firestore
+                .collection('drivers')
+                .doc(roomData['driver_id'])
+                .get();
+
+        if (driverDoc.exists) {
+          final driverToken = driverDoc.get('token');
+          if (driverToken != null && driverToken.isNotEmpty) {
+            tokens.add(driverToken);
+            print('운전자 토큰 추가: $driverToken');
+          }
+        }
       }
+
+      // 2. 일반 사용자 토큰 수집
+      final members = List<String>.from(roomData['members'] ?? []);
+      for (String userId in members) {
+        if (userId != senderId) {
+          final userDoc =
+              await _firestore.collection('users').doc(userId).get();
+
+          if (userDoc.exists) {
+            String? userToken = userDoc.get('fcm_token');
+            if (userToken == null || userToken.isEmpty) {
+              userToken = userDoc.get('token');
+            }
+
+            if (userToken != null && userToken.isNotEmpty) {
+              tokens.add(userToken);
+              print('사용자 토큰 추가: $userToken (사용자: $userId)');
+            }
+          }
+        }
+      }
+
+      if (tokens.isEmpty) {
+        print('전송할 토큰이 없습니다.');
+        return;
+      }
+
+      print('수집된 토큰 목록: $tokens');
+
+      // Cloud Function 호출
+      final response = await http.post(
+        Uri.parse(
+          'https://us-central1-geetaxi-aa379.cloudfunctions.net/sendChatNotification',
+        ),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'tokens': tokens,
+          'notification': {
+            'title': '새 메시지',
+            'body': messageText,
+            'sound': 'default',
+            'badge': 1,
+          },
+          'data': {
+            'type': 'chat_message',
+            'chatRoomId': widget.chatRoomId,
+            'chatRoomCollection': widget.chatRoomCollection,
+            'senderId': senderId,
+            'messageText': messageText,
+            'click_action': 'FLUTTER_NOTIFICATION_CLICK',
+          },
+          'android': {
+            'priority': 'high',
+            'notification': {
+              'channel_id': 'chat_messages',
+              'priority': 'max',
+              'default_sound': true,
+              'default_vibrate_timings': true,
+            },
+          },
+          'apns': {
+            'headers': {'apns-priority': '10', 'apns-push-type': 'background'},
+            'payload': {
+              'aps': {
+                'alert': {'title': '새 메시지', 'body': messageText},
+                'sound': 'default',
+                'badge': 1,
+                'content-available': 1,
+                'mutable-content': 1,
+              },
+            },
+          },
+        }),
+      );
+
+      print('FCM 응답: ${response.statusCode} - ${response.body}');
+
+      // 앱이 포그라운드 상태일 때만 로컬 알림 표시
+      if (mounted && await _isAppInForeground()) {
+        await _showLocalNotification('새 메시지', messageText, widget.chatRoomId);
+      }
+    } catch (e, stackTrace) {
+      print('알림 전송 중 오류 발생: $e');
+      print('스택 트레이스: $stackTrace');
     }
   }
 
@@ -857,160 +1064,208 @@ class _ChatRoomPageState extends State<ChatRoomPage>
                                         )
                                       else
                                         Column(
-                                          children: List.generate(
-                                            users.length,
-                                            (index) {
-                                              final userId = users[index];
-                                              final companionCount =
-                                                  data['user_companion_counts']?[userId] ??
-                                                  0;
-                                              final luggageCount =
-                                                  data['user_luggage_counts']?[userId] ??
-                                                  0;
+                                          children: List.generate(users.length, (
+                                            index,
+                                          ) {
+                                            final userId = users[index];
+                                            final companionCount =
+                                                data['user_companion_counts']?[userId] ??
+                                                0;
+                                            final luggageCount =
+                                                data['user_luggage_counts']?[userId] ??
+                                                0;
 
-                                              return FutureBuilder<String>(
-                                                future: _getUserName(userId),
-                                                builder: (context, snapshot) {
-                                                  return Padding(
-                                                    padding:
-                                                        const EdgeInsets.only(
-                                                          bottom: 12.0,
-                                                        ),
-                                                    child: Row(
-                                                      children: [
-                                                        CircleAvatar(
-                                                          radius: 20,
-                                                          backgroundColor:
-                                                              isDarkMode
-                                                                  ? Color(
-                                                                    0xFF3A3A3C,
-                                                                  )
-                                                                  : Color(
-                                                                    0xFFE5E5EA,
-                                                                  ),
-                                                          child: Text(
-                                                            (snapshot.data ??
-                                                                    '?')
-                                                                .substring(0, 1)
-                                                                .toUpperCase(),
-                                                            style: TextStyle(
-                                                              color:
-                                                                  isDarkMode
-                                                                      ? Colors.white
-                                                                      : Colors.black,
-                                                              fontWeight:
-                                                                  FontWeight.bold,
-                                                            ),
+                                            return FutureBuilder<String>(
+                                              future: _getUserName(userId),
+                                              builder: (context, snapshot) {
+                                                return Padding(
+                                                  padding:
+                                                      const EdgeInsets.only(
+                                                        bottom: 12.0,
+                                                      ),
+                                                  child: Row(
+                                                    children: [
+                                                      CircleAvatar(
+                                                        radius: 20,
+                                                        backgroundColor:
+                                                            isDarkMode
+                                                                ? Color(
+                                                                  0xFF3A3A3C,
+                                                                )
+                                                                : Color(
+                                                                  0xFFE5E5EA,
+                                                                ),
+                                                        child: Text(
+                                                          (snapshot.data ?? '?')
+                                                              .substring(0, 1)
+                                                              .toUpperCase(),
+                                                          style: TextStyle(
+                                                            color:
+                                                                isDarkMode
+                                                                    ? Colors
+                                                                        .white
+                                                                    : Colors
+                                                                        .black,
+                                                            fontWeight:
+                                                                FontWeight.bold,
                                                           ),
                                                         ),
-                                                        SizedBox(width: 12),
-                                                        Expanded(
-                                                          child: Column(
-                                                            crossAxisAlignment:
-                                                                CrossAxisAlignment.start,
-                                                            children: [
-                                                              Text(
-                                                                snapshot.data ??
-                                                                    'app.chat.room.drawer.loading'
-                                                                        .tr(),
-                                                                style: TextStyle(
-                                                                  fontSize: 16,
-                                                                  color:
-                                                                      isDarkMode
-                                                                          ? Colors.white
-                                                                          : Colors.black,
-                                                                ),
+                                                      ),
+                                                      SizedBox(width: 12),
+                                                      Expanded(
+                                                        child: Column(
+                                                          crossAxisAlignment:
+                                                              CrossAxisAlignment
+                                                                  .start,
+                                                          children: [
+                                                            Text(
+                                                              snapshot.data ??
+                                                                  'app.chat.room.drawer.loading'
+                                                                      .tr(),
+                                                              style: TextStyle(
+                                                                fontSize: 16,
+                                                                color:
+                                                                    isDarkMode
+                                                                        ? Colors
+                                                                            .white
+                                                                        : Colors
+                                                                            .black,
                                                               ),
-                                                              if (companionCount > 0 ||
-                                                                  luggageCount > 0 ||
-                                                                  true)
-                                                                Row(
-                                                                  children: [
-                                                                    Container(
-                                                                      padding: EdgeInsets.symmetric(
-                                                                        horizontal: 8,
-                                                                        vertical: 2,
-                                                                      ),
-                                                                      decoration: BoxDecoration(
-                                                                        color: isDarkMode
-                                                                            ? Color(0xFF3A3A3C)
-                                                                            : Color(0xFFE5E5EA),
-                                                                        borderRadius: BorderRadius.circular(10),
-                                                                      ),
-                                                                      child: Row(
-                                                                        mainAxisSize: MainAxisSize.min,
-                                                                        children: [
-                                                                          Icon(
-                                                                            Icons.people_rounded,
-                                                                            size: 14,
-                                                                            color: isDarkMode
-                                                                                ? Colors.white70
-                                                                                : Colors.black54,
+                                                            ),
+                                                            if (companionCount >
+                                                                    0 ||
+                                                                luggageCount >
+                                                                    0 ||
+                                                                true)
+                                                              Row(
+                                                                children: [
+                                                                  Container(
+                                                                    padding: EdgeInsets.symmetric(
+                                                                      horizontal:
+                                                                          8,
+                                                                      vertical:
+                                                                          2,
+                                                                    ),
+                                                                    decoration: BoxDecoration(
+                                                                      color:
+                                                                          isDarkMode
+                                                                              ? Color(
+                                                                                0xFF3A3A3C,
+                                                                              )
+                                                                              : Color(
+                                                                                0xFFE5E5EA,
+                                                                              ),
+                                                                      borderRadius:
+                                                                          BorderRadius.circular(
+                                                                            10,
                                                                           ),
-                                                                          SizedBox(width: 4),
-                                                                          Text(
-                                                                            '${companionCount + 1}',
-                                                                            style: TextStyle(
-                                                                              color: isDarkMode
+                                                                    ),
+                                                                    child: Row(
+                                                                      mainAxisSize:
+                                                                          MainAxisSize
+                                                                              .min,
+                                                                      children: [
+                                                                        Icon(
+                                                                          Icons
+                                                                              .people_rounded,
+                                                                          size:
+                                                                              14,
+                                                                          color:
+                                                                              isDarkMode
                                                                                   ? Colors.white70
                                                                                   : Colors.black54,
-                                                                              fontSize: 12,
-                                                                              fontWeight: FontWeight.w500,
+                                                                        ),
+                                                                        SizedBox(
+                                                                          width:
+                                                                              4,
+                                                                        ),
+                                                                        Text(
+                                                                          '${companionCount + 1}',
+                                                                          style: TextStyle(
+                                                                            color:
+                                                                                isDarkMode
+                                                                                    ? Colors.white70
+                                                                                    : Colors.black54,
+                                                                            fontSize:
+                                                                                12,
+                                                                            fontWeight:
+                                                                                FontWeight.w500,
+                                                                          ),
+                                                                        ),
+                                                                      ],
+                                                                    ),
+                                                                  ),
+                                                                  if (luggageCount >
+                                                                      0) ...[
+                                                                    SizedBox(
+                                                                      width: 8,
+                                                                    ),
+                                                                    Container(
+                                                                      padding: EdgeInsets.symmetric(
+                                                                        horizontal:
+                                                                            8,
+                                                                        vertical:
+                                                                            2,
+                                                                      ),
+                                                                      decoration: BoxDecoration(
+                                                                        color:
+                                                                            isDarkMode
+                                                                                ? Color(
+                                                                                  0xFF3A3A3C,
+                                                                                )
+                                                                                : Color(
+                                                                                  0xFFE5E5EA,
+                                                                                ),
+                                                                        borderRadius:
+                                                                            BorderRadius.circular(
+                                                                              10,
+                                                                            ),
+                                                                      ),
+                                                                      child: Row(
+                                                                        mainAxisSize:
+                                                                            MainAxisSize.min,
+                                                                        children: [
+                                                                          Icon(
+                                                                            Icons.luggage_rounded,
+                                                                            size:
+                                                                                14,
+                                                                            color:
+                                                                                isDarkMode
+                                                                                    ? Colors.white70
+                                                                                    : Colors.black54,
+                                                                          ),
+                                                                          SizedBox(
+                                                                            width:
+                                                                                4,
+                                                                          ),
+                                                                          Text(
+                                                                            '$luggageCount',
+                                                                            style: TextStyle(
+                                                                              color:
+                                                                                  isDarkMode
+                                                                                      ? Colors.white70
+                                                                                      : Colors.black54,
+                                                                              fontSize:
+                                                                                  12,
+                                                                              fontWeight:
+                                                                                  FontWeight.w500,
                                                                             ),
                                                                           ),
                                                                         ],
                                                                       ),
                                                                     ),
-                                                                    if (luggageCount > 0) ...[
-                                                                      SizedBox(width: 8),
-                                                                      Container(
-                                                                        padding: EdgeInsets.symmetric(
-                                                                          horizontal: 8,
-                                                                          vertical: 2,
-                                                                        ),
-                                                                        decoration: BoxDecoration(
-                                                                          color: isDarkMode
-                                                                              ? Color(0xFF3A3A3C)
-                                                                              : Color(0xFFE5E5EA),
-                                                                          borderRadius: BorderRadius.circular(10),
-                                                                        ),
-                                                                        child: Row(
-                                                                          mainAxisSize: MainAxisSize.min,
-                                                                          children: [
-                                                                            Icon(
-                                                                              Icons.luggage_rounded,
-                                                                              size: 14,
-                                                                              color: isDarkMode
-                                                                                  ? Colors.white70
-                                                                                  : Colors.black54,
-                                                                            ),
-                                                                            SizedBox(width: 4),
-                                                                            Text(
-                                                                              '$luggageCount',
-                                                                              style: TextStyle(
-                                                                                color: isDarkMode
-                                                                                    ? Colors.white70
-                                                                                    : Colors.black54,
-                                                                                fontSize: 12,
-                                                                                fontWeight: FontWeight.w500,
-                                                                              ),
-                                                                            ),
-                                                                          ],
-                                                                        ),
-                                                                      ),
-                                                                    ],
                                                                   ],
-                                                                ),
-                                                            ],
-                                                          ),
+                                                                ],
+                                                              ),
+                                                          ],
                                                         ),
-                                                      ],
-                                                    ),
-                                                  );
-                                                },
-                                              );
-                                            },
-                                          ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                );
+                                              },
+                                            );
+                                          }),
                                         ),
                                     ],
                                   ),
@@ -1483,6 +1738,7 @@ class _ChatRoomPageState extends State<ChatRoomPage>
     }
     _focusNode.dispose();
     WidgetsBinding.instance.removeObserver(this);
+    _membersSubscription?.cancel();
     super.dispose();
   }
 
@@ -1903,64 +2159,24 @@ class _ChatRoomPageState extends State<ChatRoomPage>
     );
   }
 
-  // 채팅방 문서 변경 감지 설정 수정
-  void _setupChatRoomListener() {
-    _chatRoomSubscription = _firestore
-        .collection(widget.chatRoomCollection)
-        .doc(widget.chatRoomId)
-        .snapshots()
-        .listen((snapshot) {
-          if (!snapshot.exists) return;
-
-          final data = snapshot.data();
-          if (data != null) {
-            _updateChatRoomState(data);
-
-            // 드라이버 ID가 변경되었을 때 드라이버 정보 업데이트
-            if (data['driver_id'] != null) {
-              _firestore
-                  .collection('drivers') // users 대신 drivers 컬렉션 사용
-                  .doc(data['driver_id'])
-                  .snapshots()
-                  .listen((driverSnapshot) {
-                    if (driverSnapshot.exists) {
-                      setState(() {
-                        _driverName =
-                            driverSnapshot.data()?['fullname'] ?? '알 수 없는 사용자';
-                      });
-                    }
-                  });
-            } else {
-              setState(() {
-                _driverName = null;
-              });
-            }
-          }
-        });
-  }
-
   Future<void> _initializeNotifications() async {
     try {
+      print('알림 초기화 시작');
       flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
 
       // Android 설정
       const androidSettings = AndroidInitializationSettings(
         '@mipmap/ic_launcher',
       );
+      print('Android 설정 완료');
 
       // iOS 설정
       final darwinSettings = DarwinInitializationSettings(
         requestAlertPermission: true,
         requestBadgePermission: true,
         requestSoundPermission: true,
-        notificationCategories: [
-          DarwinNotificationCategory(
-            'chat_messages',
-            actions: [DarwinNotificationAction.plain('id_1', 'Action 1')],
-            options: {DarwinNotificationCategoryOption.hiddenPreviewShowTitle},
-          ),
-        ],
       );
+      print('iOS 설정 완료');
 
       // 초기화 설정 통합
       final initSettings = InitializationSettings(
@@ -1975,10 +2191,22 @@ class _ChatRoomPageState extends State<ChatRoomPage>
           print('알림 탭: ${details.payload}');
         },
       );
+      print('알림 플러그인 초기화 완료');
 
-      print('로컬 알림 초기화 완료');
+      // iOS 권한 요청
+      if (Platform.isIOS) {
+        print('iOS 권한 요청 시작');
+        final bool? result = await flutterLocalNotificationsPlugin
+            .resolvePlatformSpecificImplementation<
+              IOSFlutterLocalNotificationsPlugin
+            >()
+            ?.requestPermissions(alert: true, badge: true, sound: true);
+        print('iOS 권한 요청 결과: $result');
+      }
+
+      print('알림 초기화 완료');
     } catch (e) {
-      print('로컬 알림 초기화 중 오류 발생: $e');
+      print('알림 초기화 중 오류 발생: $e');
     }
   }
 
@@ -2340,5 +2568,58 @@ class _ChatRoomPageState extends State<ChatRoomPage>
             backgroundColor: isDarkMode ? Color(0xFF2C2C2E) : Colors.white,
           ),
     );
+  }
+
+  // 메시지 전송 메서드
+  Future<void> _sendMessage() async {
+    if (_messageController.text.trim().isEmpty) return;
+
+    setState(() {
+      _isSending = true;
+    });
+
+    final messageText = _messageController.text.trim();
+    _messageController.clear();
+
+    try {
+      // 메시지 전송
+      await _firestore
+          .collection(widget.chatRoomCollection)
+          .doc(widget.chatRoomId)
+          .collection('messages')
+          .add({
+            'text': messageText,
+            'sender_id': _currentUserId,
+            'timestamp': FieldValue.serverTimestamp(),
+            'type': 'user',
+          });
+
+      // 채팅방 마지막 메시지 정보 업데이트
+      await _firestore
+          .collection(widget.chatRoomCollection)
+          .doc(widget.chatRoomId)
+          .update({
+            'lastMessage': messageText,
+            'last_message': messageText,
+            'last_message_time': FieldValue.serverTimestamp(),
+            'last_message_sender_id': _currentUserId,
+            'timestamp': FieldValue.serverTimestamp(),
+          });
+
+      if (mounted) {
+        setState(() {
+          _isSending = false;
+        });
+        // 스크롤을 아래로 이동
+        _scrollToBottom();
+      }
+    } catch (e) {
+      print('메시지 전송 중 오류 발생: $e');
+      if (mounted) {
+        setState(() {
+          _isSending = false;
+        });
+      }
+    }
   }
 }

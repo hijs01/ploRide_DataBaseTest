@@ -1,12 +1,12 @@
 import 'dart:io' show Platform;
-import 'package:cabrider/datamodels/nearbydriver.dart';
-import 'package:cabrider/globalvariable.dart';
-import 'package:cabrider/helpers/firehelper.dart';
-import 'package:cabrider/widgets/NoDriverDialog.dart';
-import 'package:cabrider/widgets/ProgressDialog.dart';
-import 'package:cabrider/widgets/TaxiButton.dart';
+import 'package:TAGO/datamodels/nearbydriver.dart';
+import 'package:TAGO/globalvariable.dart';
+import 'package:TAGO/helpers/firehelper.dart';
+import 'package:TAGO/widgets/NoDriverDialog.dart';
+import 'package:TAGO/widgets/ProgressDialog.dart';
+import 'package:TAGO/widgets/TaxiButton.dart';
 import 'package:flutter/material.dart';
-import 'package:cabrider/dataprovider/appdata.dart';
+import 'package:TAGO/dataprovider/appdata.dart';
 import 'package:flutter_geofire/flutter_geofire.dart';
 import 'package:flutter_polyline_points/flutter_polyline_points.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
@@ -14,20 +14,20 @@ import 'package:provider/provider.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'dart:async';
 import 'package:geolocator/geolocator.dart';
-import 'package:cabrider/brand_colors.dart';
+import 'package:TAGO/brand_colors.dart';
 import 'package:outline_material_icons/outline_material_icons.dart';
-import 'package:cabrider/helpers/helpermethods.dart';
-import 'package:cabrider/styles/styles.dart';
-import 'package:cabrider/widgets/BrandDivider.dart';
-import 'package:cabrider/screens/searchpage.dart';
-import 'package:cabrider/datamodels/directiondetails.dart';
-import 'package:cabrider/datamodels/address.dart';
+import 'package:TAGO/helpers/helpermethods.dart';
+import 'package:TAGO/styles/styles.dart';
+import 'package:TAGO/widgets/BrandDivider.dart';
+import 'package:TAGO/screens/searchpage.dart';
+import 'package:TAGO/datamodels/directiondetails.dart';
+import 'package:TAGO/datamodels/address.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:animated_text_kit/animated_text_kit.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'package:cabrider/data/psu_locations.dart'; // PSU 위치 데이터 임포트
+import 'package:TAGO/data/psu_locations.dart'; // PSU 위치 데이터 임포트
 
 class MainPage extends StatefulWidget {
   final bool showDirections;

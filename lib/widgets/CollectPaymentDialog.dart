@@ -1,6 +1,6 @@
-import 'package:cabrider/brand_colors.dart';
-import 'package:cabrider/widgets/BrandDivider.dart';
-import 'package:cabrider/widgets/TaxiButton.dart';
+import 'package:TAGO/brand_colors.dart';
+import 'package:TAGO/widgets/BrandDivider.dart';
+import 'package:TAGO/widgets/TaxiButton.dart';
 import 'package:flutter/material.dart';
 
 class CollectPayment extends StatelessWidget {

@@ -1,16 +1,16 @@
 import 'package:flutter/material.dart';
-import 'package:cabrider/screens/mainpage.dart';
-import 'package:cabrider/screens/homepage.dart';
-import 'package:cabrider/screens/chat_page.dart';
+import 'package:TAGO/screens/mainpage.dart';
+import 'package:TAGO/screens/homepage.dart';
+import 'package:TAGO/screens/chat_page.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cabrider/screens/loginpage.dart';
-import 'package:cabrider/screens/history_page.dart';
+import 'package:TAGO/screens/loginpage.dart';
+import 'package:TAGO/screens/history_page.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:cabrider/screens/delete_account_page.dart';
+import 'package:TAGO/screens/delete_account_page.dart';
 
 class SettingsPage extends StatefulWidget {
   static const String id = 'settings';

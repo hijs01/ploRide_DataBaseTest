@@ -1,6 +1,6 @@
-import 'package:cabrider/brand_colors.dart';
-import 'package:cabrider/widgets/TaxiButton.dart';
-import 'package:cabrider/widgets/TaxiOutlineButton.dart';
+import 'package:TAGO/brand_colors.dart';
+import 'package:TAGO/widgets/TaxiButton.dart';
+import 'package:TAGO/widgets/TaxiOutlineButton.dart';
 import 'package:flutter/material.dart';
 
 class NoDriverDialog extends StatelessWidget {

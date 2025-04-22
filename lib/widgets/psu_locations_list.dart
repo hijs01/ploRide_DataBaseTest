@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:cabrider/dataprovider/appdata.dart';
-import 'package:cabrider/datamodels/address.dart';
-import 'package:cabrider/screens/mainpage.dart';
+import 'package:TAGO/dataprovider/appdata.dart';
+import 'package:TAGO/datamodels/address.dart';
+import 'package:TAGO/screens/mainpage.dart';
 
 class PsuLocationsList extends StatelessWidget {
   final bool isDarkMode;

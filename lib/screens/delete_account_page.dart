@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:cabrider/screens/loginpage.dart';
+import 'package:TAGO/screens/loginpage.dart';
 import 'package:easy_localization/easy_localization.dart';
 
 class DeleteAccountPage extends StatefulWidget {
